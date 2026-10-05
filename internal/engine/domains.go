@@ -44,21 +44,14 @@ func DomainFields(ctx context.Context, in *coolify.Instance, res []dbx.PlannedRe
 			}
 			row := rows[0]
 			if deref(row.BuildPack) == "dockercompose" {
-				var m map[string]any
-				_ = json.Unmarshal([]byte(deref(row.Compose)), &m)
+				m := composeDomains(deref(row.Compose))
 				keys := make([]string, 0, len(m))
 				for k := range m {
 					keys = append(keys, k)
 				}
 				sort.Strings(keys)
 				for _, k := range keys {
-					v := ""
-					switch x := m[k].(type) {
-					case string:
-						v = x
-					case map[string]any:
-						v, _ = x["domain"].(string)
-					}
+					v := m[k]
 					out = append(out, DomainField{Resource: r.UUID, Label: r.Name + " · " + k, Kind: "compose", Service: k, Value: v, Original: v})
 				}
 				continue
@@ -82,6 +75,26 @@ WHERE s.uuid = `+coolify.SQLString(r.UUID)+` AND sa.deleted_at IS NULL AND COALE
 		}
 	}
 	return out, nil
+}
+
+func composeDomains(raw string) map[string]string {
+	var decoded map[string]any
+	_ = json.Unmarshal([]byte(raw), &decoded)
+	out := make(map[string]string)
+	for service, value := range decoded {
+		domain := ""
+		switch x := value.(type) {
+		case string:
+			domain = x
+		case map[string]any:
+			domain, _ = x["domain"].(string)
+		}
+		domain = strings.TrimSpace(domain)
+		if domain != "" {
+			out[service] = domain
+		}
+	}
+	return out
 }
 
 func deref(p *string) string {
