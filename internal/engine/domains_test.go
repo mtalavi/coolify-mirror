@@ -21,21 +21,26 @@ func TestNormalizeDomains(t *testing.T) {
 	}
 }
 
-func TestComposeDomainsSkipsServicesWithoutDomains(t *testing.T) {
-	got := composeDomains(`{"web":{"domain":"https://lift.alavi.vip"},"database-backup":{"domain":null},"worker":{"domain":""},"legacy":"https://legacy.example.com"}`)
-	if len(got) != 2 {
-		t.Fatalf("got %d domain services: %#v", len(got), got)
+func TestRiskyComposeDomainMovesWarnsOnCrossServiceMove(t *testing.T) {
+	fields := []DomainField{
+		{Resource: "app", Kind: "compose", Service: "web", Original: "https://old.example.com", Value: ""},
+		{Resource: "app", Kind: "compose", Service: "database-backup", Original: "", Value: "https://new.example.com"},
 	}
-	if got["web"] != "https://lift.alavi.vip" {
-		t.Fatalf("web domain = %q", got["web"])
+	got := RiskyComposeDomainMoves(fields)
+	if len(got) != 1 {
+		t.Fatalf("warnings = %#v", got)
 	}
-	if got["legacy"] != "https://legacy.example.com" {
-		t.Fatalf("legacy domain = %q", got["legacy"])
+	if !strings.Contains(got[0], "web") || !strings.Contains(got[0], "database-backup") {
+		t.Fatalf("warning does not identify both services: %q", got[0])
 	}
-	if _, ok := got["database-backup"]; ok {
-		t.Fatal("database-backup with a null domain must not be editable")
+}
+
+func TestRiskyComposeDomainMovesAllowsIntentionalNewDomainWithoutRemoval(t *testing.T) {
+	fields := []DomainField{
+		{Resource: "app", Kind: "compose", Service: "web", Original: "https://old.example.com", Value: "https://old.example.com"},
+		{Resource: "app", Kind: "compose", Service: "api", Original: "", Value: "https://api.example.com"},
 	}
-	if _, ok := got["worker"]; ok {
-		t.Fatal("worker with an empty domain must not be editable")
+	if got := RiskyComposeDomainMoves(fields); len(got) != 0 {
+		t.Fatalf("unexpected warnings = %#v", got)
 	}
 }
