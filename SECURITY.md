@@ -16,7 +16,15 @@ Only the latest release receives security fixes.
 
 ## Scope notes
 
-- Backup files (`.cmb`) contain your Coolify secrets; they are encrypted with
-  [age](https://age-encryption.org). Anyone with the file **and** its key can read them.
-- Share links are temporary and token-protected, but plain HTTP by default: share
-  over a private network or stop sharing once the target has downloaded the file.
+- Backup files (`.cmb`) contain Coolify configuration and secrets. They are
+  encrypted with [age](https://age-encryption.org) using a random passphrase.
+  Anyone who obtains **both** the backup file and its key can decrypt it.
+- Share links are **HTTPS-only**. Each share gets a fresh self-signed TLS
+  certificate and the destination verifies its pinned public key from the link.
+  Plain `http://` share links are rejected.
+- The decryption key and certificate pin live in the URL fragment
+  (`#key=...&pin=...`). URL fragments are not sent to the share server.
+- Share URLs also contain a random token and are temporary. Background shares
+  expire after at most 24 hours; interactive shares stop when the operator quits.
+- The local `<backup>.key` file is written with root-only permissions. Treat it
+  like a secret and remove it when the backup is no longer needed.
