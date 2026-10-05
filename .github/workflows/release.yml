@@ -3,6 +3,9 @@ name: release
 on:
   push:
     tags: ["v*"]
+    branches: [main]
+    paths:
+      - internal/engine/manifest.go
 
 permissions:
   contents: write
@@ -12,15 +15,38 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+      - name: Resolve release tag
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            version="$(grep -oE 'Version = "[^"]+"' internal/engine/manifest.go | cut -d'"' -f2)"
+            tag="v${version}"
+            if git ls-remote --exit-code --tags origin "refs/tags/${tag}" >/dev/null 2>&1; then
+              echo "Tag ${tag} already exists; refusing to release the same version twice." >&2
+              exit 1
+            fi
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "${tag}" -m "${tag}"
+            git push origin "${tag}"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "version=${tag#v}" >> "$GITHUB_OUTPUT"
       - run: go vet ./... && go test ./...
-      - run: scripts/build.sh "${GITHUB_REF_NAME#v}"
+      - run: scripts/build.sh "${{ steps.version.outputs.version }}"
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" dist/coolify-mirror-linux-* dist/SHA256SUMS \
-            --title "$GITHUB_REF_NAME" --generate-notes || \
-          gh release upload "$GITHUB_REF_NAME" dist/coolify-mirror-linux-* dist/SHA256SUMS --clobber
+          gh release create "${{ steps.version.outputs.tag }}" dist/coolify-mirror-linux-* dist/SHA256SUMS \
+            --title "${{ steps.version.outputs.tag }}" --generate-notes || \
+          gh release upload "${{ steps.version.outputs.tag }}" dist/coolify-mirror-linux-* dist/SHA256SUMS --clobber
