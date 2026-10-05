@@ -44,15 +44,39 @@ func DomainFields(ctx context.Context, in *coolify.Instance, res []dbx.PlannedRe
 			}
 			row := rows[0]
 			if deref(row.BuildPack) == "dockercompose" {
-				m := composeDomains(deref(row.Compose))
-				keys := make([]string, 0, len(m))
-				for k := range m {
-					keys = append(keys, k)
+				var m map[string]any
+				_ = json.Unmarshal([]byte(deref(row.Compose)), &m)
+				type composeDomainEntry struct {
+					service string
+					domain  string
 				}
-				sort.Strings(keys)
-				for _, k := range keys {
-					v := m[k]
-					out = append(out, DomainField{Resource: r.UUID, Label: r.Name + " · " + k, Kind: "compose", Service: k, Value: v, Original: v})
+				entries := make([]composeDomainEntry, 0, len(m))
+				for service, raw := range m {
+					domain := ""
+					switch x := raw.(type) {
+					case string:
+						domain = x
+					case map[string]any:
+						domain, _ = x["domain"].(string)
+					}
+					entries = append(entries, composeDomainEntry{service: service, domain: strings.TrimSpace(domain)})
+				}
+				sort.Slice(entries, func(i, j int) bool {
+					// Existing public endpoints come first. Blank services remain editable,
+					// but are deliberately separated so one-shot jobs are not mistaken for
+					// the service that owned the source domain.
+					ihas, jhas := entries[i].domain != "", entries[j].domain != ""
+					if ihas != jhas {
+						return ihas
+					}
+					return entries[i].service < entries[j].service
+				})
+				for _, entry := range entries {
+					label := r.Name + " · " + entry.service
+					if entry.domain == "" {
+						label += " [no domain on source]"
+					}
+					out = append(out, DomainField{Resource: r.UUID, Label: label, Kind: "compose", Service: entry.service, Value: entry.domain, Original: entry.domain})
 				}
 				continue
 			}
@@ -75,26 +99,6 @@ WHERE s.uuid = `+coolify.SQLString(r.UUID)+` AND sa.deleted_at IS NULL AND COALE
 		}
 	}
 	return out, nil
-}
-
-func composeDomains(raw string) map[string]string {
-	var decoded map[string]any
-	_ = json.Unmarshal([]byte(raw), &decoded)
-	out := make(map[string]string)
-	for service, value := range decoded {
-		domain := ""
-		switch x := value.(type) {
-		case string:
-			domain = x
-		case map[string]any:
-			domain, _ = x["domain"].(string)
-		}
-		domain = strings.TrimSpace(domain)
-		if domain != "" {
-			out[service] = domain
-		}
-	}
-	return out
 }
 
 func deref(p *string) string {
@@ -122,6 +126,49 @@ func NormalizeDomains(s string) (string, error) {
 		out = append(out, strings.TrimSuffix(d, "/"))
 	}
 	return strings.Join(out, ","), nil
+}
+
+// RiskyComposeDomainMoves reports likely service-selection mistakes in the
+// interactive domain editor. It does not block assigning a domain to a
+// previously undomained service; it only flags the high-risk pattern where
+// the same resource simultaneously loses a domain from an existing compose
+// service and gains one on a service that had no source domain.
+func RiskyComposeDomainMoves(fields []DomainField) []string {
+	type change struct {
+		removed []string
+		added   []string
+	}
+	byResource := map[string]*change{}
+	for _, f := range fields {
+		if f.Kind != "compose" || f.Value == f.Original {
+			continue
+		}
+		c := byResource[f.Resource]
+		if c == nil {
+			c = &change{}
+			byResource[f.Resource] = c
+		}
+		switch {
+		case strings.TrimSpace(f.Original) != "" && strings.TrimSpace(f.Value) == "":
+			c.removed = append(c.removed, f.Service)
+		case strings.TrimSpace(f.Original) == "" && strings.TrimSpace(f.Value) != "":
+			c.added = append(c.added, f.Service)
+		}
+	}
+	var warnings []string
+	for _, c := range byResource {
+		if len(c.removed) == 0 || len(c.added) == 0 {
+			continue
+		}
+		sort.Strings(c.removed)
+		sort.Strings(c.added)
+		warnings = append(warnings, fmt.Sprintf(
+			"domain removed from %s and assigned to previously undomained %s",
+			strings.Join(c.removed, ", "), strings.Join(c.added, ", "),
+		))
+	}
+	sort.Strings(warnings)
+	return warnings
 }
 
 // ApplyDomains saves the changed fields through Coolify itself (so services
