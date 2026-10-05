@@ -2,8 +2,6 @@ package engine
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -326,19 +324,6 @@ func resourceDir(r coolify.Resource) string {
 }
 
 const boundedBuildPolicyPath = "/data/coolify/ops/bounded-build-v1.sh"
-
-func fileSHA256(path string) (string, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-	h := sha256.New()
-	if _, err := io.Copy(h, f); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(h.Sum(nil)), nil
-}
 
 // discoverHostRequirements records root-owned prerequisites implied by resource
 // configuration. They are fingerprinted, not copied: selective restore must not
