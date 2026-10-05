@@ -1,0 +1,17 @@
+# Lab negative test: healthy only on the server named cmlab-src.
+services:
+  probe:
+    image: busybox:stable
+    command: ["sh", "-c", "grep -q cmlab-src /host/hostname || { echo 'wrong host' >&2; exit 3; }; exec httpd -f -p 8080 -h /etc"]
+    volumes:
+      - /etc/hostname:/host/hostname:ro
+  sick:
+    image: busybox:stable
+    command: ["sh", "-c", "exec httpd -f -p 8080 -h /etc"]
+    volumes:
+      - /etc/hostname:/host/hostname:ro
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q cmlab-src /host/hostname"]
+      interval: 3s
+      timeout: 2s
+      retries: 2

@@ -96,6 +96,23 @@ func (u *undoLog) rollback() []error {
 	return errs
 }
 
+// topMissing returns the highest directory on the way to p that does not
+// exist yet (p itself when its parent exists): removing it on rollback also
+// removes the parent directories the restore created.
+func topMissing(p string) string {
+	p = filepath.Clean(p)
+	for {
+		parent := filepath.Dir(p)
+		if parent == p {
+			return p
+		}
+		if _, err := os.Lstat(parent); err == nil {
+			return p
+		}
+		p = parent
+	}
+}
+
 // asideVolumes lists the volumes holding previous data (kept after success).
 func (u *undoLog) asideVolumes() []string {
 	var out []string
@@ -432,7 +449,7 @@ func preparePath(ps *pathState, xp extractPlan, undo *undoLog, warn func(string)
 		exists = false
 	}
 	if !exists {
-		undo.created = append(undo.created, target)
+		undo.created = append(undo.created, topMissing(target))
 	}
 	root := target
 	if ps.single {

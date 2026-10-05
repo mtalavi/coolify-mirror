@@ -1,0 +1,52 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: app
+    volumes:
+      - dbdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+  migrate:
+    image: postgres:16-alpine
+    restart: "no"
+    environment:
+      PGPASSWORD: ${DB_PASSWORD}
+    command: ["sh", "-c", "psql -h db -U postgres -d app -v ON_ERROR_STOP=1 -c 'create table if not exists items(id serial primary key, name text)' && psql -h db -U postgres -d app -At -c 'select count(*) from items' > /data/rows.txt"]
+    volumes:
+      - uploads:/data
+    depends_on:
+      db:
+        condition: service_healthy
+  web:
+    build: .
+    environment:
+      SECRET_TOKEN: ${SECRET_TOKEN}
+    volumes:
+      - uploads:/data
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+  worker:
+    build: .
+    command: ["/worker.sh"]
+    environment:
+      SECRET_TOKEN: ${SECRET_TOKEN}
+    volumes:
+      - uploads:/data
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+volumes:
+  dbdata:
+  uploads:
