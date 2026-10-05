@@ -331,24 +331,46 @@ func askDomains(ctx context.Context, in *coolify.Instance, rep *engine.RestoreRe
 	if len(fields) == 0 {
 		return nil
 	}
-	inputs := make([]huh.Field, 0, len(fields)+1)
-	inputs = append(inputs, huh.NewNote().Title("Domains").
-		Description("Last step before starting: keep or change each domain.\nSeveral domains: separate with commas. Empty = no domain. https:// is added when missing."))
-	for i := range fields {
-		f := &fields[i]
-		inputs = append(inputs, huh.NewInput().
-			Title(f.Label).
-			Value(&f.Value).
-			Validate(func(s string) error {
-				_, err := engine.NormalizeDomains(s)
+	for {
+		inputs := make([]huh.Field, 0, len(fields)+1)
+		inputs = append(inputs, huh.NewNote().Title("Domains").
+			Description("Last step before starting: keep or change each domain.\nSeveral domains: separate with commas. Empty = no domain. https:// is added when missing.\nCompose services that had no source domain are marked explicitly; do not move a web domain onto a worker/job unless intentional."))
+		for i := range fields {
+			f := &fields[i]
+			inputs = append(inputs, huh.NewInput().
+				Title(f.Label).
+				Value(&f.Value).
+				Validate(func(s string) error {
+					_, err := engine.NormalizeDomains(s)
+					return err
+				}))
+		}
+		if err := huh.NewForm(huh.NewGroup(inputs...)).WithTheme(theme()).RunWithContext(ctx); err != nil {
+			return err
+		}
+		for i := range fields {
+			fields[i].Value, _ = engine.NormalizeDomains(fields[i].Value)
+		}
+		risky := engine.RiskyComposeDomainMoves(fields)
+		if len(risky) > 0 {
+			ok, err := confirm(ctx,
+				"Confirm compose service domain move",
+				"Potential routing mistake detected:\n\n"+strings.Join(risky, "\n")+"\n\nThis can route public traffic to a worker, migration or backup job. Continue only if the service move is intentional.",
+				false,
+			)
+			if err != nil {
 				return err
-			}))
-	}
-	if err := huh.NewForm(huh.NewGroup(inputs...)).WithTheme(theme()).RunWithContext(ctx); err != nil {
-		return err
+			}
+			if !ok {
+				for i := range fields {
+					fields[i].Value = fields[i].Original
+				}
+				continue
+			}
+		}
+		break
 	}
 	for i := range fields {
-		fields[i].Value, _ = engine.NormalizeDomains(fields[i].Value)
 		if fields[i].Original == fields[i].Value {
 			continue
 		}
