@@ -127,6 +127,24 @@ func PreflightFull(ctx context.Context, in *coolify.Instance, f *Fetched) []stri
 	return out
 }
 
+// hostRequirementBlockers protects selective restores from silently importing a
+// resource whose custom deployment depends on source-host policy that is absent
+// or different on the destination.
+func hostRequirementBlockers(man *Manifest) []string {
+	var out []string
+	for _, req := range man.HostRequirements {
+		got, err := fileSHA256(req.Path)
+		if err != nil {
+			out = append(out, fmt.Sprintf("required host file %s is missing or unreadable (%s) - provision the destination host policy before restoring; selective restore will not overwrite global server policy", req.Path, req.Reason))
+			continue
+		}
+		if req.SHA256 != "" && !strings.EqualFold(got, req.SHA256) {
+			out = append(out, fmt.Sprintf("required host file %s has SHA-256 %s but the backup requires %s (%s) - reconcile the destination host policy before restoring", req.Path, got, req.SHA256, req.Reason))
+		}
+	}
+	return out
+}
+
 // PreflightSelective returns the problems that forbid a selective restore here.
 func PreflightSelective(ctx context.Context, in *coolify.Instance, f *Fetched) []string {
 	var out []string
@@ -136,6 +154,7 @@ func PreflightSelective(ctx context.Context, in *coolify.Instance, f *Fetched) [
 	if s := SpaceWarning(in.DockerRoot, f.Manifest); s != "" {
 		out = append(out, "not enough disk space: "+s)
 	}
+	out = append(out, hostRequirementBlockers(f.Manifest)...)
 	if len(out) == 0 {
 		b, _ := checkBundle(ctx, in, f)
 		out = append(out, b...)
