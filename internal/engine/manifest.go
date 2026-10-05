@@ -10,7 +10,7 @@ import (
 )
 
 // Version of this tool (set at build time with -ldflags).
-var Version = "1.2.0"
+var Version = "1.2.1"
 
 // FormatName identifies the backup layout.
 const FormatName = "github.com/mtalavi/coolify-mirror/1"
