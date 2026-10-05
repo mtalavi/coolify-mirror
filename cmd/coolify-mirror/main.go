@@ -620,6 +620,8 @@ func cmdRestore(ctx context.Context, args []string) error {
 		}
 		for _, h := range sr.HostPaths {
 			switch {
+			case h.Same:
+				fmt.Println("  host file already identical here, kept:", h.Path)
 			case h.Shared:
 				fmt.Println("  ! host folder shared with the original resource, not overwritten:", h.Path)
 			case h.Exists:

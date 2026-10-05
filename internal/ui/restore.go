@@ -147,6 +147,8 @@ func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetch
 	}
 	for _, h := range sr.HostPaths {
 		switch {
+		case h.Same:
+			lines = append(lines, sMuted.Render("host file "+h.Path+" is already identical here - kept"))
 		case h.Shared:
 			lines = append(lines, sWarn.Render("! host folder "+h.Path+" is shared with the original resource - the copy uses it as it is (not overwritten)"))
 		case h.Exists:

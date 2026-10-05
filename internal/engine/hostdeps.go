@@ -49,6 +49,10 @@ type HostDep struct {
 	// Saved: the file or builder definition is in the backup and restored;
 	// otherwise it must already exist on the target.
 	Saved bool `json:"saved,omitempty"`
+	// SHA256 of a saved regular file. A selective restore never replaces a
+	// different file of the same path on an existing server (server policy
+	// shared by other resources); an identical one is left as it is.
+	SHA256 string `json:"sha256,omitempty"`
 }
 
 // BuilderEntry is a saved buildx builder definition.
@@ -243,7 +247,11 @@ func findHostDeps(texts []depText, allBuilders bool) (deps []HostDep, saved []Bu
 				continue // too broad to be a dependency (/data, /opt/x)
 			}
 			paths = append(paths, PathEntry{Path: p, Owner: t.owner})
-			add(HostDep{Owner: t.owner, Kind: depPath, Ref: p, Where: t.where, Saved: true})
+			sum := ""
+			if st.Mode().IsRegular() {
+				sum, _ = fileSHA256(p)
+			}
+			add(HostDep{Owner: t.owner, Kind: depPath, Ref: p, Where: t.where, Saved: true, SHA256: sum})
 			if !nested {
 				if c := textFile(p); c != nil {
 					scan(depText{owner: t.owner, where: p, text: string(c)}, true)
@@ -298,6 +306,44 @@ func hostDepBlockers(ctx context.Context, man *Manifest) []string {
 		out = append(out, "the backup builds with docker buildx builders ("+builderNames(man)+") but the docker buildx plugin is not installed here")
 	}
 	return out
+}
+
+// hostDepConflicts lists saved host files that already exist here with other
+// content. A selective restore merges into a running server whose other
+// resources may use them, so it does not replace them (a full restore goes
+// onto an empty server and restores them).
+func hostDepConflicts(man *Manifest) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, d := range man.HostDeps {
+		if !d.Saved || d.Kind != depPath || seen[d.Ref] {
+			continue
+		}
+		seen[d.Ref] = true
+		st, err := os.Lstat(d.Ref)
+		if err != nil {
+			continue // missing: restored
+		}
+		if d.SHA256 != "" && st.Mode().IsRegular() {
+			if sum, err := fileSHA256(d.Ref); err == nil && strings.EqualFold(sum, d.SHA256) {
+				continue // identical: kept
+			}
+		}
+		out = append(out, fmt.Sprintf("host file %s (used by %s, %s) already exists here with different content - a selective restore does not replace server files other resources may use; make it identical to the source or remove it, then restore", d.Ref, ownerName(man, d.Owner), d.Where))
+	}
+	return out
+}
+
+// sameHostFile reports a saved host file that already exists here with the
+// same content (nothing to restore).
+func sameHostFile(man *Manifest, path string) bool {
+	for _, d := range man.HostDeps {
+		if d.Saved && d.Kind == depPath && d.Ref == path && d.SHA256 != "" {
+			sum, err := fileSHA256(path)
+			return err == nil && strings.EqualFold(sum, d.SHA256)
+		}
+	}
+	return false
 }
 
 func builderNames(man *Manifest) string {

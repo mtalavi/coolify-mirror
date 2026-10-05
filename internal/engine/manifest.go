@@ -10,7 +10,7 @@ import (
 )
 
 // Version of this tool (set at build time with -ldflags).
-var Version = "1.3.0"
+var Version = "1.3.1"
 
 // FormatName identifies the backup layout.
 const FormatName = "github.com/mtalavi/coolify-mirror/1"
@@ -46,6 +46,10 @@ type Manifest struct {
 	Volumes     []VolumeEntry      `json:"volumes"`
 	Paths       []PathEntry        `json:"paths"`
 	Images      []ImageEntry       `json:"images"`
+	// HostRequirements: fingerprinted host files from backups made by an
+	// intermediate build; still validated on restore. New backups record
+	// host files in HostDeps (with their SHA-256).
+	HostRequirements []HostRequirement `json:"host_requirements,omitempty"`
 	// Dumps are PostgreSQL/MySQL/MariaDB databases saved with their own dump
 	// tool; their data volumes are stored as definitions only.
 	Dumps []DumpEntry `json:"dumps,omitempty"`
@@ -105,6 +109,15 @@ type ImageEntry struct {
 	Refs  []string `json:"refs"`
 	Size  int64    `json:"size"`
 	Owner string   `json:"owner,omitempty"`
+}
+
+// HostRequirement describes a root-owned host prerequisite used by a resource.
+// Selective restore validates it instead of copying it, preserving the boundary
+// between application data and server policy.
+type HostRequirement struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // BackupOptions records how the backup was taken.

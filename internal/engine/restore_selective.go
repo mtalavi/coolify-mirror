@@ -46,6 +46,7 @@ type HostPath struct {
 	Path   string
 	Exists bool // current content is moved aside first
 	Shared bool // not restored: a copy keeps using the original's directory
+	Same   bool // not restored: this server already has the identical file
 }
 
 // isResourceDir reports Coolify's per-resource folders (always restored).
@@ -120,7 +121,10 @@ func (s *SelectiveRestore) Build(ctx context.Context, decisions map[string]dbx.D
 			continue
 		}
 		hp := HostPath{Path: plan.Rename(p.Path)}
-		if hp.Path == p.Path && s.decisions[p.Owner] == dbx.NewCopy {
+		if sameHostFile(s.F.Manifest, p.Path) {
+			hp.Same = true
+			s.shared[p.Path] = true
+		} else if hp.Path == p.Path && s.decisions[p.Owner] == dbx.NewCopy {
 			// The copy points at the same host directory as the original, which
 			// keeps running: never overwrite it.
 			hp.Shared = true

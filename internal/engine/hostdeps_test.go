@@ -75,8 +75,8 @@ func TestFindHostDepsCustomBuildCommand(t *testing.T) {
 	if d, ok := got["builder bounded-v1"]; !ok || !d.Saved || d.Owner != "app1" {
 		t.Errorf("builder dependency missing or not saved: %+v", deps)
 	}
-	if d, ok := got["path "+script]; !ok || !d.Saved {
-		t.Errorf("host script %s not recorded as saved dependency: %+v", script, deps)
+	if d, ok := got["path "+script]; !ok || !d.Saved || len(d.SHA256) != 64 {
+		t.Errorf("host script %s not recorded as saved, fingerprinted dependency: %+v", script, deps)
 	}
 	nested := filepath.Join(filepath.Dir(script), "policy.json")
 	if _, ok := got["path "+nested]; !ok {
@@ -205,6 +205,36 @@ func TestHostDepBlockers(t *testing.T) {
 	b := hostDepBlockers(context.Background(), man)
 	if len(b) != 1 || !strings.Contains(b[0], filepath.Join(root, "tool")) {
 		t.Fatalf("blockers = %v", b)
+	}
+}
+
+// Regression guard: a selective restore must not replace a host file that
+// other resources on the destination may use; identical files are kept.
+func TestHostDepConflicts(t *testing.T) {
+	root, script := hostDepsFixture(t)
+	sum, err := fileSHA256(script)
+	if err != nil {
+		t.Fatal(err)
+	}
+	missing := filepath.Join(root, "ops", "not-here.sh")
+	man := &Manifest{HostDeps: []HostDep{
+		{Owner: "a", Kind: depPath, Ref: script, Saved: true, SHA256: sum},
+		{Owner: "a", Kind: depPath, Ref: missing, Saved: true, SHA256: sum},
+	}}
+	if c := hostDepConflicts(man); len(c) != 0 {
+		t.Fatalf("identical or missing files reported as conflicts: %v", c)
+	}
+	if !sameHostFile(man, script) || sameHostFile(man, missing) {
+		t.Error("sameHostFile wrong")
+	}
+	if err := os.WriteFile(script, []byte("changed policy"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if c := hostDepConflicts(man); len(c) != 1 || !strings.Contains(c[0], "different content") {
+		t.Fatalf("different file not blocked: %v", c)
+	}
+	if sameHostFile(man, script) {
+		t.Error("changed file reported identical")
 	}
 }
 
