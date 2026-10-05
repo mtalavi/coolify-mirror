@@ -28,3 +28,8 @@ Only the latest release receives security fixes.
   expire after at most 24 hours; interactive shares stop when the operator quits.
 - The local `<backup>.key` file is written with root-only permissions. Treat it
   like a secret and remove it when the backup is no longer needed.
+
+## Repository security checks
+
+Changes to the protected default branch are gated by CI and GitHub CodeQL code
+scanning. A release is not intended to bypass those checks.
