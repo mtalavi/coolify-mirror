@@ -34,6 +34,10 @@ type extractPlan struct {
 	VolStep   func(VolumeEntry) *Step
 	ImageStep func(i int) *Step
 	AsideDir  string // where replaced directories are moved
+	// Dumps receives the database dumps written to disk (loaded afterwards).
+	Dumps *[]pendingDump
+	// DumpWanted filters dumps (selective restore skips skipped resources).
+	DumpWanted func(DumpEntry) bool
 }
 
 // undoLog records changes so a failed restore can be rolled back.
@@ -239,7 +243,7 @@ func extractArchive(ctx context.Context, f *Fetched, xp extractPlan, pr *Progres
 		}
 		name := h.Name
 		switch {
-		case name == entryManifest || name == entryExport:
+		case name == entryManifest || name == entryExport || name == entryTransfer:
 			continue
 
 		case strings.HasPrefix(name, prefixPaths+"/"):
@@ -306,6 +310,19 @@ func extractArchive(ctx context.Context, f *Fetched, xp extractPlan, pr *Progres
 				return fmt.Errorf("restore volume %s: %w", vs.entry.Name, err)
 			}
 
+		case strings.HasPrefix(name, prefixDumps+"/"):
+			finishPath()
+			finishVol()
+			pd, err := extractDump(f.Manifest, name, r)
+			if err != nil {
+				return err
+			}
+			if xp.Dumps == nil || (xp.DumpWanted != nil && !xp.DumpWanted(pd.DumpEntry)) {
+				_ = os.Remove(pd.file)
+				continue
+			}
+			*xp.Dumps = append(*xp.Dumps, *pd)
+
 		case strings.HasPrefix(name, prefixImages+"/"):
 			rest := strings.TrimPrefix(name, prefixImages+"/")
 			group, inner, _ := strings.Cut(rest, "/")
@@ -368,9 +385,10 @@ func extractArchive(ctx context.Context, f *Fetched, xp extractPlan, pr *Progres
 	if err := finishImages(); err != nil {
 		return err
 	}
-	// Volumes stored as definition only (NFS/CIFS/bind options) have no entries.
+	// Volumes stored as definition only (NFS/CIFS/bind options, or database
+	// volumes saved as dumps) have no entries.
 	for _, vs := range vols {
-		if !vs.prepared && vs.entry.External {
+		if !vs.prepared && (vs.entry.External || vs.entry.Dumped) {
 			if err := prepareVolume(ctx, vs, xp, undo, warn); err != nil {
 				return err
 			}

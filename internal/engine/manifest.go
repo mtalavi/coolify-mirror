@@ -10,7 +10,7 @@ import (
 )
 
 // Version of this tool (set at build time with -ldflags).
-var Version = "1.1.0"
+var Version = "1.2.0"
 
 // FormatName identifies the backup layout.
 const FormatName = "github.com/mtalavi/coolify-mirror/1"
@@ -24,6 +24,7 @@ const (
 // Entry names inside the archive.
 const (
 	entryManifest      = "manifest.json"
+	entryTransfer      = "coolify/server-transfer.json" // Coolify's own Server Transfer bundle
 	entryExport        = "db/export.json"
 	entryDump          = "db/coolify.dump"
 	entryEnv           = "db/source.env"
@@ -45,8 +46,14 @@ type Manifest struct {
 	Volumes     []VolumeEntry      `json:"volumes"`
 	Paths       []PathEntry        `json:"paths"`
 	Images      []ImageEntry       `json:"images"`
-	Options     BackupOptions      `json:"options"`
-	TotalBytes  int64              `json:"total_bytes"`
+	// Dumps are PostgreSQL/MySQL/MariaDB databases saved with their own dump
+	// tool; their data volumes are stored as definitions only.
+	Dumps []DumpEntry `json:"dumps,omitempty"`
+	// HasTransferBundle: the archive holds Coolify\'s own Server Transfer
+	// bundle (coolify/server-transfer.json) right after this manifest.
+	HasTransferBundle bool          `json:"has_transfer_bundle,omitempty"`
+	Options           BackupOptions `json:"options"`
+	TotalBytes        int64         `json:"total_bytes"`
 	// LocalKeyUUID is the private key used by the "localhost" server (full mode).
 	LocalKeyUUID string `json:"local_key_uuid,omitempty"`
 	LocalUser    string `json:"local_user,omitempty"`
@@ -72,6 +79,9 @@ type VolumeEntry struct {
 	// External: the data lives outside the volume (NFS/CIFS or bind driver
 	// options); only the definition is stored and recreated.
 	External bool `json:"external,omitempty"`
+	// Dumped: the volume is a database data directory saved as a native dump
+	// (see Manifest.Dumps); it is re-created empty and loaded from the dump.
+	Dumped bool `json:"dumped,omitempty"`
 }
 
 // PathEntry is one saved host directory or file.

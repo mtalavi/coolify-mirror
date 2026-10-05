@@ -141,6 +141,82 @@ try {
             $result['items'] = $out;
             break;
 
+        case 'transfer_bundle':
+            // Coolify's own Server Transfer export (schema_version 1), limited to
+            // the given resources of this server. The public export() refuses
+            // localhost, so the same private steps are run here in the same order.
+            $exporterClass = 'App\Services\ServerTransfer\ServerTransferExporter';
+            if (! class_exists($exporterClass)) {
+                $result['supported'] = false;
+                break;
+            }
+            $uuids = array_flip($input['uuids'] ?? []);
+            $server = Server::findOrFail(0);
+            $server->loadMissing(['settings', 'privateKey', 'standaloneDockers', 'swarmDockers', 'cloudProviderToken', 'sslCertificates']);
+            $pick = fn ($r) => isset($uuids[$r->uuid]);
+            $applications = $server->applications()->unique('id')->filter($pick)->values();
+            $databases = collect($server->databases())->unique(fn ($db) => $db::class.':'.$db->id)->filter($pick)->values();
+            $services = $server->services()->get()->unique('id')->filter($pick)->values();
+            $export = function () use ($server, $applications, $databases, $services) {
+                $projects = App\Models\Project::query()
+                    ->whereIn('id', $this->collectProjectIds($applications, $databases, $services))
+                    ->orderBy('name')->get();
+                $destinationUuidByKey = $this->destinationUuidMap($server);
+                $dependencies = $this->collectDependencies($server, $applications, $databases, $services);
+                $sourceInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
+
+                return App\Services\ServerTransfer\ServerTransferBundle::wrap([
+                    'source_instance' => ['url' => $sourceInstanceUrl, 'name' => config('app.name')],
+                    'warnings' => $this->buildWarnings($applications, $dependencies, $sourceInstanceUrl),
+                    'private_key' => $this->exportPrivateKey($server->privateKey),
+                    'private_keys' => $dependencies['private_keys']->map(fn ($k) => $this->exportPrivateKey($k))->values()->all(),
+                    'github_apps' => $dependencies['github_apps']->map(fn ($a) => $this->exportGithubApp($a))->values()->all(),
+                    'gitlab_apps' => $dependencies['gitlab_apps']->map(fn ($a) => $this->exportGitlabApp($a))->values()->all(),
+                    's3_storages' => $dependencies['s3_storages']->map(fn ($s) => $this->exportS3Storage($s))->values()->all(),
+                    'cloud_provider_tokens' => $dependencies['cloud_provider_tokens']->map(fn ($t) => $this->exportCloudProviderToken($t))->values()->all(),
+                    'ssl_certificates' => $this->exportSslCertificates($server),
+                    'volume_backups' => $this->exportVolumeBackups($applications, $databases, $services),
+                    'server' => $this->exportServer($server),
+                    'destinations' => $this->exportDestinations($server),
+                    'shared_environment_variables' => ['server' => []],
+                    'projects' => $projects->map(fn ($p) => $this->exportProject($p, $server, $destinationUuidByKey, $applications, $databases, $services))->values()->all(),
+                ]);
+            };
+            $result['supported'] = true;
+            $result['bundle'] = Closure::bind($export, new $exporterClass, $exporterClass)();
+            break;
+
+        case 'transfer_validate':
+            // Validate a bundle with Coolify's own validator (the file is removed).
+            $file = (string) ($input['file'] ?? '');
+            $bundle = json_decode((string) @file_get_contents($file), true);
+            @unlink($file);
+            $bundleClass = 'App\Services\ServerTransfer\ServerTransferBundle';
+            if (! class_exists($bundleClass)) {
+                $result['supported'] = false;
+                break;
+            }
+            if (! is_array($bundle)) {
+                throw new RuntimeException('the transfer bundle is not valid JSON');
+            }
+            $check = $bundleClass::validate($bundle);
+            $result['supported'] = true;
+            $result['valid'] = $check['valid'];
+            $result['errors'] = $check['errors'];
+            $result['warnings'] = array_values(array_merge($check['warnings'], (array) ($bundle['warnings'] ?? [])));
+            $found = [];
+            foreach ((array) ($bundle['projects'] ?? []) as $project) {
+                foreach ((array) ($project['environments'] ?? []) as $env) {
+                    foreach (['applications', 'databases', 'services'] as $kind) {
+                        foreach ((array) ($env[$kind] ?? []) as $res) {
+                            $found[] = $res['uuid'] ?? '';
+                        }
+                    }
+                }
+            }
+            $result['uuids'] = $found;
+            break;
+
         case 'set_domains':
             // Same effect as editing the domain field in Coolify's UI.
             Illuminate\Support\Facades\DB::transaction(function () use ($input) {

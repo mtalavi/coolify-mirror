@@ -37,11 +37,14 @@ var envKeepTarget = map[string]bool{
 
 // FullCheck lists problems found before a full restore.
 type FullCheck struct {
-	VersionProblem string   // target older than source
-	ArchProblem    string   // different CPU architecture
-	ExistingCount  int      // resources on this server that will be forgotten
-	RemoteServers  []string // remote servers the restored Coolify will manage
-	Space          string   // not enough disk space (warning)
+	// Blockers forbid the restore: version mismatch, a non-empty target,
+	// not enough disk space.
+	Blockers []string
+	// CoolifyWarnings come from Coolify's own transfer bundle validation.
+	CoolifyWarnings []string
+	ArchProblem     string   // different CPU architecture
+	ExistingCount   int      // resources on this server that will be forgotten
+	RemoteServers   []string // remote servers the restored Coolify will manage
 	// ExistingVolumes already exist here with the same name as a restored
 	// volume; they get the backup's data and their current data is set aside.
 	ExistingVolumes []string
@@ -50,17 +53,14 @@ type FullCheck struct {
 // CheckFull inspects the target before a full restore.
 func CheckFull(ctx context.Context, in *coolify.Instance, f *Fetched) (*FullCheck, error) {
 	c := &FullCheck{}
-	src := f.Manifest.Source.CoolifyVersion
-	if src != "" && in.Version != "" && coolify.CompareVersions(in.Version, src) < 0 {
-		c.VersionProblem = fmt.Sprintf("this server runs Coolify %s but the backup is from %s - upgrade this Coolify to %s or newer first", in.Version, src, src)
-	}
+	c.Blockers = PreflightFull(ctx, in, f)
+	c.CoolifyWarnings = BundleWarnings(ctx, in, f)
 	if a := f.Manifest.Source.Arch; a != "" && in.Arch != "" && a != in.Arch {
 		c.ArchProblem = fmt.Sprintf("the backup comes from a %s server and this one is %s: application images cannot be reused, Coolify will rebuild them", a, in.Arch)
 	}
 	if rs, err := in.ListResources(ctx); err == nil {
 		c.ExistingCount = len(rs)
 	}
-	c.Space = SpaceWarning(in.DockerRoot, f.Manifest)
 	for _, v := range f.Manifest.Volumes {
 		if ex, _ := docker.InspectVolume(ctx, v.Name); ex != nil && !v.External {
 			c.ExistingVolumes = append(c.ExistingVolumes, v.Name)
@@ -89,6 +89,9 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 		return nil, err
 	}
 	defer unlock()
+	if err := blockersErr(PreflightFull(ctx, in, f)); err != nil {
+		return nil, err
+	}
 	start := time.Now()
 	man := f.Manifest
 	stamp := time.Now().Format("20060102-150405")
@@ -119,6 +122,17 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 			delete(imgSteps, i)
 		}
 	}
+
+	dumpSteps := map[string]*Step{}
+	for _, d := range man.Dumps {
+		dumpSteps[d.Container] = pr.Add("Load database dump "+d.Container, d.Size)
+	}
+	var dumps []pendingDump
+	defer func() {
+		for _, d := range dumps {
+			_ = os.Remove(d.file)
+		}
+	}()
 
 	// 1. Safety copy.
 	stSafety.Begin(safety)
@@ -227,6 +241,7 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 		PathStep:     func(p PathEntry) *Step { return pathSteps[p.Path] },
 		VolStep:      func(v VolumeEntry) *Step { return volSteps[v.Name] },
 		ImageStep:    func(i int) *Step { return imgSteps[i] },
+		Dumps:        &dumps,
 		OnEntry: func(h *tar.Header, r io.Reader) (bool, error) {
 			switch h.Name {
 			case entryDump:
@@ -276,6 +291,10 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 		err = errors.New("the backup contains no Coolify database")
 		return nil, err
 	}
+	if err = loadDumps(ctx, dumps, func(s string) string { return s }, dumpSteps); err != nil {
+		return nil, err
+	}
+	dumps = nil
 
 	// 3. APP_KEY: the restored secrets are encrypted with the source key.
 	stEnv.Begin("")

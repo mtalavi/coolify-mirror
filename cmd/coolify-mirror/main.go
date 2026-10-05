@@ -112,7 +112,7 @@ Run it as root on a Coolify server:
         --output DIR                    where to write the file (default /data/coolify-mirror/backups)
         --serve                         share the file over HTTP when done
   ./coolify-mirror serve FILE [flags]   share an existing backup file
-        --mode direct|proxy             direct port (default) or through Coolify's proxy on port 80
+        --mode direct|proxy             direct HTTPS port (default 8123) or through Coolify's proxy on port 443
         --port 8123  --host IP  --open-firewall  --detach  --ttl 24h
   ./coolify-mirror restore LINK|FILE    download, verify and restore a backup
         --key KEY                       if the link has no #key=... part
@@ -477,11 +477,24 @@ func cmdServeInternal(ctx context.Context, args []string) error {
 	token := fs.String("token", "", "")
 	listen := fs.String("listen", ":8080", "")
 	ttl := fs.Duration("ttl", 24*time.Hour, "")
+	tlsDir := fs.String("tls-dir", "", "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	certPEM, err := os.ReadFile(filepath.Join(*tlsDir, "cert.pem"))
+	if err != nil {
+		return err
+	}
+	keyPEM, err := os.ReadFile(filepath.Join(*tlsDir, "key.pem"))
+	if err != nil {
+		return err
+	}
+	cert, err := transfer.LoadCert(certPEM, keyPEM)
+	if err != nil {
+		return err
+	}
 	enc := json.NewEncoder(os.Stdout)
-	srv := &transfer.Server{File: *file, Token: *token, Binary: *binary, OnEvent: func(e transfer.Event) { _ = enc.Encode(e) }}
+	srv := &transfer.Server{File: *file, Token: *token, Binary: *binary, Cert: cert, OnEvent: func(e transfer.Event) { _ = enc.Encode(e) }}
 	if _, err := srv.Listen(*listen); err != nil {
 		return err
 	}
@@ -545,19 +558,19 @@ func cmdRestore(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		if chk.VersionProblem != "" {
-			return errors.New(chk.VersionProblem)
+		if len(chk.Blockers) > 0 {
+			return errors.New("restore not allowed:\n  - " + strings.Join(chk.Blockers, "\n  - "))
+		}
+		for _, w := range chk.CoolifyWarnings {
+			fmt.Println("Coolify:", w)
 		}
 		if chk.ArchProblem != "" {
 			fmt.Println("WARNING:", chk.ArchProblem)
 		}
-		if chk.Space != "" {
-			fmt.Println("WARNING: disk space:", chk.Space)
-		}
 		if len(chk.ExistingVolumes) > 0 {
 			fmt.Printf("Volumes that already exist here get the backup's data (their current data is kept in *.cm-old-* volumes): %s\n", strings.Join(chk.ExistingVolumes, ", "))
 		}
-		fmt.Printf("\nFULL RESTORE: this replaces ALL Coolify data on this server (%d existing resource(s) will be forgotten).\n", chk.ExistingCount)
+		fmt.Println("\nFULL RESTORE: this empty Coolify becomes an exact copy of the source (users, settings, keys, every resource).")
 		if len(chk.RemoteServers) > 0 {
 			fmt.Printf("The restored Coolify will also manage these remote servers: %s - stop the old Coolify to avoid two controllers.\n", strings.Join(chk.RemoteServers, ", "))
 		}
@@ -576,6 +589,9 @@ func cmdRestore(ctx context.Context, args []string) error {
 			return err
 		}
 	} else {
+		if b := engine.PreflightSelective(ctx, in, f); len(b) > 0 {
+			return errors.New("restore not allowed:\n  - " + strings.Join(b, "\n  - "))
+		}
 		sr, err := engine.PrepareSelective(ctx, in, f, *team)
 		if err != nil {
 			return err
@@ -612,8 +628,8 @@ func cmdRestore(ctx context.Context, args []string) error {
 		for _, d := range sr.DomainClashes {
 			fmt.Println("  ! domain clash:", d)
 		}
-		if sr.Space != "" {
-			fmt.Println("  ! disk space:", sr.Space)
+		for _, w := range sr.CoolifyWarnings {
+			fmt.Println("  coolify:", w)
 		}
 		if !*yes && !confirm("Restore these resources into this Coolify?") {
 			return errors.New("aborted")
