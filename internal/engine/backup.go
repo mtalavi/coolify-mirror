@@ -323,6 +323,30 @@ func resourceDir(r coolify.Resource) string {
 	return ""
 }
 
+const boundedBuildPolicyPath = "/data/coolify/ops/bounded-build-v1.sh"
+
+// discoverHostRequirements records root-owned prerequisites implied by resource
+// configuration. They are fingerprinted, not copied: selective restore must not
+// silently replace server policy on an existing destination.
+func (b *backupper) discoverHostRequirements(ex *dbx.Export) error {
+	for _, row := range ex.Tables["applications"] {
+		cmd, _ := dbx.PlainString(row["docker_compose_custom_build_command"])
+		if !strings.Contains(cmd, ".coolify-ops-build.sh") {
+			continue
+		}
+		sum, err := fileSHA256(boundedBuildPolicyPath)
+		if err != nil {
+			return fmt.Errorf("application custom build command uses .coolify-ops-build.sh but host prerequisite %s cannot be fingerprinted: %w", boundedBuildPolicyPath, err)
+		}
+		b.man.HostRequirements = append(b.man.HostRequirements, HostRequirement{
+			Path: boundedBuildPolicyPath, SHA256: sum,
+			Reason: "Docker Compose custom build command uses .coolify-ops-build.sh",
+		})
+		return nil
+	}
+	return nil
+}
+
 func (b *backupper) discoverSelective(ctx context.Context) error {
 	for _, r := range b.req.Resources {
 		if !r.Local() {
@@ -336,6 +360,9 @@ func (b *backupper) discoverSelective(ctx context.Context) error {
 	}
 	for _, w := range ex.Warnings {
 		b.pr.Warn("%s", w)
+	}
+	if err := b.discoverHostRequirements(ex); err != nil {
+		return err
 	}
 	b.export, err = json.Marshal(ex)
 	if err != nil {
