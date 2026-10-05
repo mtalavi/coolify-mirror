@@ -323,3 +323,88 @@ func Describe(cs []Container) string {
 	}
 	return fmt.Sprint(strings.Join(names, ", "))
 }
+
+// Details is the part of `docker inspect` used to judge a container's health.
+type Details struct {
+	ID           string `json:"Id"`
+	Name         string `json:"Name"`
+	RestartCount int    `json:"RestartCount"`
+	State        struct {
+		Status   string `json:"Status"`
+		Running  bool   `json:"Running"`
+		ExitCode int    `json:"ExitCode"`
+		Health   *struct {
+			Status string `json:"Status"`
+		} `json:"Health"`
+	} `json:"State"`
+	HostConfig struct {
+		RestartPolicy struct {
+			Name string `json:"Name"`
+		} `json:"RestartPolicy"`
+	} `json:"HostConfig"`
+	Config struct {
+		Labels map[string]string `json:"Labels"`
+	} `json:"Config"`
+	NetworkSettings struct {
+		Networks map[string]json.RawMessage `json:"Networks"`
+	} `json:"NetworkSettings"`
+}
+
+// HealthStatus returns the healthcheck state ("" without a healthcheck).
+func (d Details) HealthStatus() string {
+	if d.State.Health == nil {
+		return ""
+	}
+	return d.State.Health.Status
+}
+
+// Networks lists the networks the container is attached to.
+func (d Details) Networks() []string {
+	return sortedKeysRaw(d.NetworkSettings.Networks)
+}
+
+// Inspect returns the details of containers (missing ones are left out).
+func Inspect(ctx context.Context, ids ...string) ([]Details, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	out, err := run.Output(ctx, "docker", append([]string{"inspect", "--type", "container"}, ids...)...)
+	var ds []Details
+	if jerr := json.Unmarshal(out, &ds); jerr != nil {
+		if err != nil {
+			return nil, err
+		}
+		return nil, jerr
+	}
+	return ds, nil
+}
+
+// Images lists local image references (repository:tag).
+func Images(ctx context.Context) ([]string, error) {
+	out, err := run.Text(ctx, "docker", "images", "--format", "{{.Repository}}:{{.Tag}}")
+	if err != nil {
+		return nil, err
+	}
+	return lines(out), nil
+}
+
+// BuildxAvailable reports whether the docker buildx plugin is installed.
+func BuildxAvailable(ctx context.Context) bool {
+	_, err := run.Output(ctx, "docker", "buildx", "version")
+	return err == nil
+}
+
+// BootstrapBuilder checks that a buildx builder exists and can start.
+func BootstrapBuilder(ctx context.Context, name string) error {
+	_, err := run.Output(ctx, "docker", "buildx", "inspect", "--bootstrap", name)
+	return err
+}
+
+func sortedKeysRaw(m map[string]json.RawMessage) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}

@@ -147,6 +147,8 @@ func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetch
 	}
 	for _, h := range sr.HostPaths {
 		switch {
+		case h.Same:
+			lines = append(lines, sMuted.Render("host file "+h.Path+" is already identical here - kept"))
 		case h.Shared:
 			lines = append(lines, sWarn.Render("! host folder "+h.Path+" is shared with the original resource - the copy uses it as it is (not overwritten)"))
 		case h.Exists:
@@ -276,9 +278,12 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	}
 	dash := dashboardBase(ctx, in)
 	var b strings.Builder
-	failed := 0
+	failed, held := 0, 0
 	for _, r := range results {
-		if r.OK && r.Resource.Hold != "" {
+		if r.OK && r.Stopped {
+			if r.Resource.Hold != "" {
+				held++
+			}
 			b.WriteString(sWarn.Render("! ") + r.Resource.Name + sWarn.Render(" · "+r.Message))
 		} else if r.OK {
 			b.WriteString(sOK.Render("✓ ") + r.Resource.Name + sMuted.Render(" · "+r.Message))
@@ -291,14 +296,18 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 		}
 		b.WriteString("\n")
 	}
+	for _, p := range rep.Problems {
+		b.WriteString(sErr.Render("✗ "+p) + "\n")
+	}
 	for _, n := range rep.Notes {
 		b.WriteString(sMuted.Render("note: "+n) + "\n")
 	}
-	head := sOK.Render("Restore complete") + sMuted.Render(" · "+engine.HumanDuration(time.Since(restoreStarted)))
-	if failed > 0 {
-		head = sWarn.Render(fmt.Sprintf("Restored, but %d resource(s) did not start", failed))
+	head := sOK.Render("Restore complete · everything verified") + sMuted.Render(" · "+engine.HumanDuration(time.Since(restoreStarted)))
+	verdict := engine.Verdict(failed, held, rep.Problems)
+	if verdict != "" {
+		head = sWarn.Render(verdict)
 	}
-	if failed == 0 && f.Downloaded {
+	if verdict == "" && f.Downloaded {
 		if err := os.Remove(f.Path); err == nil {
 			b.WriteString(sMuted.Render("the downloaded backup copy was deleted (the source server still has it)") + "\n")
 		}
@@ -306,6 +315,48 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	b.WriteString("\n" + sBold.Render("Open Coolify: ") + dash)
 	b.WriteString("\n" + sMuted.Render("Point your domains' DNS to this server when you are ready to switch."))
 	fmt.Println(boxed(sBox, head+"\n"+b.String()))
+	if verdict != "" {
+		return nil
+	}
+	builds := 0
+	for _, r := range rep.Resources {
+		if engine.NeedsBuild(r) && r.Hold == "" && r.WasRunning {
+			builds++
+		}
+	}
+	if builds == 0 {
+		return nil
+	}
+	ok, err := confirm(ctx, fmt.Sprintf("Rebuild %d application(s) once now?", builds),
+		"They run from the restored images. One rebuild here (same commit, no cache) proves that the next deploy works on this server without the old one.", true)
+	if err != nil || !ok {
+		return err
+	}
+	pr = engine.NewProgress("Redeploy check")
+	var checks []engine.StartResult
+	err = runWithProgress(ctx, "Rebuilding through Coolify", pr, func(ctx context.Context) error {
+		var err error
+		checks, err = engine.VerifyRedeploy(ctx, in, rep.Resources, pr)
+		return err
+	})
+	if err != nil {
+		return err
+	}
+	var c strings.Builder
+	bad := 0
+	for _, r := range checks {
+		if r.OK {
+			c.WriteString(sOK.Render("✓ ") + r.Resource.Name + sMuted.Render(" · "+r.Message) + "\n")
+		} else {
+			bad++
+			c.WriteString(sErr.Render("✗ ") + r.Resource.Name + " · " + sErr.Render(r.Message) + "\n")
+		}
+	}
+	h := sOK.Render("Redeploy check passed · later deploys work on this server")
+	if bad > 0 {
+		h = sWarn.Render(fmt.Sprintf("%d application(s) cannot be rebuilt here - a build dependency is missing (see the deployment log in Coolify)", bad))
+	}
+	fmt.Println(boxed(sBox, h+"\n"+c.String()))
 	return nil
 }
 

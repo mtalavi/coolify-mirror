@@ -46,6 +46,7 @@ type HostPath struct {
 	Path   string
 	Exists bool // current content is moved aside first
 	Shared bool // not restored: a copy keeps using the original's directory
+	Same   bool // not restored: this server already has the identical file
 }
 
 // isResourceDir reports Coolify's per-resource folders (always restored).
@@ -120,7 +121,10 @@ func (s *SelectiveRestore) Build(ctx context.Context, decisions map[string]dbx.D
 			continue
 		}
 		hp := HostPath{Path: plan.Rename(p.Path)}
-		if hp.Path == p.Path && s.decisions[p.Owner] == dbx.NewCopy {
+		if sameHostFile(s.F.Manifest, p.Path) {
+			hp.Same = true
+			s.shared[p.Path] = true
+		} else if hp.Path == p.Path && s.decisions[p.Owner] == dbx.NewCopy {
 			// The copy points at the same host directory as the original, which
 			// keeps running: never overwrite it.
 			hp.Shared = true
@@ -173,8 +177,11 @@ func (s *SelectiveRestore) domainClashes(ctx context.Context) []string {
 type RestoreReport struct {
 	Resources []dbx.PlannedResource
 	Notes     []string
-	AsideDir  string
-	Duration  time.Duration
+	// Problems: the restore is complete but something a resource needs to
+	// run or deploy again is missing here (never reported as a success).
+	Problems []string
+	AsideDir string
+	Duration time.Duration
 }
 
 // Apply writes files, volumes and images, then imports the configuration.
@@ -220,6 +227,7 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 	}
 	stDB := pr.Add("Add resources to Coolify", 0)
 	stNet := pr.Add("Prepare networks", 0)
+	stDeps := pr.Add("Check build and runtime dependencies", 0)
 
 	if man.Source.Arch != "" && s.In.Arch != "" && man.Source.Arch != s.In.Arch && len(man.Images) > 0 {
 		pr.Warn("images were built for %s but this server is %s; they are skipped and Coolify will rebuild", man.Source.Arch, s.In.Arch)
@@ -304,6 +312,10 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 		return nil, err
 	}
 	dumps = nil
+	builderNotes, err := restoreBuilders(man, undo)
+	if err != nil {
+		return nil, fmt.Errorf("install buildx builders: %w", err)
+	}
 
 	stDB.Begin("database transaction")
 	if err = failpoint("selective-before-import"); err != nil {
@@ -340,7 +352,21 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 	}
 	stNet.Finish("")
 
-	notes := append([]string{}, plan.Notes...)
+	stDeps.Begin("")
+	problems := checkHostDeps(ctx, man, plan.Rename, s.skipOwner)
+	if len(problems) > 0 {
+		stDeps.Fail(fmt.Errorf("%d missing", len(problems)))
+	} else {
+		stDeps.Finish(fmt.Sprintf("%d checked", len(man.HostDeps)))
+	}
+	for i := range plan.Resources {
+		r := &plan.Resources[i]
+		r.Expect = man.Runtime[r.SourceUUID]
+		// Coolify's status column can lag behind; running containers count.
+		r.WasRunning = r.WasRunning || len(r.Expect) > 0
+	}
+
+	notes := append(append([]string{}, plan.Notes...), builderNotes...)
 	for _, w := range plan.Warnings {
 		pr.Warn("%s", w)
 	}
@@ -350,5 +376,5 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 	if av := undo.asideVolumes(); len(av) > 0 {
 		notes = append(notes, "previous data of volumes that already existed is kept in: "+strings.Join(av, ", ")+" (docker volume rm them when no longer needed)")
 	}
-	return &RestoreReport{Resources: plan.Resources, Notes: notes, AsideDir: asideDir, Duration: time.Since(start)}, nil
+	return &RestoreReport{Resources: plan.Resources, Notes: notes, Problems: problems, AsideDir: asideDir, Duration: time.Since(start)}, nil
 }
