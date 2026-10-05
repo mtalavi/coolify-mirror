@@ -46,6 +46,9 @@ type Manifest struct {
 	Volumes     []VolumeEntry      `json:"volumes"`
 	Paths       []PathEntry        `json:"paths"`
 	Images      []ImageEntry       `json:"images"`
+	// HostRequirements are source-host prerequisites that selective restore must
+	// validate but must not silently overwrite on the destination.
+	HostRequirements []HostRequirement `json:"host_requirements,omitempty"`
 	// Dumps are PostgreSQL/MySQL/MariaDB databases saved with their own dump
 	// tool; their data volumes are stored as definitions only.
 	Dumps []DumpEntry `json:"dumps,omitempty"`
@@ -96,6 +99,15 @@ type ImageEntry struct {
 	Refs  []string `json:"refs"`
 	Size  int64    `json:"size"`
 	Owner string   `json:"owner,omitempty"`
+}
+
+// HostRequirement describes a root-owned host prerequisite used by a resource.
+// Selective restore validates it instead of copying it, preserving the boundary
+// between application data and server policy.
+type HostRequirement struct {
+	Path   string `json:"path"`
+	SHA256 string `json:"sha256"`
+	Reason string `json:"reason,omitempty"`
 }
 
 // BackupOptions records how the backup was taken.
