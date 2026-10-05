@@ -31,8 +31,10 @@ type SelectiveRestore struct {
 	HostPaths []HostPath
 	// DomainClashes lists domains already used by resources on this server.
 	DomainClashes []string
-	// Space is a warning when the data probably does not fit.
-	Space string
+	// Blockers forbid the restore (version mismatch, disk space).
+	Blockers []string
+	// CoolifyWarnings come from Coolify's own transfer bundle validation.
+	CoolifyWarnings []string
 
 	sql       string
 	decisions map[string]dbx.Decision
@@ -71,7 +73,7 @@ func PrepareSelective(ctx context.Context, in *coolify.Instance, f *Fetched, tea
 	if err != nil {
 		return nil, err
 	}
-	s := &SelectiveRestore{In: in, F: f, Target: ts}
+	s := &SelectiveRestore{In: in, F: f, Target: ts, Blockers: PreflightSelective(ctx, in, f), CoolifyWarnings: BundleWarnings(ctx, in, f)}
 	for _, r := range f.Export.Roots {
 		if _, ok := ts.Existing[r.Table][r.UUID]; ok {
 			s.Conflicts = append(s.Conflicts, r)
@@ -129,7 +131,6 @@ func (s *SelectiveRestore) Build(ctx context.Context, decisions map[string]dbx.D
 		s.HostPaths = append(s.HostPaths, hp)
 	}
 	s.DomainClashes = s.domainClashes(ctx)
-	s.Space = SpaceWarning(s.In.DockerRoot, s.F.Manifest)
 	return nil
 }
 
@@ -179,6 +180,12 @@ type RestoreReport struct {
 // Apply writes files, volumes and images, then imports the configuration.
 func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *RestoreReport, err error) {
 	defer func() { pr.End(err) }()
+	if err := blockersErr(PreflightSelective(ctx, s.In, s.F)); err != nil {
+		return nil, err
+	}
+	if s.Plan == nil {
+		return nil, errors.New("restore not allowed: the import was not prepared and trial-run first")
+	}
 	unlock, err := Lock()
 	if err != nil {
 		return nil, err
@@ -205,6 +212,12 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 	for i, im := range man.Images {
 		imgSteps[i] = pr.Add("Image  "+strings.Join(im.Refs, ", "), im.Size)
 	}
+	dumpSteps := map[string]*Step{}
+	for _, d := range man.Dumps {
+		if !s.skipOwner(d.Owner) {
+			dumpSteps[d.Container] = pr.Add("Load database dump "+plan.Rename(d.Container), d.Size)
+		}
+	}
 	stDB := pr.Add("Add resources to Coolify", 0)
 	stNet := pr.Add("Prepare networks", 0)
 
@@ -218,7 +231,11 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 
 	undo := newUndo()
 	failed := true
+	var dumps []pendingDump
 	defer func() {
+		for _, d := range dumps {
+			_ = os.Remove(d.file)
+		}
 		if failed {
 			if errs := undo.rollback(); len(errs) > 0 {
 				pr.Warn("rollback was incomplete: %v", errors.Join(errs...))
@@ -246,9 +263,11 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 			}
 			return t, true
 		},
-		PathStep:  func(p PathEntry) *Step { return pathSteps[p.Path] },
-		VolStep:   func(v VolumeEntry) *Step { return volSteps[v.Name] },
-		ImageStep: func(i int) *Step { return imgSteps[i] },
+		PathStep:   func(p PathEntry) *Step { return pathSteps[p.Path] },
+		VolStep:    func(v VolumeEntry) *Step { return volSteps[v.Name] },
+		ImageStep:  func(i int) *Step { return imgSteps[i] },
+		Dumps:      &dumps,
+		DumpWanted: func(d DumpEntry) bool { return !s.skipOwner(d.Owner) },
 		OnEntry: func(h *tar.Header, r io.Reader) (bool, error) {
 			if h.Name != entryDockerConfig {
 				return false, nil
@@ -280,6 +299,11 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 			}
 		}
 	}
+
+	if err = loadDumps(ctx, dumps, plan.Rename, dumpSteps); err != nil {
+		return nil, err
+	}
+	dumps = nil
 
 	stDB.Begin("database transaction")
 	if err = failpoint("selective-before-import"); err != nil {

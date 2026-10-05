@@ -54,7 +54,8 @@ type BackupResult struct {
 }
 
 type saveItem struct {
-	kind       string // path | volume | image
+	kind       string // path | volume | image | dump
+	dump       *DumpEntry
 	path       PathEntry
 	vol        VolumeEntry
 	img        ImageEntry
@@ -69,6 +70,7 @@ type backupper struct {
 	pr       *Progress
 	man      *Manifest
 	export   []byte
+	bundle   []byte
 	items    []*saveItem
 	pathSeen map[string]bool
 	volSeen  map[string]bool
@@ -112,6 +114,22 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 		stRead.Fail(err)
 		return nil, err
 	}
+	var owners []string
+	for _, r := range b.man.Resources {
+		if r.Local() {
+			owners = append(owners, r.UUID)
+		}
+	}
+	b.planDumps(ctx, owners)
+	// Coolify's own Server Transfer bundle of the same resources, so the backup
+	// also carries the official export format.
+	stRead.SetDetail("Coolify transfer bundle")
+	if bundle, err := in.TransferBundle(ctx, owners); err != nil {
+		pr.Warn("Coolify's own transfer export failed (the backup is complete without it): %v", err)
+	} else if bundle != nil {
+		b.bundle = bundle
+		b.man.HasTransferBundle = true
+	}
 	stRead.Finish(fmt.Sprintf("%d resource(s)", len(b.man.Resources)))
 
 	stMeasure.Begin("")
@@ -138,6 +156,8 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 			it.step = pr.Add("Volume "+it.vol.Name, it.vol.Size)
 		case "image":
 			it.step = pr.Add("Image  "+strings.Join(it.img.Refs, ", "), it.img.Size)
+		case "dump":
+			it.step = pr.Add("Database dump "+it.dump.Container, 0)
 		}
 	}
 	stFinal := pr.Add("Finish and verify backup file", 0)
@@ -162,6 +182,11 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 	manJSON, _ := json.MarshalIndent(b.man, "", " ")
 	if err = w.AddBytes(entryManifest, manJSON); err != nil {
 		return nil, err
+	}
+	if b.bundle != nil {
+		if err = w.AddBytes(entryTransfer, b.bundle); err != nil {
+			return nil, err
+		}
 	}
 
 	stDB.Begin("")
@@ -498,7 +523,7 @@ func (b *backupper) measure(ctx context.Context, st *Step) error {
 			it.running, _ = docker.BindUsers(ctx, it.path.Path)
 		case "volume":
 			st.SetDetail("volume " + it.vol.Name)
-			if it.vol.External {
+			if it.vol.External || it.vol.Dumped {
 				continue
 			}
 			n, _, err := archive.TreeSize(it.mountpoint, nil)
@@ -560,9 +585,43 @@ func (b *backupper) measure(ctx context.Context, st *Step) error {
 			b.man.Volumes = append(b.man.Volumes, it.vol)
 		case "image":
 			b.man.Images = append(b.man.Images, it.img)
+		case "dump":
+			b.man.Dumps = append(b.man.Dumps, *it.dump)
 		}
 	}
 	return nil
+}
+
+// planDumps replaces the raw copy of PostgreSQL/MySQL/MariaDB data volumes by
+// native dumps for databases that are running now.
+func (b *backupper) planDumps(ctx context.Context, owners []string) {
+	vols := map[string]*saveItem{}
+	for _, it := range b.items {
+		if it.kind == "volume" {
+			vols[it.vol.Name] = it
+		}
+	}
+	for _, owner := range owners {
+		cs, err := docker.Containers(ctx, "label=com.docker.compose.project="+owner, "status=running")
+		if err != nil {
+			continue
+		}
+		for _, c := range cs {
+			d, note := detectDump(ctx, c.ID, owner)
+			if note != "" {
+				b.pr.Warn("%s", note)
+			}
+			if d == nil {
+				continue
+			}
+			v := vols[d.Volume]
+			if v == nil || v.vol.External {
+				continue
+			}
+			v.vol.Dumped = true
+			b.items = append(b.items, &saveItem{kind: "dump", dump: d})
+		}
+	}
 }
 
 func (b *backupper) pathSkip(root string) func(string) bool {
@@ -732,6 +791,11 @@ func (b *backupper) saveItems(ctx context.Context, w *archive.Writer) error {
 				it.step.Finish("definition only (data lives outside the volume)")
 				continue
 			}
+			if it.vol.Dumped {
+				it.step.Begin("")
+				it.step.Finish("saved as a database dump")
+				continue
+			}
 			if err := enter(it); err != nil {
 				return err
 			}
@@ -743,6 +807,14 @@ func (b *backupper) saveItems(ctx context.Context, w *archive.Writer) error {
 				return fmt.Errorf("save volume %s: %w", it.vol.Name, err)
 			}
 			it.step.Finish(fmt.Sprintf("%s · %d files", HumanBytes(stats.Bytes), stats.Files))
+
+		case "dump":
+			it.step.Begin(it.dump.Engine + " dump, database keeps running")
+			if err := saveDump(ctx, w, it.dump, it.step); err != nil {
+				it.step.Fail(err)
+				return err
+			}
+			it.step.Finish(HumanBytes(it.dump.Size))
 
 		case "image":
 			if err := flush(); err != nil {

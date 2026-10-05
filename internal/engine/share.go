@@ -26,7 +26,7 @@ import (
 // Share modes.
 const (
 	ShareDirect = "direct" // this process listens on a TCP port
-	ShareProxy  = "proxy"  // a helper container behind Coolify's Traefik on port 80
+	ShareProxy  = "proxy"  // a helper container behind Coolify's Traefik on port 443 (TLS passthrough)
 )
 
 // DefaultPort is used for direct sharing.
@@ -47,13 +47,15 @@ type ShareOptions struct {
 // Share is an active share of a backup file.
 type Share struct {
 	Link      string
-	ToolLink  string
 	ToolSHA   string // sha256 of the served tool binary
+	Pin       string // certificate pin (also in the link)
+	hostPort  string
 	Mode      string
 	Token     string
 	Events    chan transfer.Event
 	server    *transfer.Server
 	container string
+	certDir   string
 	ufwPort   int
 	cancel    context.CancelFunc
 }
@@ -117,6 +119,12 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 	if sum, err := fileSHA256(self); err == nil {
 		s.ToolSHA = sum
 	}
+	cert, err := transfer.NewCert(token)
+	if err != nil {
+		cancel()
+		return nil, err
+	}
+	s.Pin = cert.Pin
 
 	switch opt.Mode {
 	case ShareProxy:
@@ -129,28 +137,45 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 		if image == "" {
 			image, _ = docker.Image(ctx, coolify.ProxyContainer)
 		}
+		// Traefik passes the TLS connection through by its SNI name, so TLS
+		// ends in the helper with our pinned certificate.
+		s.certDir = filepath.Join(HomeDir, "share-"+token[:8])
+		if err := os.MkdirAll(s.certDir, 0o700); err != nil {
+			cancel()
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(s.certDir, "cert.pem"), cert.CertPEM, 0o600); err != nil {
+			cancel()
+			return nil, err
+		}
+		if err := os.WriteFile(filepath.Join(s.certDir, "key.pem"), cert.KeyPEM, 0o600); err != nil {
+			cancel()
+			return nil, err
+		}
 		router := "coolify-mirror-" + token[:8]
-		args := []string{"run", "-d", "--name", name, "--network", "coolify", "--restart", "no",
+		args := []string{"run", "-d", "--name", name, "--network", "coolify", "--restart", "no", "--user", "0:0",
 			"--label", "coolify-mirror.share=true",
 			"--label", "traefik.enable=true",
 			"--label", "traefik.docker.network=coolify",
-			"--label", "traefik.http.routers." + router + ".rule=PathPrefix(`/cm/" + token + "`)",
-			"--label", "traefik.http.routers." + router + ".entrypoints=http",
-			"--label", "traefik.http.routers." + router + ".priority=100000",
-			"--label", "traefik.http.routers." + router + ".service=" + router,
-			"--label", "traefik.http.services." + router + ".loadbalancer.server.port=8080",
+			"--label", "traefik.tcp.routers." + router + ".rule=HostSNI(`" + transfer.SNIName(token) + "`)",
+			"--label", "traefik.tcp.routers." + router + ".entrypoints=https",
+			"--label", "traefik.tcp.routers." + router + ".tls.passthrough=true",
+			"--label", "traefik.tcp.routers." + router + ".service=" + router,
+			"--label", "traefik.tcp.services." + router + ".loadbalancer.server.port=8443",
 			"-v", file + ":/share/" + transfer.BackupName + ":ro",
 			"-v", self + ":/share/coolify-mirror:ro",
+			"-v", s.certDir + ":/share/tls:ro",
 			"--entrypoint", "/share/coolify-mirror", image,
 			"serve-internal", "--file", "/share/" + transfer.BackupName, "--binary", "/share/coolify-mirror",
-			"--token", token, "--listen", ":8080", "--ttl", "24h"}
+			"--token", token, "--listen", ":8443", "--ttl", "24h", "--tls-dir", "/share/tls"}
 		if _, err := run.Output(ctx, "docker", args...); err != nil {
 			cancel()
+			_ = os.RemoveAll(s.certDir)
 			return nil, fmt.Errorf("start sharing container: %w", err)
 		}
 		s.container = name
-		s.Link = transfer.Link(host, token, key)
-		s.ToolLink = transfer.ToolLink(host, token)
+		s.hostPort = net.JoinHostPort(strings.Trim(host, "[]"), "443")
+		s.Link = transfer.Link(strings.TrimSuffix(s.hostPort, ":443"), token, key, cert.Pin)
 		go followContainerEvents(sctx, name, s.Events)
 
 	default:
@@ -159,7 +184,7 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 		if port == 0 {
 			port = DefaultPort
 		}
-		srv := &transfer.Server{File: file, Token: token, Binary: self, OnEvent: func(e transfer.Event) {
+		srv := &transfer.Server{File: file, Token: token, Binary: self, Cert: cert, OnEvent: func(e transfer.Event) {
 			select {
 			case s.Events <- e:
 			default:
@@ -181,9 +206,8 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 				s.ufwPort = actual
 			}
 		}
-		hp := net.JoinHostPort(strings.Trim(host, "[]"), strconv.Itoa(actual))
-		s.Link = transfer.Link(hp, token, key)
-		s.ToolLink = transfer.ToolLink(hp, token)
+		s.hostPort = net.JoinHostPort(strings.Trim(host, "[]"), strconv.Itoa(actual))
+		s.Link = transfer.Link(s.hostPort, token, key, cert.Pin)
 	}
 	return s, nil
 }
@@ -230,6 +254,9 @@ func (s *Share) Stop() {
 		defer cancel()
 		_ = docker.Remove(ctx, s.container)
 	}
+	if s.certDir != "" {
+		_ = os.RemoveAll(s.certDir)
+	}
 	s.closeFirewall()
 }
 
@@ -273,15 +300,11 @@ func Detach(file, key string, opt ShareOptions, ttl time.Duration) (int, string,
 	return pid, logPath, nil
 }
 
-// ToolCommand is the one-liner that downloads this tool on the other server,
-// checks its SHA-256 (the download is plain HTTP) and opens the menu. The
+// ToolCommand is the one-liner that downloads this tool on the other server
+// over the pinned HTTPS connection, checks its SHA-256 and opens the menu. The
 // backup link is pasted into the menu, so its key stays out of shell history.
 func (s *Share) ToolCommand() string {
-	check := ""
-	if s.ToolSHA != "" {
-		check = fmt.Sprintf(" && echo '%s  coolify-mirror' | sha256sum -c -", s.ToolSHA)
-	}
-	return fmt.Sprintf("curl -fsSL %s -o coolify-mirror%s && chmod +x coolify-mirror && ./coolify-mirror", s.ToolLink, check)
+	return transfer.ToolCommand(s.hostPort, s.Token, s.Pin, s.ToolSHA)
 }
 
 func fileSHA256(path string) (string, error) {

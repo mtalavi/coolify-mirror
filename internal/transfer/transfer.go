@@ -1,6 +1,7 @@
-// Package transfer shares a backup file over HTTP and downloads it on the
-// other server. The file is already encrypted; the decryption key travels only
-// in the URL fragment (#key=...), which HTTP clients never send to the server.
+// Package transfer shares a backup file over HTTPS (pinned self-signed
+// certificate, see tls.go) and downloads it on the other server. The file is
+// also encrypted itself; the decryption key and the certificate pin travel only
+// in the URL fragment (#key=...&pin=...), which clients never send.
 package transfer
 
 import (
@@ -37,18 +38,10 @@ func NewToken() string {
 	return hex.EncodeToString(b)
 }
 
-// Link builds the share link for a host:port, token and key.
-func Link(hostPort, token, key string) string {
-	return fmt.Sprintf("http://%s/cm/%s/%s#key=%s", hostPort, token, BackupName, key)
-}
-
-// ToolLink is where the tool binary can be downloaded from.
-func ToolLink(hostPort, token string) string {
-	return fmt.Sprintf("http://%s/cm/%s/%s", hostPort, token, ToolName)
-}
-
 // ParseSource splits a pasted link (or file path) into location and key.
-// Accepted: http(s)://…/backup.cmb#key=KEY, /path/file.cmb#key=KEY, /path/file.cmb
+// Accepted: https://…/backup.cmb#key=KEY&pin=PIN, /path/file.cmb#key=KEY,
+// /path/file.cmb. For links the returned location keeps "#pin=PIN" (the
+// download needs it; it is never sent). Plain http links are refused.
 func ParseSource(s string) (location, key string, isURL bool, err error) {
 	s = strings.TrimSpace(s)
 	s = strings.Trim(s, `"'`)
@@ -56,19 +49,33 @@ func ParseSource(s string) (location, key string, isURL bool, err error) {
 		return "", "", false, errors.New("empty link")
 	}
 	loc, frag, _ := strings.Cut(s, "#")
+	pin := ""
 	if frag != "" {
-		if v, ok := strings.CutPrefix(frag, "key="); ok {
-			key = v
-		} else {
+		if !strings.Contains(frag, "=") {
 			key = frag
+		} else if q, err := url.ParseQuery(frag); err == nil {
+			key, pin = q.Get("key"), q.Get("pin")
 		}
 	}
 	key = strings.TrimSpace(key)
-	if strings.HasPrefix(loc, "http://") || strings.HasPrefix(loc, "https://") {
-		if _, err := url.Parse(loc); err != nil {
+	if strings.HasPrefix(loc, "http://") {
+		return "", "", false, errors.New("this is an unencrypted http:// link - links are https only; share the backup again with this version of coolify-mirror on the source server")
+	}
+	if strings.HasPrefix(loc, "https://") {
+		u, err := url.Parse(loc)
+		if err != nil {
 			return "", "", false, fmt.Errorf("invalid link: %w", err)
 		}
-		return loc, key, true, nil
+		if pin == "" {
+			return "", "", false, errors.New("the link has no certificate pin (#...&pin=) - copy the whole link")
+		}
+		if _, err := decodePin(pin); err != nil {
+			return "", "", false, err
+		}
+		if tokenFromURL(u) == "" {
+			return "", "", false, errors.New("invalid link: no share token in it")
+		}
+		return loc + "#pin=" + url.QueryEscape(pin), key, true, nil
 	}
 	return loc, key, false, nil
 }
@@ -89,6 +96,7 @@ type Server struct {
 	File    string
 	Token   string
 	Binary  string // path of this executable, served as /cm/<token>/coolify-mirror
+	Cert    *Cert  // TLS certificate (required by Listen)
 	OnEvent func(Event)
 
 	completed atomic.Int64
@@ -197,12 +205,16 @@ func (c *countingSeeker) Seek(off int64, whence int) (int64, error) {
 	return n, err
 }
 
-// Listen starts serving on addr (":8123"). It returns the bound address.
+// Listen starts serving HTTPS on addr (":8123"). It returns the bound address.
 func (s *Server) Listen(addr string) (net.Addr, error) {
-	ln, err := net.Listen("tcp", addr)
+	if s.Cert == nil {
+		return nil, errors.New("sharing needs a TLS certificate")
+	}
+	tcp, err := net.Listen("tcp", addr)
 	if err != nil {
 		return nil, err
 	}
+	ln := tls.NewListener(tcp, s.Cert.serverConfig())
 	s.mu.Lock()
 	s.srv = &http.Server{Handler: s.Handler(), ReadHeaderTimeout: 30 * time.Second}
 	srv := s.srv
@@ -234,29 +246,47 @@ type Info struct {
 	Size int64  `json:"size"`
 }
 
-// newClient is the HTTP client for downloads.
-func newClient() *http.Client {
-	return &http.Client{Transport: &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
-		ResponseHeaderTimeout: 60 * time.Second,
-		// Links point at a server IP, which never has a valid certificate when a
-		// proxy redirects to https. Authenticity does not rely on TLS: the file is
-		// age-encrypted and authenticated with a key that is never sent over the
-		// network, so a tampered or substituted file fails verification.
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, //nolint:gosec
-	}}
+// newClient returns the HTTPS client for a link (with "#pin=..." from
+// ParseSource) and the URL to request (fragment removed).
+func newClient(link string) (*http.Client, string, error) {
+	loc, frag, _ := strings.Cut(link, "#")
+	u, err := url.Parse(loc)
+	if err != nil {
+		return nil, "", err
+	}
+	if u.Scheme != "https" {
+		return nil, "", errors.New("only https links are accepted")
+	}
+	q, _ := url.ParseQuery(frag)
+	cfg, err := pinnedConfig(q.Get("pin"), SNIName(tokenFromURL(u)))
+	if err != nil {
+		return nil, "", err
+	}
+	return &http.Client{
+		// Never follow redirects away from the pinned server.
+		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
+		Transport: &http.Transport{
+			Proxy:                 http.ProxyFromEnvironment,
+			DialContext:           (&net.Dialer{Timeout: 15 * time.Second, KeepAlive: 30 * time.Second}).DialContext,
+			ResponseHeaderTimeout: 60 * time.Second,
+			TLSClientConfig:       cfg,
+			ForceAttemptHTTP2:     true,
+		}}, loc, nil
 }
 
 // RemoteSize asks the server for the size of the shared file (HEAD request).
 func RemoteSize(ctx context.Context, link string) (int64, error) {
 	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, link, nil)
+	client, loc, err := newClient(link)
 	if err != nil {
 		return 0, err
 	}
-	resp, err := newClient().Do(req)
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, loc, nil)
+	if err != nil {
+		return 0, err
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return 0, explainNetErr(err)
 	}
@@ -274,7 +304,10 @@ func RemoteSize(ctx context.Context, link string) (int64, error) {
 // (dest+".part") and retrying on network errors. progress gets (done, total).
 func Download(ctx context.Context, link, dest string, progress func(done, total int64)) error {
 	part := dest + ".part"
-	client := newClient()
+	client, link, err := newClient(link)
+	if err != nil {
+		return err
+	}
 	var total int64 = -1
 	var lastErr error
 	connected := false // got at least one HTTP response

@@ -27,7 +27,7 @@ func offerShare(ctx context.Context, in *coolify.Instance, file, key string) err
 	proxy := engine.ProxyAvailable(ctx)
 	var opts []huh.Option[string]
 	if proxy {
-		opts = append(opts, huh.NewOption("Share a link through Coolify's proxy on port 80 (recommended - already open)", engine.ShareProxy))
+		opts = append(opts, huh.NewOption("Share a link through Coolify's proxy on port 443 (recommended - already open)", engine.ShareProxy))
 	}
 	opts = append(opts,
 		huh.NewOption(fmt.Sprintf("Share a link on port %d (the port must be open in the firewall)", engine.DefaultPort), engine.ShareDirect),

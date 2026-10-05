@@ -3,8 +3,10 @@ package coolify
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	_ "embed"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -116,4 +118,52 @@ func (in *Instance) CheckCrypto(ctx context.Context) error {
 		return errors.New("round trip mismatch")
 	}
 	return nil
+}
+
+// TransferBundle builds Coolify's own Server Transfer bundle (schema_version
+// 1) for the given resources of this server, using Coolify's exporter code.
+// It returns nil when this Coolify has no Server Transfer support.
+func (in *Instance) TransferBundle(ctx context.Context, uuids []string) (json.RawMessage, error) {
+	var out struct {
+		Supported bool            `json:"supported"`
+		Bundle    json.RawMessage `json:"bundle"`
+	}
+	if err := in.PHP(ctx, "transfer_bundle", map[string]any{"uuids": uuids}, &out); err != nil {
+		return nil, err
+	}
+	if !out.Supported {
+		return nil, nil
+	}
+	return out.Bundle, nil
+}
+
+// BundleCheck is the result of Coolify's own bundle validation.
+type BundleCheck struct {
+	Supported bool     `json:"supported"`
+	Valid     bool     `json:"valid"`
+	Errors    []string `json:"errors"`
+	Warnings  []string `json:"warnings"`
+	UUIDs     []string `json:"uuids"`
+}
+
+// ValidateBundle runs ServerTransferBundle::validate on a bundle. The bundle
+// holds secrets, so it is handed over as a private file, never as an argument.
+func (in *Instance) ValidateBundle(ctx context.Context, bundle []byte) (*BundleCheck, error) {
+	file := "/tmp/cm-bundle-" + randomHex(8) + ".json"
+	if _, err := run.Do(ctx, run.Spec{Name: "docker", Args: []string{"exec", "-i", "-u", "www-data", AppContainer,
+		"sh", "-c", "umask 077 && cat > " + file}, Stdin: bytes.NewReader(bundle)}); err != nil {
+		return nil, fmt.Errorf("hand the transfer bundle to Coolify: %w", err)
+	}
+	var out BundleCheck
+	if err := in.PHP(ctx, "transfer_validate", map[string]string{"file": file}, &out); err != nil {
+		_, _ = run.Output(context.Background(), "docker", "exec", AppContainer, "rm", "-f", file)
+		return nil, err
+	}
+	return &out, nil
+}
+
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }

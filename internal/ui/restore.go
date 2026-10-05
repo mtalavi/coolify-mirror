@@ -22,7 +22,7 @@ func restoreFlow(ctx context.Context, in *coolify.Instance) error {
 	err := huh.NewForm(huh.NewGroup(
 		huh.NewInput().
 			Title("Paste the link shown on the source server").
-			Description("It looks like http://1.2.3.4/cm/…/backup.cmb#key=… (a local .cmb file path also works)").
+			Description("It looks like https://1.2.3.4/cm/…/backup.cmb#key=…&pin=… (a local .cmb file path also works)").
 			Value(&link).
 			Validate(func(s string) error {
 				loc, key, isURL, err := transfer.ParseSource(s)
@@ -33,7 +33,7 @@ func restoreFlow(ctx context.Context, in *coolify.Instance) error {
 					return errors.New("the link must include the #key=… part at the end")
 				}
 				if !isURL && !strings.HasSuffix(loc, ".cmb") {
-					return errors.New("paste the http://… link (or the path of a .cmb file)")
+					return errors.New("paste the https://… link (or the path of a .cmb file)")
 				}
 				return nil
 			}),
@@ -86,8 +86,8 @@ func restoreFlow(ctx context.Context, in *coolify.Instance) error {
 var restoreStarted time.Time
 
 func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetched) error {
-	if src := f.Manifest.Source.CoolifyVersion; src != "" && coolify.CompareVersions(in.Version, src) < 0 {
-		fmt.Println(sWarn.Render(fmt.Sprintf("  ! This server runs Coolify %s, the backup comes from %s. Upgrading this Coolify first is recommended.", in.Version, src)))
+	if showBlockers(engine.PreflightSelective(ctx, in, f)) {
+		return errBack
 	}
 	var teams []struct {
 		ID   int64  `json:"id"`
@@ -158,8 +158,8 @@ func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetch
 	for _, d := range sr.DomainClashes {
 		lines = append(lines, sWarn.Render("! domain "+d))
 	}
-	if sr.Space != "" {
-		lines = append(lines, sErr.Render("! disk space: "+sr.Space))
+	for _, w := range sr.CoolifyWarnings {
+		lines = append(lines, sMuted.Render("coolify: "+w))
 	}
 	ok, err := confirm(ctx, "Restore these resources into this Coolify?", strings.Join(lines, "\n"), true)
 	if err != nil {
@@ -189,13 +189,11 @@ func restoreFull(ctx context.Context, in *coolify.Instance, f *engine.Fetched) e
 	if err != nil {
 		return err
 	}
-	if chk.VersionProblem != "" {
-		fmt.Println(sErr.Render("  ✗ " + chk.VersionProblem))
-		fmt.Println(sMuted.Render("    Upgrade command: curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s " + f.Manifest.Source.CoolifyVersion))
+	if showBlockers(chk.Blockers) {
 		return errBack
 	}
 	var warn []string
-	warn = append(warn, fmt.Sprintf("This REPLACES everything in this Coolify (%d existing resource(s) here are forgotten and their containers removed; their volumes stay).", chk.ExistingCount))
+	warn = append(warn, "This empty Coolify becomes an exact copy of the source: its users, settings, keys and every resource.")
 	if len(chk.ExistingVolumes) > 0 {
 		warn = append(warn, fmt.Sprintf("%d volume(s) with the same name already exist here (%s): they get the backup's data and their current data is kept in *.cm-old-* volumes.",
 			len(chk.ExistingVolumes), strings.Join(chk.ExistingVolumes, ", ")))
@@ -204,8 +202,8 @@ func restoreFull(ctx context.Context, in *coolify.Instance, f *engine.Fetched) e
 	if chk.ArchProblem != "" {
 		warn = append(warn, chk.ArchProblem)
 	}
-	if chk.Space != "" {
-		warn = append(warn, "Disk space: "+chk.Space)
+	for _, w := range chk.CoolifyWarnings {
+		warn = append(warn, "Coolify: "+w)
 	}
 	if len(chk.RemoteServers) > 0 {
 		warn = append(warn, "Remote servers "+strings.Join(chk.RemoteServers, ", ")+" will be managed by this Coolify too - shut down the old Coolify to avoid two controllers.")
@@ -243,6 +241,19 @@ func restoreFull(ctx context.Context, in *coolify.Instance, f *engine.Fetched) e
 	}
 	rep.Notes = append(rep.Notes, "scheduled tasks and backups are active here too - disable them on the old server (or shut it down) once you switch")
 	return startAndReport(ctx, nin, f, rep)
+}
+
+// showBlockers prints the preflight problems that forbid a restore.
+func showBlockers(b []string) bool {
+	if len(b) == 0 {
+		return false
+	}
+	var lines []string
+	for _, x := range b {
+		lines = append(lines, "✗ "+x)
+	}
+	fmt.Println(boxed(sErrBox, sErr.Render("Restore not allowed")+"\n"+wrap(strings.Join(lines, "\n"), termWidth()-8)))
+	return true
 }
 
 func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched, rep *engine.RestoreReport) error {
