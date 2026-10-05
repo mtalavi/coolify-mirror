@@ -1,0 +1,103 @@
+package engine
+
+import (
+	"crypto/rand"
+	"encoding/base32"
+	"strings"
+	"time"
+
+	"github.com/mtalavi/coolify-mirror/internal/coolify"
+)
+
+// Version of this tool (set at build time with -ldflags).
+var Version = "1.1.0"
+
+// FormatName identifies the backup layout.
+const FormatName = "github.com/mtalavi/coolify-mirror/1"
+
+// Backup modes.
+const (
+	ModeSelective = "selective"
+	ModeFull      = "full"
+)
+
+// Entry names inside the archive.
+const (
+	entryManifest      = "manifest.json"
+	entryExport        = "db/export.json"
+	entryDump          = "db/coolify.dump"
+	entryEnv           = "db/source.env"
+	entryDockerConfig  = "extra/docker-config.json"
+	entryCustomCompose = "extra/docker-compose.custom.yml"
+	prefixPaths        = "paths"
+	prefixVolumes      = "volumes"
+	prefixImages       = "images"
+)
+
+// Manifest describes a backup; it is the first entry of the archive.
+type Manifest struct {
+	Format      string             `json:"format"`
+	ToolVersion string             `json:"tool_version"`
+	CreatedAt   time.Time          `json:"created_at"`
+	Mode        string             `json:"mode"`
+	Source      SourceInfo         `json:"source"`
+	Resources   []coolify.Resource `json:"resources"`
+	Volumes     []VolumeEntry      `json:"volumes"`
+	Paths       []PathEntry        `json:"paths"`
+	Images      []ImageEntry       `json:"images"`
+	Options     BackupOptions      `json:"options"`
+	TotalBytes  int64              `json:"total_bytes"`
+	// LocalKeyUUID is the private key used by the "localhost" server (full mode).
+	LocalKeyUUID string `json:"local_key_uuid,omitempty"`
+	LocalUser    string `json:"local_user,omitempty"`
+}
+
+// SourceInfo describes the server the backup was taken on.
+type SourceInfo struct {
+	Hostname       string `json:"hostname"`
+	IPv4           string `json:"ipv4,omitempty"`
+	IPv6           string `json:"ipv6,omitempty"`
+	CoolifyVersion string `json:"coolify_version"`
+	Arch           string `json:"arch"`
+}
+
+// VolumeEntry is one saved docker volume.
+type VolumeEntry struct {
+	Name    string            `json:"name"`
+	Driver  string            `json:"driver"`
+	Labels  map[string]string `json:"labels,omitempty"`
+	Options map[string]string `json:"options,omitempty"`
+	Size    int64             `json:"size"`
+	Owner   string            `json:"owner,omitempty"` // resource uuid
+	// External: the data lives outside the volume (NFS/CIFS or bind driver
+	// options); only the definition is stored and recreated.
+	External bool `json:"external,omitempty"`
+}
+
+// PathEntry is one saved host directory or file.
+type PathEntry struct {
+	Path  string `json:"path"`
+	Size  int64  `json:"size"`
+	Owner string `json:"owner,omitempty"`
+}
+
+// ImageEntry is one `docker save` group.
+type ImageEntry struct {
+	Refs  []string `json:"refs"`
+	Size  int64    `json:"size"`
+	Owner string   `json:"owner,omitempty"`
+}
+
+// BackupOptions records how the backup was taken.
+type BackupOptions struct {
+	Consistency    string `json:"consistency"`
+	Images         string `json:"images"`
+	IncludeBackups bool   `json:"include_backups"`
+}
+
+// NewPassphrase returns a random 130 bit key, easy to copy (a-z2-7).
+func NewPassphrase() string {
+	b := make([]byte, 16)
+	_, _ = rand.Read(b)
+	return strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b))
+}
