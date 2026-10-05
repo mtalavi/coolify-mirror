@@ -115,12 +115,20 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 		return nil, err
 	}
 	var owners []string
+	var local []coolify.Resource
 	for _, r := range b.man.Resources {
 		if r.Local() {
 			owners = append(owners, r.UUID)
+			local = append(local, r)
 		}
 	}
 	b.planDumps(ctx, owners)
+	stRead.SetDetail("host dependencies")
+	if err = b.planHostDeps(ctx, local); err != nil {
+		stRead.Fail(err)
+		return nil, err
+	}
+	b.recordRuntime(ctx, local)
 	// Coolify's own Server Transfer bundle of the same resources, so the backup
 	// also carries the official export format.
 	stRead.SetDetail("Coolify transfer bundle")
@@ -405,12 +413,95 @@ func (b *backupper) fromContainers(ctx context.Context, r coolify.Resource) erro
 				b.addVolume(ctx, m.Name, r.UUID)
 			}
 		}
-		wantImage := b.req.Images == ImagesAll || (b.req.Images == ImagesApps && r.Table == "applications")
-		if wantImage {
+		if b.wantImages(r) {
 			b.addImage(c.Image, r.UUID)
 		}
 	}
+	if r.Table == "applications" && b.wantImages(r) {
+		b.addDeployedImages(ctx, r)
+	}
 	return nil
+}
+
+func (b *backupper) wantImages(r coolify.Resource) bool {
+	return b.req.Images == ImagesAll || (b.req.Images == ImagesApps && r.Table == "applications")
+}
+
+// addDeployedImages adds the images built by the application's last
+// successful deployment (<uuid>:<commit>, <uuid>_<service>:<commit>), also
+// when no container runs right now, so the target can start without a build.
+func (b *backupper) addDeployedImages(ctx context.Context, r coolify.Resource) {
+	commit, err := b.in.Scalar(ctx, fmt.Sprintf(`SELECT commit FROM application_deployment_queues WHERE application_id = '%d'
+  AND status = 'finished' AND pull_request_id = 0 ORDER BY created_at DESC, id DESC LIMIT 1`, r.ID))
+	if err != nil || commit == "" {
+		return
+	}
+	refs, err := docker.Images(ctx)
+	if err != nil {
+		return
+	}
+	for _, ref := range deployedImages(refs, r.UUID, commit) {
+		b.addImage(ref, r.UUID)
+	}
+}
+
+// deployedImages picks the images Coolify built for an application at a
+// commit: <uuid>:<commit> (Dockerfile/Nixpacks) and <uuid>_<service>:<commit>
+// (Docker Compose).
+func deployedImages(refs []string, uuid, commit string) []string {
+	var out []string
+	for _, ref := range refs {
+		repo, tag, ok := strings.Cut(ref, ":")
+		if ok && tag == commit && (repo == uuid || strings.HasPrefix(repo, uuid+"_")) {
+			out = append(out, ref)
+		}
+	}
+	return out
+}
+
+// recordRuntime stores which compose services of each resource are up now,
+// and warns about resources that are not healthy on the source: a restore can
+// only be as healthy as what was backed up.
+func (b *backupper) recordRuntime(ctx context.Context, rs []coolify.Resource) {
+	b.man.Runtime = map[string][]string{}
+	for _, r := range rs {
+		cs, err := docker.Containers(ctx, "label=com.docker.compose.project="+r.UUID)
+		if err != nil {
+			continue
+		}
+		var ids []string
+		for _, c := range cs {
+			if pr := c.Label("coolify.pullRequestId"); pr == "" || pr == "0" {
+				ids = append(ids, c.ID)
+			}
+		}
+		ds, _ := docker.Inspect(ctx, ids...)
+		var up, bad []string
+		for _, d := range ds {
+			svc := d.Config.Labels["com.docker.compose.service"]
+			if svc == "" {
+				svc = strings.TrimPrefix(d.Name, "/")
+			}
+			switch containerState(d) {
+			case stateUp, stateDone:
+				up = append(up, svc)
+			case stateStarting:
+				up = append(up, svc)
+			default:
+				bad = append(bad, svc+" "+describeState(d))
+			}
+		}
+		sort.Strings(up)
+		if len(up) > 0 {
+			b.man.Runtime[r.UUID] = uniq(up)
+		}
+		switch {
+		case !r.Running() && len(up) == 0:
+			b.pr.Warn("%s is not running on this server: it is restored stopped, as it is here", r.Name)
+		case len(bad) > 0:
+			b.pr.Warn("%s is not healthy on this server (%s): the restored copy will have the same problem", r.Name, strings.Join(bad, ", "))
+		}
+	}
 }
 
 func (b *backupper) discoverFull(ctx context.Context) error {

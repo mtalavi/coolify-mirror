@@ -115,6 +115,7 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 	stEnv := pr.Add("Install the source APP_KEY", 0)
 	stSSH := pr.Add("Authorize Coolify's SSH key for this server", 0)
 	stStart := pr.Add("Start Coolify", 0)
+	stDeps := pr.Add("Check build and runtime dependencies", 0)
 
 	if man.Source.Arch != "" && in.Arch != "" && man.Source.Arch != in.Arch {
 		for i := range imgSteps {
@@ -295,6 +296,10 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 		return nil, err
 	}
 	dumps = nil
+	builderNotes, err := restoreBuilders(man, undo)
+	if err != nil {
+		return nil, fmt.Errorf("install buildx builders: %w", err)
+	}
 
 	// 3. APP_KEY: the restored secrets are encrypted with the source key.
 	stEnv.Begin("")
@@ -379,11 +384,19 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 	restartProxy(ctx, in, pr)
 	stStart.Finish("healthy")
 
-	notes := []string{"a safety copy of the previous Coolify database and .env is in " + safety}
+	stDeps.Begin("")
+	problems := checkHostDeps(ctx, man, func(s string) string { return s }, func(string) bool { return false })
+	if len(problems) > 0 {
+		stDeps.Fail(fmt.Errorf("%d missing", len(problems)))
+	} else {
+		stDeps.Finish(fmt.Sprintf("%d checked", len(man.HostDeps)))
+	}
+
+	notes := append([]string{"a safety copy of the previous Coolify database and .env is in " + safety}, builderNotes...)
 	if av := undo.asideVolumes(); len(av) > 0 {
 		notes = append(notes, "previous data of volumes that already existed is kept in: "+strings.Join(av, ", ")+" (docker volume rm them when no longer needed)")
 	}
-	return &RestoreReport{Resources: fullResources(man), Notes: notes, AsideDir: safety, Duration: time.Since(start)}, nil
+	return &RestoreReport{Resources: fullResources(man), Notes: notes, Problems: problems, AsideDir: safety, Duration: time.Since(start)}, nil
 }
 
 func uniq(in []string) []string {
@@ -597,7 +610,7 @@ func fullResources(man *Manifest) []dbx.PlannedResource {
 	var out []dbx.PlannedResource
 	for _, r := range man.Resources {
 		if r.Local() {
-			out = append(out, dbx.PlannedResource{Resource: r, SourceUUID: r.UUID, WasRunning: r.Running()})
+			out = append(out, dbx.PlannedResource{Resource: r, SourceUUID: r.UUID, WasRunning: r.Running() || len(man.Runtime[r.UUID]) > 0, Expect: man.Runtime[r.UUID]})
 		}
 	}
 	return out

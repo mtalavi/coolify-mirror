@@ -40,6 +40,8 @@ Coolify's own backup covers its database. Moving **one app** to a new server —
 | 🗄️ **Native database dumps** | PostgreSQL, MySQL and MariaDB are saved with `pg_dumpall` / `mysqldump` while they keep running, and loaded with the same image on the target. |
 | 🧾 **Coolify's own format inside** | Every backup also carries Coolify's official *Server Transfer* bundle (`schema_version 1`, made by Coolify's exporter) and the target validates it with Coolify's own validator. |
 | ⚡ **No rebuild** | The exact image your app runs is shipped, so Coolify on the target logs *“Build step skipped”* and starts the same commit. |
+| 🧰 **Host dependencies travel too** | Files on the host that custom build/start commands or helper files use (a build policy script under `/data/coolify/ops`, …) and named `docker buildx` builders are carried and restored; system files are checked on the target before anything changes. |
+| ✅ **SUCCESS means it really works** | A resource counts as running only when the services that ran on the source are up, stay healthy for 30 s without restarting, and each domain answers through the local Traefik. `--verify-redeploy` also rebuilds every app once on the target to prove later deploys work. |
 | 🌐 **Domains last** | Right before anything starts you can keep or change every domain. |
 | ♻️ **Preflight + rollback** | Exact-version check, conflict and domain detection, disk space, bundle validation and a trial import in a rolled-back transaction run **before** anything changes; a failure in the middle puts the target back the way it was. |
 
@@ -137,7 +139,7 @@ Real screenshots from two Coolify 4.3.23 servers (IP addresses replaced with doc
 
 <img src="docs/shots/12-domains.png" width="760" alt="domains step">
 
-**11 · Running** — Coolify itself starts databases, then services, then apps, and the tool waits until they are healthy.
+**11 · Running** — Coolify itself starts databases, then services, then apps. The tool then checks the real state: the same services as on the source, all containers healthy for 30 s without restarts, and every domain answering through the proxy. Anything else ends as *Restored, but NOT operational* with the reason and a non-zero exit code.
 
 <img src="docs/shots/13-complete.png" width="760" alt="restore complete">
 
@@ -166,6 +168,7 @@ flowchart LR
     X --> I[import rows<br/>new IDs · re-encrypted secrets]
     I --> N[your domains]
     N --> Z[Coolify starts everything]
+    Z --> V[verify: services · health 30 s<br/>domains through the proxy<br/>build dependencies · optional rebuild]
   end
 ```
 
@@ -222,6 +225,7 @@ coolify-mirror start-all                                # ask Coolify to start a
 | | `--team ID` | target team (selective) |
 | | `--set-domain OLD=NEW` | change a domain; `NEW` = `-` removes it (repeatable) |
 | | `--no-start` | restore but don't start |
+| | `--verify-redeploy` | after starting, rebuild every app Coolify builds (same commit, no cache) and check it again |
 | | `--keep-download` | keep the downloaded file |
 </details>
 
@@ -234,7 +238,8 @@ coolify-mirror start-all                                # ask Coolify to start a
 - **Same Coolify version only.** Restores require exactly the same Coolify version on both servers.
 - **Full restore only onto an empty Coolify.** A target with projects, resources, extra servers or S3 storages is refused — use a selective (merge) restore.
 - **Mandatory preflight.** Version, disk space, Coolify's bundle validation, conflicts (same resources, volumes, host folders, domains) and a trial import in a rolled-back transaction run before anything is written. `--yes` only skips the confirmation, never these checks.
-- **Rollback.** Selective: everything created is removed if the import fails. Full: the previous Coolify database and `.env` are restored and its containers started again.
+- **Verified result.** `SUCCESS` is printed only when every restored resource runs like on the source and its domains answer through the proxy; build dependencies on the host are checked too. A resource held back by a domain clash or failing any check makes the restore end with *NOT operational* and exit code 1.
+- **Rollback.** Selective: everything created is removed if the import fails (including parent folders it created). Full: the previous Coolify database and `.env` are restored and its containers started again.
 - **Nothing is deleted.** Volumes that already exist on the target keep their old data in `<name>.cm-old-<time>`; replaced folders go to `/data/coolify-mirror/replaced-<time>`.
 - **One run at a time.** A lock prevents two backups/restores on a server. Paused containers are always resumed — even after `Ctrl+C` or a crash.
 - **Logs** of every run: `/data/coolify-mirror/logs/` (no secrets).
@@ -251,12 +256,14 @@ coolify-mirror start-all                                # ask Coolify to start a
 - Resources running on **remote servers**, **preview deployments** and **Swarm** are not part of a selective backup.
 - **GitHub webhooks**, **DNS** and **scheduled tasks/backups** still point to / run on the old server — switch them when you move.
 - Different CPU architecture (amd64 → arm64): shipped images can't be used, Coolify rebuilds.
+- Host dependencies are found in Coolify's settings and the resource's folder on the source. A host file referenced only from inside the git repository can't be seen; `--verify-redeploy` proves (or disproves) the build on the target.
+- Docker Compose applications are always built by Coolify on deploy (its own behaviour), so their build dependencies must be on the target — which is why they are carried and checked.
 
 ---
 
 ## 🧪 Tested
 
-On real Coolify 4.3.23 installs (lab in [`lab/`](lab)): native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals, restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
+On real Coolify 4.3.23 installs (lab in [`lab/`](lab)): **a real migration with zero manual fixes** — healthy source → new backup → freshly installed Coolify → selective and full restore with `--verify-redeploy` (a multi-service compose app whose build uses a host policy script and a named buildx builder, a Dockerfile app, an image app, WordPress + MariaDB, Postgres): `SUCCESS`, the same secrets, volume data and database rows as the source, every domain answering through Traefik, and a full rebuild on the target; merge into an existing Coolify without touching its other resources; an app that exits and one that turns unhealthy after the restore reported as *NOT operational*; rollback leaving the target exactly as before; backups made by 1.2.0. Also: native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals, restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
 
 ---
 

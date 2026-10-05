@@ -48,6 +48,8 @@ type PlannedResource struct {
 	// DeploymentUUID is the restored "last deployment" row on the target.
 	DeploymentUUID string `json:"deployment_uuid,omitempty"`
 	WasRunning     bool   `json:"was_running"`
+	// Expect lists the compose services that were up on the source.
+	Expect []string `json:"expect,omitempty"`
 	// Hold, when set, keeps the resource stopped and explains why.
 	Hold string `json:"hold,omitempty"`
 }

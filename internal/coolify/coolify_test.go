@@ -66,3 +66,15 @@ func TestDomains(t *testing.T) {
 		t.Fatalf("%v", c)
 	}
 }
+
+// Regression: a Docker Compose application was probed on the fqdn Coolify
+// generates at creation, which is never routed for compose applications.
+func TestAppDomains(t *testing.T) {
+	compose := `{"web":{"domain":"http://app.example.com:8080"}}`
+	if d := appDomains("dockercompose", "http://uuid.1.2.3.4.sslip.io", compose); len(d) != 1 || d[0] != "http://app.example.com:8080" {
+		t.Fatalf("compose app domains = %v", d)
+	}
+	if d := appDomains("dockerfile", "https://a.com,https://b.com", ""); len(d) != 2 {
+		t.Fatalf("dockerfile app domains = %v", d)
+	}
+}

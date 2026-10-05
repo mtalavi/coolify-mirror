@@ -10,7 +10,7 @@ import (
 )
 
 // Version of this tool (set at build time with -ldflags).
-var Version = "1.2.0"
+var Version = "1.3.0"
 
 // FormatName identifies the backup layout.
 const FormatName = "github.com/mtalavi/coolify-mirror/1"
@@ -51,9 +51,18 @@ type Manifest struct {
 	Dumps []DumpEntry `json:"dumps,omitempty"`
 	// HasTransferBundle: the archive holds Coolify\'s own Server Transfer
 	// bundle (coolify/server-transfer.json) right after this manifest.
-	HasTransferBundle bool          `json:"has_transfer_bundle,omitempty"`
-	Options           BackupOptions `json:"options"`
-	TotalBytes        int64         `json:"total_bytes"`
+	HasTransferBundle bool `json:"has_transfer_bundle,omitempty"`
+	// HostDeps are files and buildx builders outside the resources' folders
+	// that they need to build or run (see hostdeps.go).
+	HostDeps []HostDep      `json:"host_deps,omitempty"`
+	Builders []BuilderEntry `json:"builders,omitempty"`
+	// Runtime lists, per resource uuid, the compose services that were up
+	// (or had finished successfully) on the source; the restored resource is
+	// only reported as running when the same services are up here.
+	Runtime map[string][]string `json:"runtime,omitempty"`
+
+	Options    BackupOptions `json:"options"`
+	TotalBytes int64         `json:"total_bytes"`
 	// LocalKeyUUID is the private key used by the "localhost" server (full mode).
 	LocalKeyUUID string `json:"local_key_uuid,omitempty"`
 	LocalUser    string `json:"local_user,omitempty"`

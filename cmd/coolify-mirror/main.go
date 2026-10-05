@@ -110,7 +110,7 @@ Run it as root on a Coolify server:
         --images apps|all|none          which docker images to include (default apps)
         --include-backups               full mode: include /data/coolify/backups
         --output DIR                    where to write the file (default /data/coolify-mirror/backups)
-        --serve                         share the file over HTTP when done
+        --serve                         share the file over HTTPS when done
   ./coolify-mirror serve FILE [flags]   share an existing backup file
         --mode direct|proxy             direct HTTPS port (default 8123) or through Coolify's proxy on port 443
         --port 8123  --host IP  --open-firewall  --detach  --ttl 24h
@@ -120,6 +120,8 @@ Run it as root on a Coolify server:
         --on-conflict copy|skip         selective restore: resource already exists here
         --team ID                       selective restore: target team (default 0)
         --no-start                      do not start/deploy restored resources
+        --verify-redeploy               after starting, rebuild every application Coolify builds
+                                        (same commit, no cache) to prove the next deploy works here
         --keep-download                 keep the downloaded file after a successful restore
         --set-domain OLD=NEW            replace a restored domain (repeatable, e.g. a.com=b.com);
                                         without --yes every domain is asked for at the end
@@ -515,6 +517,7 @@ func cmdRestore(ctx context.Context, args []string) error {
 	onConflict := fs.String("on-conflict", "copy", "")
 	team := fs.Int64("team", 0, "")
 	noStart := fs.Bool("no-start", false, "")
+	verifyRedeploy := fs.Bool("verify-redeploy", false, "")
 	keepDownload := fs.Bool("keep-download", false, "")
 	var setDomains multiFlag
 	fs.Var(&setDomains, "set-domain", "")
@@ -652,7 +655,13 @@ func cmdRestore(ctx context.Context, args []string) error {
 		// The resources are restored; a clashing one simply stays stopped.
 		fmt.Println("  ! domains were not changed:", err, "- change them in Coolify")
 	}
+	for _, p := range report.Problems {
+		fmt.Println("  ✗", p)
+	}
 	if *noStart {
+		if len(report.Problems) > 0 {
+			return fmt.Errorf("restored, but %d dependency problem(s) remain - the next deploy would fail", len(report.Problems))
+		}
 		fmt.Println("\nRestored. Start the resources from the Coolify dashboard.")
 		return nil
 	}
@@ -664,26 +673,58 @@ func cmdRestore(ctx context.Context, args []string) error {
 	if err != nil {
 		return err
 	}
-	failed := 0
+	failed, held, stopped := 0, 0, 0
 	for _, r := range results {
 		mark := "✓"
 		switch {
 		case !r.OK:
 			mark, failed = "✗", failed+1
 		case r.Resource.Hold != "":
-			mark = "!"
+			mark, held = "!", held+1
+		case r.Stopped:
+			mark, stopped = "-", stopped+1
 		}
 		fmt.Printf("  %s %-28s %s\n", mark, r.Resource.Name, r.Message)
 	}
-	if failed > 0 {
-		return fmt.Errorf("%d resource(s) did not start - see the Coolify dashboard", failed)
+	if v := engine.Verdict(failed, held, report.Problems); v != "" {
+		return errors.New(v)
+	}
+	redeployed := false
+	if *verifyRedeploy {
+		fmt.Println("\nRebuilding the applications on this server to prove the next deploy works…")
+		pr = engine.NewProgress("Redeploy check")
+		stop = printProgress(pr)
+		checks, err := engine.VerifyRedeploy(ctx, in, report.Resources, pr)
+		stop()
+		if err != nil {
+			return err
+		}
+		bad := 0
+		for _, r := range checks {
+			mark := "✓"
+			if !r.OK {
+				mark, bad = "✗", bad+1
+			}
+			fmt.Printf("  %s %-28s %s\n", mark, r.Resource.Name, r.Message)
+		}
+		if bad > 0 {
+			return fmt.Errorf("Restored and running, but NOT redeployable: %d application(s) failed to rebuild here - a dependency of their build is missing on this server (see the deployment log in Coolify)", bad)
+		}
+		redeployed = len(checks) > 0
 	}
 	if f.Downloaded && !*keepDownload {
 		if err := os.Remove(f.Path); err == nil {
 			fmt.Println("  note: the downloaded backup copy was deleted (the source server still has it)")
 		}
 	}
-	fmt.Println("\nDone. Everything is running and visible in Coolify.")
+	if stopped > 0 {
+		fmt.Printf("\nDone. %d resource(s) are stopped, as they were on the source; everything else is running and verified.\n", stopped)
+	} else {
+		fmt.Println("\nSUCCESS. Every resource is running, stable and reachable through the proxy.")
+	}
+	if redeployed {
+		fmt.Println("Every application was also rebuilt here from its source and runs: later deploys work on this server.")
+	}
 	fmt.Println("Scheduled tasks/backups run here now too - disable them on the old server once you switch.")
 	return nil
 }

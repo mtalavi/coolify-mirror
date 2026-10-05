@@ -91,8 +91,10 @@ curl -fsSL -k --pinnedpubkey 'sha256//<pin>' --resolve '<توکن>.cm.invalid:44
 3. **Preflight اجباری** (با `--yes` هم رد نمی‌شود): نسخه‌ی Coolify هر دو سرور باید **دقیقاً یکی** باشد؛ فضای دیسک کافی؛ اعتبارسنجی bundle رسمی Coolify با validator خود Coolify؛ تشخیص تداخل (ریسورس هم‌شناسه، volume، پوشه‌ی میزبان، دامنه)؛ آزمایش رمزنگاری با Coolify مقصد؛ اجرای آزمایشی کامل import داخل تراکنشی که rollback می‌شود.
 4. تأیید شما ← بازگردانی فایل‌ها، volumeها، imageها ← بارگذاری dump دیتابیس‌ها ← اضافه شدن ریسورس‌ها به Coolify در **یک تراکنش**.
 5. **دامنه‌ها (آخرین مرحله، دستی):** برای هر اپ، هر سرویس داخل docker-compose و هر بخش یک سرویس Coolify (مثلاً WordPress) یک خانه با دامنه‌ی فعلی نشان داده می‌شود. همان را نگه دارید یا دامنه‌ی جدید بنویسید. چند دامنه را با کاما جدا کنید. خانه‌ی خالی یعنی بدون دامنه. اگر `https://` ننویسید خودش اضافه می‌شود. تغییر از طریق خود Coolify ذخیره می‌شود، پس متغیرهای `SERVICE_URL_*` و `SERVICE_FQDN_*` و برچسب‌های پروکسی هم به‌روز می‌شوند. ریسورسی که دامنه‌اش هنوز روی این سرور دست ریسورس دیگری است روشن نمی‌شود.
-6. روشن کردن همه‌چیز **از طریق خود Coolify** (اول دیتابیس‌ها، بعد سرویس‌ها، بعد اپ‌ها) و صبر تا سالم (healthy) شدن.
-7. گزارش نهایی + آدرس داشبورد.
+6. روشن کردن همه‌چیز **از طریق خود Coolify** (اول دیتابیس‌ها، بعد سرویس‌ها، بعد اپ‌ها).
+7. **بررسی واقعی مقصد، نه فقط «درخواست start فرستاده شد»:** هر ریسورس فقط وقتی «running» گزارش می‌شود که (۱) deployment خودش در Coolify تمام شده باشد، (۲) همه‌ی سرویس‌هایی که روی مبدأ بالا بودند روی مقصد هم ساخته شده باشند، (۳) همه‌ی کانتینرها **۳۰ ثانیه پشت سر هم** روشن و healthy باشند بدون ری‌استارت (jobهای یک‌باره مثل migration فقط با exit code صفر قبول‌اند)، و (۴) هر دامنه از مسیر Traefik محلی واقعاً به خود اپ برسد (پاسخ‌های خود پروکسی مثل `no available server`، 404 بدون route، 502 و 504 خطا حساب می‌شوند). پروکسی اگر به شبکه‌ی اپ وصل نباشد خودکار وصل می‌شود.
+8. **وابستگی‌های build/runtime روی میزبان** (پایین را ببینید) دوباره بررسی می‌شوند. با `--verify-redeploy` (یا تأیید در منو) هر اپی که Coolify خودش build می‌کند یک بار روی مقصد از همان commit و بدون cache دوباره build و deploy و دوباره همین بررسی‌ها انجام می‌شود؛ یعنی deployهای بعدی هم روی سرور جدید کار می‌کنند.
+9. گزارش نهایی: `SUCCESS` فقط وقتی همه‌ی موارد بالا درست باشد. در غیر این صورت «Restored, but NOT operational» با علت دقیق و exit code غیرصفر. ریسورسی که روی مبدأ خاموش بود خاموش می‌ماند و جدا اعلام می‌شود.
 
 ---
 
@@ -117,12 +119,14 @@ curl -fsSL -k --pinnedpubkey 'sha256//<pin>' --resolve '<توکن>.cm.invalid:44
 - volumeهای داکر با **مالکیت، دسترسی، زمان، symlink، hardlink و xattr دقیق**.
 - **دیتابیس‌های PostgreSQL، MySQL و MariaDB** (مستقل یا داخل یک سرویس) با ابزار native خودشان (`pg_dumpall` و `mysqldump`/`mariadb-dump`) در حالی که روشن‌اند و بدون pause گرفته می‌شوند. در ریستور، volume داده خالی ساخته می‌شود، همان image با همان رمزها در یک کانتینر موقت (بدون شبکه) آن را مقداردهی می‌کند، dump بارگذاری می‌شود و بعد Coolify کانتینر اصلی را روشن می‌کند. دیتابیس‌های دیگر (Redis، MongoDB، ClickHouse، …) مثل قبل فایلی کپی می‌شوند.
 - **bundle رسمی Server Transfer خود Coolify** (`schema_version 1`) که با کد exporter خود Coolify برای همین ریسورس‌ها ساخته می‌شود (در `coolify/server-transfer.json` داخل فایل رمزشده).
-- image اپلیکیشن‌ها (پیش‌فرض) ← روی مقصد **دوباره build نمی‌شود**؛ Coolify همان image را با همان commit بالا می‌آورد.
+- image اپلیکیشن‌ها (پیش‌فرض) ← روی مقصد **دوباره build نمی‌شود**؛ Coolify همان image را با همان commit بالا می‌آورد. imageهای آخرین deployment موفق حتی وقتی اپ همان لحظه روی مبدأ روشن نیست هم برداشته می‌شوند. (اپ‌های Docker Compose را خود Coolify در هر deploy دوباره build می‌کند؛ برای همین وابستگی‌های build آن‌ها باید روی مقصد باشد — مورد بعدی.)
+- **وابستگی‌های میزبان:** دستورهای build/start سفارشی، pre/post deployment، گزینه‌های docker run و فایل‌های دستی داخل پوشه‌ی ریسورس خوانده می‌شوند. فایل‌ها و پوشه‌هایی از میزبان که در آن‌ها آمده‌اند (مثلاً `/data/coolify/ops/build-policy.sh`، و فایل‌هایی که خود همان اسکریپت استفاده می‌کند) **داخل بک‌آپ می‌روند و روی مقصد برمی‌گردند**؛ builderهای نام‌دار `docker buildx` (`--builder X`) هم با تنظیماتشان منتقل و روی مقصد راه‌اندازی می‌شوند. فایل‌های سیستمی (`/usr`، `/etc`، …) کپی نمی‌شوند ولی قبل از ریستور روی مقصد بررسی می‌شوند و اگر نباشند ریستور شروع نمی‌شود.
+- وضعیت اجرای مبدأ (کدام سرویس‌های هر ریسورس بالا بودند) تا مقصد دقیقاً با همان مقایسه شود. اگر ریسورسی روی مبدأ سالم نیست، همان موقع بک‌آپ هشدار داده می‌شود.
 - لاگین رجیستری‌های داکر (`/root/.docker/config.json`) برای imageهای خصوصی (فقط رجیستری‌هایی که مقصد ندارد اضافه می‌شوند).
 
 ### داخل بک‌آپ کامل
 
-همه‌ی موارد بالا برای کل سرور + dump کامل دیتابیس Coolify + فایل `.env` (APP_KEY) + کل `/data/coolify` (پروکسی، گواهی‌ها، کلیدهای SSH، compose فایل‌ها، تصاویر/آیکون‌ها) + `docker-compose.custom.yml` در صورت وجود. پوشه‌ی بک‌آپ‌های دیتابیس خود Coolify (`/data/coolify/backups`) اختیاری است.
+همه‌ی موارد بالا برای کل سرور + dump کامل دیتابیس Coolify + فایل `.env` (APP_KEY) + کل `/data/coolify` (پروکسی، گواهی‌ها، کلیدهای SSH، compose فایل‌ها، تصاویر/آیکون‌ها، پوشه‌های دستی مثل `ops`) + **همه‌ی builderهای `docker buildx`** + `docker-compose.custom.yml` در صورت وجود. پوشه‌ی بک‌آپ‌های دیتابیس خود Coolify (`/data/coolify/backups`) اختیاری است.
 
 ---
 
@@ -171,6 +175,7 @@ curl -fsSL -k --pinnedpubkey 'sha256//<pin>' --resolve '<توکن>.cm.invalid:44
 ./coolify-mirror serve /data/coolify-mirror/backups/<file>.cmb --mode direct --port 8123 --open-firewall
 ./coolify-mirror serve <file>.cmb --detach              # ۲۴ ساعت در پس‌زمینه
 ./coolify-mirror restore '<لینک>' [--yes] [--on-conflict copy|skip] [--team ID] [--no-start] [--keep-download]
+./coolify-mirror restore '<لینک>' --yes --verify-redeploy   # بعد از بالا آمدن، یک build و deploy کامل روی مقصد برای اثبات deployهای بعدی
 ./coolify-mirror restore '<لینک>' --yes --set-domain shop.com=shop.new.com --set-domain www.shop.com=-   # عوض/حذف دامنه بدون سؤال
 ./coolify-mirror restore /path/file.cmb --key <کلید>
 ./coolify-mirror start-all                              # روشن کردن ریسورس‌های خاموش این سرور از طریق Coolify
@@ -201,6 +206,8 @@ curl -fsSL -k --pinnedpubkey 'sha256//<pin>' --resolve '<توکن>.cm.invalid:44
 - **dump دیتابیس MySQL/MariaDB** دیتابیس‌های کاربر را دارد؛ کاربرهای دیتابیسی که دستی (جدا از `MYSQL_USER` خود image) ساخته‌اید دوباره ساخته نمی‌شوند. dump پستگرس همه‌ی roleها را دارد.
 - **bundle رسمی Coolify:** importer رسمی Coolify همیشه یک رکورد سرور جدید می‌سازد و داده جابه‌جا نمی‌کند، پس ردیف‌ها با importer همین برنامه وارد می‌شوند؛ bundle رسمی برای سازگاری با فرمت Coolify، اعتبارسنجی با validator خود Coolify و نمایش هشدارهای Coolify (آدرس webhookها، credentialهایی که باید تازه شوند) استفاده می‌شود.
 - **سرورهای remote**: ریسورس‌هایی که Coolify مبدأ روی سرورهای دیگر اجرا می‌کند در بک‌آپ انتخابی پشتیبانی نمی‌شوند (در لیست علامت دارند). در بک‌آپ کامل تنظیماتشان منتقل می‌شود و داده‌شان روی همان سرورها می‌ماند؛ Coolify قدیمی را خاموش کنید تا دو کنترل‌کننده نداشته باشید.
+- **وابستگی‌هایی که فقط داخل مخزن git هستند:** برنامه فقط چیزی را می‌بیند که در تنظیمات Coolify یا پوشه‌ی ریسورس روی مبدأ آمده باشد. اگر اسکریپتی داخل مخزن به فایلی روی میزبان اشاره کند و کپی‌اش در پوشه‌ی ریسورس نباشد، دیده نمی‌شود؛ `--verify-redeploy` همین را با یک build واقعی روی مقصد ثابت یا رد می‌کند (و گزارش «NOT redeployable» می‌دهد).
+- **فایل‌های سیستمی** (`/usr`، `/etc`، …) و builder پیش‌فرض داکر کپی نمی‌شوند؛ فقط وجودشان روی مقصد بررسی می‌شود.
 - **Preview deploymentها** (PRها) و **Docker Swarm** منتقل نمی‌شوند.
 - **معماری CPU متفاوت** (مثلاً amd64 ← arm64): imageها استفاده نمی‌شوند و Coolify دوباره build می‌کند.
 - اپ‌های Git هنگام deploy روی مقصد باید به مخزن دسترسی داشته باشند (GitHub App / deploy key / مخزن عمومی — همه منتقل می‌شوند). **Webhookهای GitHub** همچنان به سرور قدیمی اشاره دارند؛ بعد از جابه‌جایی در GitHub به‌روز کنید.
@@ -222,6 +229,9 @@ curl -fsSL -k --pinnedpubkey 'sha256//<pin>' --resolve '<توکن>.cm.invalid:44
 | `this server runs Coolify X but the backup comes from Coolify Y` | هر دو را هم‌نسخه کنید: `curl -fsSL https://cdn.coollabs.io/coolify/install.sh \| bash -s Y` |
 | `Coolify cannot use this server yet` | در Coolify مقصد: Servers → localhost → Validate |
 | ریسورسی بالا نیامد | لاگ deployment همان ریسورس در داشبورد Coolify + فایل لاگ در `/data/coolify-mirror/logs` |
+| `Restored, but NOT operational` | جلوی هر ریسورس علت آمده: `exited (1)`، `unhealthy`، `service(s) not created`، `no available server` و …؛ همان را در Coolify درست کنید |
+| `needs /path on this server` | فایلی سیستمی که اپ برای build/اجرا لازم دارد روی مقصد نیست؛ نصبش کنید و دوباره ریستور کنید |
+| `NOT redeployable` | اپ روی مقصد اجرا می‌شود ولی build روی این سرور شکست خورد؛ لاگ deployment در Coolify وابستگی گمشده را نشان می‌دهد |
 
 ---
 
@@ -249,7 +259,7 @@ docker run --rm -v "$PWD":/src -w /src golang:1.26 go test ./...
 
 ### محیط آزمایشگاه (`lab/`)
 
-`lab/Dockerfile` یک سرور Ubuntu 24.04 با systemd می‌سازد تا نصب‌کننده‌ی رسمی Coolify داخلش مثل VPS واقعی اجرا شود. نمونه‌ها: `cmlab-src` (مبدأ، داشبورد `localhost:18000`)، `cmlab-dst` (مقصد، `localhost:28000`) و `cmlab-new` (Coolify تازه، `localhost:38000`) روی شبکه‌ی داکر `cmlab`. `lab/bootstrap.php` کاربر و توکن API می‌سازد و `lab/seed_src.py` + `lab/seed_src2.py` ریسورس‌های تست را روی مبدأ می‌سازند. اطلاعات ورود آزمایشی در `lab/.lab-credentials` است (در git نیست).
+`lab/Dockerfile` یک سرور Ubuntu 24.04 با systemd می‌سازد تا نصب‌کننده‌ی رسمی Coolify داخلش مثل VPS واقعی اجرا شود. نمونه‌ها: `cmlab-src` (مبدأ، داشبورد `localhost:18000`)، `cmlab-dst` (مقصد، `localhost:28000`) و `cmlab-new` (Coolify تازه، `localhost:38000`) روی شبکه‌ی داکر `cmlab`. `lab/bootstrap.php` کاربر و توکن API می‌سازد و `lab/seed_src.py` + `lab/seed_src2.py` ریسورس‌های تست را روی مبدأ می‌سازند. `lab/compose-app/` یک اپ Docker Compose چندسرویسی (Postgres + migration یک‌باره + web با healthcheck + worker) است که build آن از یک اسکریپت روی میزبان (`host/build-policy.sh` در `/data/coolify/ops`) و builder نام‌دار `cm-bounded` استفاده می‌کند، فقط با secret و دیتای volume بالا می‌آید و محتوایش (hash secret، نشانه‌ی volume، تعداد ردیف دیتابیس) را نشان می‌دهد؛ `hostbound.yaml` تست منفی است (فقط روی سرور `cmlab-src` سالم است). مخزن git آن را یک کانتینر `git http-backend` روی شبکه‌ی `cmlab` سرو می‌کند (آدرس `nip.io`، با `uploadpack.allowAnySHA1InWant` مثل GitHub) و `lab/seed_compose.py` اپ را از API می‌سازد. Coolifyهای تازه برای ریستور روی مقصد خالی: `cmlab-c2` (`localhost:52000`) و `cmlab-c3` (`localhost:53000`). اطلاعات ورود آزمایشی در `lab/.lab-credentials` است (در git نیست).
 
 نکته‌های محیط آزمایشی: نصب‌کننده را با `USER=root` اجرا کنید (وگرنه کاربر سرور localhost خالی ثبت می‌شود) و بعد از هر بوت `/run/nologin` را حذف کنید.
 
@@ -260,7 +270,7 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 
 ---
 
-## تست‌ها (1.0.0 تا 1.2.0)
+## تست‌ها (1.0.0 تا 1.3.0)
 
 روی دو Coolify 4.3.23 واقعی:
 
@@ -286,13 +296,36 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 | 1.2.0: ریستور کامل روی Coolify غیرخالی (حتی با `--yes`) | ✓ رد شد با پیام روشن؛ روی Coolify تازه‌نصب کامل انجام شد و ۶ ریسورس بالا آمدند |
 | 1.2.0: bundle رسمی Server Transfer | ✓ با exporter خود Coolify ساخته و با validator خود Coolify روی مقصد تأیید شد؛ هشدار رسمی Coolify (S3) نمایش داده شد |
 | 1.2.0: خطای عمدی بعد از بارگذاری dump | ✓ rollback کامل: تعداد volume/کانتینر/ریسورس مثل قبل، فایل موقت باقی نماند |
+| 1.3.0: **migration واقعی بدون هیچ دخالت دستی** — مبدأ سالم ← بک‌آپ تازه ← Coolify تازه‌نصب ← ریستور انتخابی با `--verify-redeploy` (اپ Compose با اسکریپت build روی میزبان و builder نام‌دار، اپ Dockerfile، اپ image، سرویس WordPress+MariaDB، Postgres) | ✓ `SUCCESS`، exit 0؛ خروجی اپ از مسیر Traefik مقصد با مبدأ یکی (hash secret، نشانه‌ی volume، ۳ ردیف دیتابیس با md5 یکسان)؛ همه‌ی دامنه‌ها مثل مبدأ جواب دادند؛ اپ Dockerfile بدون build با image منتقل‌شده بالا آمد؛ rebuild کامل هر دو اپ روی مقصد از مسیر سیاست build میزبان (`BUILD_POLICY=bounded`) و builder منتقل‌شده موفق |
+| 1.3.0: همان سناریو با **ریستور کامل** روی Coolify تازه‌نصب دیگر | ✓ `SUCCESS` برای ۷ ریسورس + rebuild موفق؛ داده‌ها، builder و اسکریپت میزبان مثل مبدأ |
+| 1.3.0: ریستور انتخابی روی Coolify **موجود** (merge) | ✓ `SUCCESS` + rebuild موفق؛ کانتینرهای بقیه‌ی ریسورس‌های مقصد بدون تغییر |
+| 1.3.0: اپی که روی مقصد بعد از start **exit می‌کند** و سرویسی که **unhealthy** می‌شود | ✓ «NOT operational: probe restarting, sick unhealthy»، exit 1 (نسخه‌ی قبل با یک نگاه لحظه‌ای ممکن بود موفق اعلام کند) |
+| 1.3.0: deploy روی مقصد ناموفق (commit مبدأ در git در دسترس نبود) | ✓ «deployment failed» و exit 1، نه موفقیت |
+| 1.3.0: خطای عمدی قبل از import با فایل میزبان و builder در بک‌آپ | ✓ وضعیت مقصد دقیقاً مثل قبل (دیتابیس، کانتینرها، volumeها، پوشه‌ها)، شامل پوشه‌های والدی که ریستور ساخته بود |
+| 1.3.0: پاسخ واقعی Traefik وقتی پروکسی از شبکه‌ی اپ جدا است / دامنه route ندارد | ✓ 504 و 404 شناخته شدند؛ بعد از وصل دوباره 200 |
+| 1.3.0: ریستور بک‌آپ ساخته‌شده با 1.2.0 با نسخه‌ی جدید + تغییر دامنه با `--set-domain` | ✓ `SUCCESS`؛ دامنه‌ی جدید از Traefik جواب داد (200) |
 | 1.1.0: تغییر دامنه در مرحله‌ی آخر (منو و CLI)، شامل اپ و سرویس WordPress، با ورودی نامعتبر | ✓ دامنه‌ی جدید در Coolify ذخیره شد، `SERVICE_URL_WORDPRESS` و برچسب Traefik به‌روز شدند، سایت روی دامنه‌ی جدید از پروکسی جواب داد (302)، دامنه‌ی حذف‌شده پاک شد، ورودی نامعتبر قبل از ریستور رد شد |
 | باینری arm64 (شبیه‌سازی QEMU) | ✓ اجرا می‌شود |
 | تست واحد: رمزنگاری Laravel، فرمت فایل و متادیتا، برنامه‌ریز import (keep/copy/skip)، دانلود قابل ادامه | ✓ |
+| تست واحد 1.3.0: تشخیص وابستگی‌های میزبان و builder، پرهیز از مسیرهای runtime/سیستمی/گسترده، نصب builder و rollback آن، مانع preflight، سازگاری manifest قدیمی، انتخاب imageهای آخرین deployment، وضعیت کانتینر (healthy/unhealthy/exit/job یک‌باره/restart)، سرویس‌های ساخته‌نشده، پاسخ‌های خطای پروکسی، پورت داخلی در دامنه، دامنه‌های اپ Compose، حکم نهایی | ✓ |
 
 ---
 
 ## تغییرات
+
+### 1.3.0 — ۲۰۲۶-۱۰-۰۶
+
+قرارداد اصلی: ریسورس مقصد بعد از ریستور باید از نظر اجرایی معادل مبدأ باشد و `SUCCESS` فقط با بررسی وضعیت واقعی مقصد چاپ شود. دو migration واقعی نشان دادند این تضمین نمی‌شد.
+
+- **وابستگی‌های build/runtime روی میزبان منتقل و بررسی می‌شوند** (ریشه‌ی شکست deploy بعد از ریستور): فایل‌هایی از میزبان که دستورهای سفارشی Coolify یا فایل‌های پوشه‌ی ریسورس به آن‌ها اشاره می‌کنند، و builderهای نام‌دار `docker buildx` (`--builder`) داخل بک‌آپ می‌روند و برمی‌گردند؛ فایل‌های سیستمی قبل از ریستور روی مقصد بررسی می‌شوند؛ بعد از ریستور همه دوباره بررسی و builderها راه‌اندازی می‌شوند. بک‌آپ کامل همه‌ی builderها را هم می‌برد.
+- **SUCCESS فقط با وضعیت واقعی** (ریشه‌ی «موفق» اعلام شدن ریسورس Exited/Unhealthy): ثبات ۳۰ ثانیه‌ای همه‌ی کانتینرها بدون ری‌استارت، همان سرویس‌هایی که روی مبدأ بالا بودند، job یک‌باره فقط با exit 0، و درخواست واقعی به هر دامنه از مسیر Traefik محلی. هر مشکل ← «Restored, but NOT operational» با علت و exit code غیرصفر. ریسورس نگه‌داشته‌شده به‌خاطر تداخل دامنه هم موفقیت حساب نمی‌شود؛ ریسورسی که روی مبدأ خاموش بود جدا اعلام می‌شود.
+- **`--verify-redeploy`** (و سؤال در منو): rebuild کامل روی مقصد از همان commit و بدون cache، برای اثبات این‌که deployهای بعدی بدون سرور قدیمی کار می‌کنند.
+- imageهای آخرین deployment موفق حتی وقتی اپ روی مبدأ خاموش است برداشته می‌شوند؛ بک‌آپ درباره‌ی ریسورس خاموش یا ناسالم مبدأ هشدار می‌دهد. وضعیت «running» مبدأ از کانتینرهای واقعی هم گرفته می‌شود، نه فقط ستون status خود Coolify.
+- اتصال پروکسی به شبکه‌ی اپ (که قبلاً فقط برای سرویس‌ها بود) برای همه‌ی ریسورس‌های دارای برچسب Traefik انجام می‌شود.
+- رفع: تغییر دامنه‌ی اپ غیر Compose در مرحله‌ی دامنه‌ها، برچسب‌های Traefik را به‌روز نمی‌کرد و دامنه‌ی قدیمی route می‌شد (حالا مثل UI خود Coolify دوباره ساخته می‌شوند).
+- رفع: دامنه‌ی خودکار `sslip.io` که Coolify هنگام ساخت اپ Compose می‌گذارد (و هرگز route نمی‌شود) جزو دامنه‌های اپ حساب می‌شد.
+- رفع: rollback پوشه‌های والدی را که ریستور ساخته بود (مثلاً `/data/coolify/ops`) باقی می‌گذاشت.
+- بک‌آپ‌های نسخه‌های قبل همچنان ریستور می‌شوند.
 
 ### 1.2.0 — ۲۰۲۶-۱۰-۰۵
 

@@ -109,7 +109,7 @@ try {
                             application: $application,
                             deployment_uuid: $deploymentUuid,
                             commit: ($item['commit'] ?? null) ?: null,
-                            force_rebuild: false,
+                            force_rebuild: (bool) ($item['force_rebuild'] ?? false),
                             is_api: true,
                         );
                         $row['deployment_uuid'] = $res['deployment_uuid'] ?? $deploymentUuid;
@@ -249,6 +249,14 @@ try {
                         $application->fqdn = $fqdn;
                     }
                     $application->save();
+                    // Like the domain field in Coolify's UI: the proxy labels
+                    // are generated from the domains unless they were edited by
+                    // hand (otherwise the old domain keeps being routed).
+                    if ($item['kind'] !== 'compose' && $application->settings?->is_container_label_readonly_enabled && function_exists('generateLabelsApplication')) {
+                        $application->refresh();
+                        $application->custom_labels = base64_encode(implode("\n", generateLabelsApplication($application)));
+                        $application->save();
+                    }
                 }
             });
             break;

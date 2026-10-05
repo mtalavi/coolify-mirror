@@ -27,6 +27,16 @@ type Resource struct {
 	BuildPack       string   `json:"build_pack,omitempty"`
 }
 
+// appDomains returns the domains an application is served on. A Docker
+// Compose application is routed only through its per-service domains; the
+// fqdn column Coolify fills in at creation is not used for it.
+func appDomains(buildPack, fqdn, compose string) []string {
+	if buildPack == "dockercompose" {
+		return composeDomains(compose)
+	}
+	return append(SplitDomains(fqdn), composeDomains(compose)...)
+}
+
 // Local reports whether the resource runs on the Coolify host itself.
 func (r Resource) Local() bool { return r.ServerID == LocalServerID }
 
@@ -94,7 +104,7 @@ WHERE t.deleted_at IS NULL`, &apps)
 	for _, r := range apps {
 		res := base(r, "application", "applications")
 		res.BuildPack = str(r.BuildPack)
-		res.Domains = append(SplitDomains(str(r.Fqdn)), composeDomains(str(r.ComposeDomains))...)
+		res.Domains = appDomains(res.BuildPack, str(r.Fqdn), str(r.ComposeDomains))
 		out = append(out, res)
 	}
 

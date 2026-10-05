@@ -124,7 +124,7 @@ func PreflightFull(ctx context.Context, in *coolify.Instance, f *Fetched) []stri
 	if s := SpaceWarning(in.DockerRoot, f.Manifest); s != "" {
 		out = append(out, "not enough disk space: "+s)
 	}
-	return out
+	return append(out, hostDepBlockers(ctx, f.Manifest)...)
 }
 
 // PreflightSelective returns the problems that forbid a selective restore here.
@@ -140,7 +140,7 @@ func PreflightSelective(ctx context.Context, in *coolify.Instance, f *Fetched) [
 		b, _ := checkBundle(ctx, in, f)
 		out = append(out, b...)
 	}
-	return out
+	return append(out, hostDepBlockers(ctx, f.Manifest)...)
 }
 
 // BundleWarnings returns Coolify's own warnings for the backup's transfer
