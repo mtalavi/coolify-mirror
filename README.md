@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/banner.png" alt="Coolify Mirror — move Coolify projects between servers with one link" width="100%">
+  <img src="docs/banner.png" alt="Coolify Mirror: move Coolify apps between servers with one command" width="100%">
 </p>
 
 <p align="center">
@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <b>Back up one domain, a few, or a whole Coolify server — then restore it on another Coolify with a single pasted link.</b><br>
+  <b>Back up one domain, a few, or a whole Coolify server — then restore it on another Coolify by pasting one command.</b><br>
   Projects, environments, env vars, secrets, volumes, files, images and proxy settings arrive intact and start through Coolify itself.
 </p>
 
@@ -121,7 +121,7 @@ Coolify's own backup covers its database. Moving **one app** to a new server —
 |---|---|
 | 🎯 **Pick by domain** | Arrow keys + enter (space to tick several). Databases and services an app depends on (via `DATABASE_URL`, etc.) are found and added for you. |
 | 🔒 **Encrypted at rest and in transit** | The whole backup — `APP_KEY`, env vars, SSH keys, tokens, S3 keys, database passwords — is one [age](https://age-encryption.org)-encrypted file (passphrase, scrypt). It travels over **HTTPS with a pinned certificate**; the key and the pin live only in the link's `#fragment`. |
-| 🔗 **One link transfer** | A temporary, random-token HTTPS link — through Coolify's own proxy on port 443 (TLS passthrough), or a direct port. Plain HTTP is never served. |
+| 🔗 **One share code** | The old server shares the backup over HTTPS for as long as you need, through Coolify's own proxy on port 443 (TLS passthrough) or a direct port, and prints one command with a short share code for the new server. Plain HTTP is never served. |
 | 🗄️ **Native database dumps** | PostgreSQL, MySQL and MariaDB are saved with `pg_dumpall` / `mysqldump` while they keep running, and loaded with the same image on the target. |
 | 🧾 **Coolify's own format inside** | Every backup also carries Coolify's official *Server Transfer* bundle (`schema_version 1`, made by Coolify's exporter) and the target validates it with Coolify's own validator. |
 | ⚡ **No rebuild** | The exact images your app runs are shipped. Dockerfile apps: Coolify logs *“Build step skipped”*. Docker Compose apps: started from those images without cloning or building (Coolify would rebuild them on every deploy). |

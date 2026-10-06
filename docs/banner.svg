@@ -21,9 +21,9 @@
 
   <text x="64" y="104" fill="#a78bfa" font-size="18" letter-spacing="4">◆ OPEN SOURCE · MIT</text>
   <text x="64" y="168" fill="#f4f4f5" font-size="58" font-weight="700">Coolify Mirror</text>
-  <text x="64" y="214" fill="#a1a1aa" font-size="21">Back up one domain or the whole server.</text>
-  <text x="64" y="244" fill="#a1a1aa" font-size="21">Paste one link on the new server. Same projects,</text>
-  <text x="64" y="274" fill="#a1a1aa" font-size="21">envs, volumes and containers — running.</text>
+  <text x="64" y="214" fill="#a1a1aa" font-size="21">Back up one app or the whole server.</text>
+  <text x="64" y="244" fill="#a1a1aa" font-size="21">Paste one command on the new server:</text>
+  <text x="64" y="274" fill="#a1a1aa" font-size="21">same projects, data and domains, running.</text>
   <g font-size="15">
     <rect x="64" y="310" width="170" height="36" rx="8" fill="#1f1b3a" stroke="#8b5cf6" stroke-opacity="0.6"/>
     <text x="149" y="333" fill="#c4b5fd" text-anchor="middle">single binary</text>
@@ -45,7 +45,7 @@
   <!-- beam -->
   <rect x="880" y="204" width="80" height="10" rx="5" fill="url(#beam)" filter="url(#glow)" opacity="0.8"/>
   <rect x="880" y="206" width="80" height="6" rx="3" fill="url(#beam)"/>
-  <text x="920" y="192" fill="#a1a1aa" font-size="12" text-anchor="middle">one link</text>
+  <text x="920" y="192" fill="#a1a1aa" font-size="12" text-anchor="middle">one command</text>
   <!-- target server -->
   <g transform="translate(970 110)">
     <rect width="170" height="200" rx="14" fill="#11131c" stroke="#22c55e" stroke-opacity="0.7"/>
