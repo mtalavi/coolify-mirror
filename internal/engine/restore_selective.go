@@ -370,7 +370,12 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 	}
 	for i := range plan.Resources {
 		r := &plan.Resources[i]
-		r.Expect = man.Runtime[r.SourceUUID]
+		// A copy gets new uuids, and single-container applications are
+		// named after theirs.
+		r.Expect = nil
+		for _, s := range man.Runtime[r.SourceUUID] {
+			r.Expect = append(r.Expect, plan.Rename(s))
+		}
 		// Coolify's status column can lag behind; running containers count.
 		r.WasRunning = r.WasRunning || len(r.Expect) > 0
 	}
@@ -380,10 +385,10 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 		pr.Warn("%s", w)
 	}
 	if len(undo.aside) > 0 {
-		notes = append(notes, "replaced directories were moved to "+asideDir)
+		notes = append(notes, "replaced directories were moved to "+asideDir+" (delete them from the menu, 'Saved files & disk space', once everything works)")
 	}
 	if av := undo.asideVolumes(); len(av) > 0 {
-		notes = append(notes, "previous data of volumes that already existed is kept in: "+strings.Join(av, ", ")+" (docker volume rm them when no longer needed)")
+		notes = append(notes, "previous data of volumes that already existed is kept in: "+strings.Join(av, ", ")+" (delete them from the menu, 'Saved files & disk space', once everything works)")
 	}
 	return &RestoreReport{Resources: plan.Resources, Notes: notes, Problems: problems, AsideDir: asideDir, Duration: time.Since(start)}, nil
 }

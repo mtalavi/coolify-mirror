@@ -69,6 +69,8 @@ func realMain(args []string) int {
 		err = cmdStartAll(ctx)
 	case "update":
 		err = cmdUpdate(ctx)
+	case "files":
+		err = cmdFiles(ctx, args)
 	case "version", "--version", "-v":
 		fmt.Println("coolify-mirror", engine.Version)
 		return 0
@@ -128,6 +130,11 @@ Run it as root on a Coolify server:
         --keep-download                 keep the downloaded file after a successful restore
         --set-domain OLD=NEW            replace a restored domain (repeatable, e.g. a.com=b.com);
                                         without --yes every domain is asked for at the end
+  ./coolify-mirror files                list what coolify-mirror keeps here (backups, downloads,
+                                        safety copies of restores, logs) with sizes
+  ./coolify-mirror files delete NAME…   delete them to free disk space (NAME as listed)
+        --all                           everything that is not in use
+        --yes                           do not ask for confirmation
   ./coolify-mirror update               install the latest release of coolify-mirror (checksum verified)
   ./coolify-mirror start-all            ask Coolify to start every resource on this server
                                         that has no running container (recovery helper)
@@ -155,6 +162,7 @@ func openLog(cmd string) {
 	run.SetLog(f)
 	archive.SetDebugLog(func(s string) { run.Logf("%s", s) })
 	ui.LogPath = logPath
+	engine.CurrentLog = logPath
 	run.Logf("coolify-mirror %s %s", engine.Version, cmd)
 }
 
@@ -189,6 +197,114 @@ func cmdUpdate(ctx context.Context) error {
 		return nil
 	}
 	fmt.Printf("Updated coolify-mirror %s -> %s\n", engine.Version, v)
+	return nil
+}
+
+// --- files -----------------------------------------------------------------------
+
+func cmdFiles(ctx context.Context, args []string) error {
+	sub := "list"
+	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
+		sub, args = args[0], args[1:]
+	}
+	fs := flag.NewFlagSet("files", flag.ContinueOnError)
+	yes := fs.Bool("yes", false, "")
+	all := fs.Bool("all", false, "")
+	var names []string
+	for {
+		if err := fs.Parse(args); err != nil {
+			return err
+		}
+		if fs.NArg() == 0 {
+			break
+		}
+		names = append(names, fs.Arg(0))
+		args = fs.Args()[1:]
+	}
+	if os.Geteuid() != 0 {
+		return errors.New("run it as root: sudo coolify-mirror files")
+	}
+	list, err := engine.ListStored(ctx)
+	if err != nil {
+		return err
+	}
+	switch sub {
+	case "list", "ls":
+		free, total := engine.DiskSpace(engine.HomeDir)
+		fmt.Printf("coolify-mirror keeps %s on this server (disk: %s free of %s)\n\n",
+			engine.HumanBytes(engine.StoredTotal(list)), engine.HumanBytes(free), engine.HumanBytes(total))
+		if len(list) == 0 {
+			fmt.Println("Nothing - no backups, downloads or safety copies are kept here.")
+			return nil
+		}
+		fmt.Printf("%-12s %-48s %10s  %-16s  %s\n", "KIND", "NAME", "SIZE", "DATE", "ABOUT")
+		for _, f := range list {
+			about := f.About
+			if len(f.Shares) > 0 {
+				about += "  [shared right now]"
+			}
+			if f.Busy != "" {
+				about += "  [in use: " + f.Busy + "]"
+			}
+			fmt.Printf("%-12s %-48s %10s  %-16s  %s\n", engine.KindLabel(f.Kind), f.Name, engine.HumanBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"), about)
+		}
+		fmt.Println("\nDelete with: coolify-mirror files delete NAME [NAME...]   (or --all for everything not in use)")
+		return nil
+	case "delete", "rm":
+	default:
+		return fmt.Errorf("unknown files command %q (use: files, files delete NAME...)", sub)
+	}
+	var todo []engine.StoredFile
+	byName := map[string]engine.StoredFile{}
+	for _, f := range list {
+		byName[f.Name] = f
+		if *all && f.Busy == "" {
+			todo = append(todo, f)
+		}
+	}
+	for _, n := range names {
+		f, ok := byName[strings.TrimPrefix(n, engine.BackupsDir+"/")]
+		if !ok {
+			f, ok = byName[filepath.Base(n)]
+		}
+		if !ok {
+			return fmt.Errorf("%q is not in the list - see: coolify-mirror files", n)
+		}
+		if f.Busy != "" {
+			return fmt.Errorf("%s cannot be deleted now: %s", f.Name, f.Busy)
+		}
+		if !*all {
+			todo = append(todo, f)
+		}
+	}
+	if len(todo) == 0 {
+		return errors.New("nothing to delete: name the files (see: coolify-mirror files) or use --all")
+	}
+	for _, f := range todo {
+		fmt.Printf("  - %-12s %s (%s)\n", engine.KindLabel(f.Kind), f.Name, engine.HumanBytes(f.Size))
+		for _, w := range engine.DeleteWarnings(f) {
+			fmt.Println("      !", w)
+		}
+	}
+	if !*yes && !confirm(fmt.Sprintf("Delete %d item(s) and free %s?", len(todo), engine.HumanBytes(engine.StoredTotal(todo)))) {
+		return errors.New("aborted - nothing was deleted")
+	}
+	var freed int64
+	failed := 0
+	for _, f := range todo {
+		if err := engine.DeleteStored(ctx, f); err != nil {
+			failed++
+			fmt.Printf("  ✗ %s: %v\n", f.Name, err)
+			continue
+		}
+		freed += f.Size
+		fmt.Printf("  ✓ deleted %s\n", f.Name)
+	}
+	free, _ := engine.DiskSpace(engine.HomeDir)
+	fmt.Printf("\nFreed %s - %s free now.\n", engine.HumanBytes(freed), engine.HumanBytes(free))
+	if failed > 0 {
+		return fmt.Errorf("%d item(s) were not deleted", failed)
+	}
 	return nil
 }
 
@@ -295,7 +411,7 @@ func cmdBackup(ctx context.Context, args []string) error {
 		fmt.Printf("\nShare it with:  %s serve %s\n", os.Args[0], res.Path)
 		return nil
 	}
-	return serveLoop(ctx, in, res.Path, res.Key, engine.ShareOptions{Mode: *mode, Port: *port, Host: *host, OpenFirewall: *openFW}, 0)
+	return serveLoop(ctx, in, res.Path, res.Key, engine.ShareOptions{Mode: *mode, Port: *port, Host: *host, OpenFirewall: *openFW, Dedicated: true}, 0)
 }
 
 func selectResources(rs []coolify.Resource, all bool, domains, uuids []string) ([]coolify.Resource, error) {
@@ -430,7 +546,7 @@ func cmdServe(ctx context.Context, args []string) error {
 		return errors.New("no key: pass --key (it was printed when the backup was created)")
 	}
 	_ = token // accepted for compatibility; the share code is kept with COOLIFY_MIRROR_SECRET
-	opt := engine.ShareOptions{Mode: *mode, Port: *port, Host: *host, OpenFirewall: *openFW, Secret: os.Getenv(engine.SecretEnv)}
+	opt := engine.ShareOptions{Mode: *mode, Port: *port, Host: *host, OpenFirewall: *openFW, Secret: os.Getenv(engine.SecretEnv), Dedicated: true}
 	if *detach {
 		pid, logf, err := engine.Detach(file, *key, opt, *ttl)
 		if err != nil {

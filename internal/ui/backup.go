@@ -74,30 +74,37 @@ func backupSelected(ctx context.Context, in *coolify.Instance) error {
 	if height > 18 {
 		height = 18
 	}
-	for len(chosen) == 0 {
-		err = huh.NewForm(huh.NewGroup(
-			huh.NewMultiSelect[string]().
-				Title("Which domains / resources should be backed up?").
-				Description("↑/↓ move · space select · / filter · ctrl+a all · enter continue · esc back").
-				Options(opts...).
-				Filterable(true).
-				Height(height).
-				Value(&chosen).
-				Validate(func(v []string) error {
-					for _, u := range v {
-						if r := byUUID[u]; !r.Local() {
-							return fmt.Errorf("%s runs on remote server %s - only resources on this server can be backed up", r.Name, r.ServerName)
-						}
-					}
-					return nil
-				}),
-		)).WithTheme(theme()).WithShowHelp(true).RunWithContext(ctx)
-		if err != nil {
-			return err
+	// Enter alone takes the highlighted line; space ticks several first.
+	ms := huh.NewMultiSelect[string]()
+	ms.Title("Which app should be backed up?").
+		Description("↑/↓ move · enter = the highlighted one · several: space on each, then enter · / search · esc back").
+		Options(opts...).
+		Filterable(true).
+		Height(height).
+		Value(&chosen).
+		Validate(func(v []string) error {
+			if len(v) == 0 {
+				if h, ok := ms.Hovered(); ok {
+					v = []string{h}
+				}
+			}
+			for _, u := range v {
+				if r := byUUID[u]; !r.Local() {
+					return fmt.Errorf("%s runs on remote server %s - only resources on this server can be backed up", r.Name, r.ServerName)
+				}
+			}
+			return nil
+		})
+	if err = huh.NewForm(huh.NewGroup(ms)).WithTheme(theme()).WithKeyMap(listKeys()).WithShowHelp(true).RunWithContext(ctx); err != nil {
+		return err
+	}
+	if len(chosen) == 0 {
+		if h, ok := ms.Hovered(); ok {
+			chosen = []string{h}
 		}
-		if len(chosen) == 0 {
-			fmt.Println(sWarn.Render("  Nothing selected - press space on a line to select it, then enter."))
-		}
+	}
+	if len(chosen) == 0 {
+		return errBack
 	}
 	var sel []coolify.Resource
 	for _, u := range chosen {
@@ -163,9 +170,26 @@ func backupFull(ctx context.Context, in *coolify.Instance) error {
 	return runBackup(ctx, in, req)
 }
 
+const (
+	settingsRecommended = "recommended"
+	settingsCustom      = "custom"
+)
+
 func backupOptions(ctx context.Context, req *engine.BackupRequest, full bool) error {
 	req.Consistency = engine.ConsistencyPause
 	req.Images = engine.ImagesApps
+	how := settingsRecommended
+	if err := huh.NewForm(huh.NewGroup(huh.NewSelect[string]().
+		Title("Backup settings").
+		Options(
+			huh.NewOption("Recommended  —  pause containers for a moment, include app images (no rebuild on the new server)", settingsRecommended),
+			huh.NewOption("Choose them myself", settingsCustom),
+		).Value(&how))).WithTheme(theme()).WithKeyMap(keys()).WithShowHelp(true).RunWithContext(ctx); err != nil {
+		return err
+	}
+	if how == settingsRecommended {
+		return nil
+	}
 	fields := []huh.Field{
 		huh.NewSelect[string]().
 			Title("Running containers while their data is copied").
@@ -187,7 +211,7 @@ func backupOptions(ctx context.Context, req *engine.BackupRequest, full bool) er
 			Title("Include Coolify's own database backup files (/data/coolify/backups)?").
 			Affirmative("Yes").Negative("No").Value(&req.IncludeBackups))
 	}
-	return huh.NewForm(huh.NewGroup(fields...)).WithTheme(theme()).WithShowHelp(true).RunWithContext(ctx)
+	return huh.NewForm(huh.NewGroup(fields...)).WithTheme(theme()).WithKeyMap(keys()).WithShowHelp(true).RunWithContext(ctx)
 }
 
 func runBackup(ctx context.Context, in *coolify.Instance, req engine.BackupRequest) error {
@@ -210,7 +234,8 @@ func runBackup(ctx context.Context, in *coolify.Instance, req engine.BackupReque
 	b.WriteString(fmt.Sprintf("%s  %s\n", sMuted.Render("File "), res.Path))
 	b.WriteString(fmt.Sprintf("%s  %s  %s\n", sMuted.Render("Size "), sBold.Render(engine.HumanBytes(res.Size)),
 		sMuted.Render(fmt.Sprintf("(%s of data, %d resource(s), %s)", engine.HumanBytes(res.RawBytes), len(res.Manifest.Resources), engine.HumanDuration(res.Duration)))))
-	b.WriteString(fmt.Sprintf("%s  %s", sMuted.Render("Key  "), res.Key))
+	b.WriteString(fmt.Sprintf("%s  %s\n", sMuted.Render("Key  "), res.Key))
+	b.WriteString(sMuted.Render("Kept on this server until you delete it (menu → " + filesMenuName + ")"))
 	fmt.Println(boxed(sBox, b.String()))
 	return offerShare(ctx, in, res.Path, res.Key)
 }
