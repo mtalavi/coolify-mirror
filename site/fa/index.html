@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="fa" dir="rtl" class="no-js">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Coolify Mirror: انتقال اپ‌های Coolify بین سرورها</title>
+<meta name="description" content="از یک اپ یا کل سرور Coolify بک‌آپ بگیرید و با یک دستور روی سرور دیگر ریستور کنید. داده‌ها، دیتابیس‌ها، دامنه‌ها و imageها روشن و بررسی‌شده می‌رسند. متن‌باز، MIT.">
+<link rel="canonical" href="https://coolify-mirror.pages.dev/fa/">
+<link rel="alternate" hreflang="en" href="https://coolify-mirror.pages.dev/">
+<link rel="alternate" hreflang="fa" href="https://coolify-mirror.pages.dev/fa/">
+<meta property="og:type" content="website">
+<meta property="og:locale" content="fa_IR">
+<meta property="og:title" content="Coolify Mirror: انتقال اپ‌های Coolify بین سرورها">
+<meta property="og:description" content="روی هر سرور یک دستور. داده‌ها، دیتابیس‌ها، دامنه‌ها و imageها روشن و بررسی‌شده می‌رسند.">
+<meta property="og:url" content="https://coolify-mirror.pages.dev/fa/">
+<meta property="og:image" content="https://coolify-mirror.pages.dev/assets/img/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
+<link rel="icon" href="../assets/mark.svg" type="image/svg+xml">
+<link rel="preload" href="../assets/fonts/vazirmatn-arabic-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="../assets/img/01-menu.webp" as="image" type="image/webp">
+<link rel="stylesheet" href="../assets/site.css">
+<link rel="stylesheet" href="../assets/icons/phosphor.min.css">
+<script defer src="../assets/site.js"></script>
+</head>
+<body>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Coolify Mirror، صفحه‌ی اول"><img src="../assets/mark.svg" alt="" width="26" height="26">Coolify Mirror</a>
+    <nav class="nav-links" aria-label="بخش‌ها">
+      <a href="#tutorial">آموزش</a>
+      <a href="#what-moves">چه منتقل می‌شود</a>
+      <a href="#case-studies">نمونه‌های واقعی</a>
+      <a href="#stack">پشت صحنه</a>
+      <a href="#changelog">تاریخچه‌ی نسخه‌ها</a>
+      <a href="#faq">پرسش‌ها</a>
+    </nav>
+    <div class="nav-side">
+      <a class="lang" href="../" hreflang="en" lang="en">English</a>
+      <a class="btn btn-ghost btn-sm" href="https://github.com/mtalavi/coolify-mirror" aria-label="GitHub"><i class="ph ph-github-logo" aria-hidden="true"></i><span class="hide-sm">GitHub</span></a>
+      <button class="icon-btn menu-btn" type="button" aria-label="منو" aria-expanded="false"><i class="ph ph-list" aria-hidden="true"></i></button>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+<section class="hero">
+  <div class="wrap">
+    <div>
+      <h1 class="reveal">اپ‌های Coolify را به سرور جدید ببرید، روشن.</h1>
+      <p class="lead reveal" style="--d:.08s">از یک اپ یا کل سرور بک‌آپ بگیرید. روی سرور جدید فقط یک دستور بزنید. همه‌چیز روشن و بررسی‌شده می‌رسد.</p>
+      <div class="hero-cta reveal" style="--d:.16s">
+        <a class="btn btn-primary" href="#tutorial">شروع انتقال<i class="ph ph-arrow-left" aria-hidden="true"></i></a>
+        <a class="btn btn-ghost" href="https://github.com/mtalavi/coolify-mirror"><i class="ph ph-github-logo" aria-hidden="true"></i>دیدن در GitHub</a>
+      </div>
+    </div>
+    <div class="hero-shot reveal" style="--d:.12s">
+      <img class="shot" src="../assets/img/01-menu.webp" width="2024" height="1087" alt="ترمینال: نصب coolify-mirror با یک دستور و منوی اصلی آن روی سرور قدیم" fetchpriority="high">
+    </div>
+  </div>
+</section>
+
+<section class="band" id="install" aria-labelledby="install-h">
+  <div class="wrap band-grid">
+    <div class="reveal">
+      <h2 id="install-h">دو دستور. روی هر سرور یکی.</h2>
+      <p>اولی برنامه را نصب می‌کند و منو را باز می‌کند. دومی را سرور قدیم بعد از بک‌آپ خودش نشان می‌دهد.</p>
+    </div>
+    <div class="cmds reveal">
+      <div>
+        <div class="cmd-label"><i class="ph ph-hard-drives" aria-hidden="true"></i>سرور قدیم (مبدأ)</div>
+        <div class="cmd">
+          <code><span class="p">$ </span>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh</code>
+          <button class="copy" type="button" aria-label="کپی" data-label="کپی" data-copied="کپی شد" data-copy="curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh"><i class="ph ph-copy" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div>
+        <div class="cmd-label"><i class="ph ph-hard-drives" aria-hidden="true"></i>سرور جدید (مقصد): خط واقعی را از سرور قدیم کپی کنید</div>
+        <div class="cmd">
+          <code><span class="p">$ </span>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore 203.0.113.10/hi4i-2dzx-hmeg-42qp-palx-52s7-zq</code>
+          <span class="tag">example</span>
+        </div>
+      </div>
+      <div class="facts">
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>بررسی SHA-256 هنگام نصب</span>
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>لینوکس amd64 و arm64</span>
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Coolify 4.3.x، هر دو سرور یک نسخه</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="what-moves" aria-labelledby="moves-h">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2 id="moves-h">همراه اپ شما چه می‌آید</h2>
+      <p>یک دامنه را از لیست انتخاب کنید. هر چیزی که اپ برای کار کردن لازم دارد همراهش می‌آید و سرور جدید آن را با خود Coolify روشن می‌کند.</p>
+    </div>
+    <div class="bento">
+      <article class="cell span2 media reveal">
+        <i class="ph ph-hard-drives ph-icon" aria-hidden="true"></i>
+        <h3>داده‌ها، در حالی که اپ کار می‌کند</h3>
+        <p>volumeها، پوشه‌ها و فایل‌ها. کانتینرها فقط چند ثانیه‌ی کپی pause می‌شوند. دیتابیس‌ها هیچ‌وقت.</p>
+        <figure><img src="../assets/img/05-progress.webp" width="1990" height="760" alt="پیشرفت بک‌آپ: فایل‌ها، volumeها، dump دیتابیس و image با حجم و سرعت" loading="lazy"></figure>
+      </article>
+      <article class="cell reveal">
+        <i class="ph ph-database ph-icon" aria-hidden="true"></i>
+        <h3>dump واقعی دیتابیس‌ها</h3>
+        <p>PostgreSQL، MySQL و MariaDB با <code>pg_dumpall</code> و <code>mysqldump</code> ذخیره و روی سرور جدید با همان image بارگذاری می‌شوند.</p>
+      </article>
+      <article class="cell reveal">
+        <i class="ph ph-sliders-horizontal ph-icon" aria-hidden="true"></i>
+        <h3>همه‌ی تنظیمات Coolify</h3>
+        <p>پروژه‌ها، environmentها، متغیرها، storageها، تگ‌ها، تسک‌ها و بک‌آپ‌های زمان‌بندی‌شده. رمزها با کلید سرور جدید دوباره رمزنگاری می‌شوند.</p>
+      </article>
+      <article class="cell span2 media reveal">
+        <i class="ph ph-graph ph-icon" aria-hidden="true"></i>
+        <h3>وابستگی‌ها خودشان پیدا می‌شوند</h3>
+        <p>اپ را انتخاب کنید. Postgresی که پشت <code>DATABASE_URL</code> آن است پیدا و پیشنهاد می‌شود.</p>
+        <figure><img src="../assets/img/03-deps.webp" width="1390" height="469" alt="سؤال برداشتن وابستگی‌ها: shop-db که shop-web از طریق DATABASE_URL استفاده می‌کند" loading="lazy"></figure>
+      </article>
+      <article class="cell span2 tint reveal">
+        <i class="ph ph-lightning ph-icon" aria-hidden="true"></i>
+        <h3>بدون build دوباره روی سرور جدید</h3>
+        <p>همان imageهایی که اپ‌ها با آن اجرا می‌شوند منتقل می‌شوند. اپ‌های Docker Compose بدون clone و build از همان‌ها روشن می‌شوند؛ مهم‌تر از همه روی اینترنت کند.</p>
+        <div class="big">۰ build</div>
+      </article>
+      <article class="cell reveal">
+        <i class="ph ph-globe ph-icon" aria-hidden="true"></i>
+        <h3>دامنه‌ها، آخر کار</h3>
+        <p>درست قبل از روشن شدن، هر دامنه را نگه دارید یا دامنه‌ی جدید بنویسید. Coolify برچسب‌های پروکسی را به‌روز می‌کند.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="tutorial" aria-labelledby="tut-h" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2 id="tut-h">کل انتقال، صفحه به صفحه</h2>
+      <p>صفحه‌های واقعی از انتقال به یک Coolify 4.3.23 تازه‌نصب با نسخه‌ی منتشرشده‌ی برنامه. یک مرحله و بعد یک صفحه را انتخاب کنید. منوی برنامه انگلیسی است؛ اسم دقیق هر گزینه را این‌جا می‌بینید.</p>
+    </div>
+
+    <div class="tabs reveal" role="tablist" aria-label="مراحل انتقال">
+      <button class="tab" role="tab" id="step-backup" aria-controls="panel-backup" aria-selected="true"><span class="n">۱</span>بک‌آپ</button>
+      <button class="tab" role="tab" id="step-restore" aria-controls="panel-restore" aria-selected="false" tabindex="-1"><span class="n">۲</span>ریستور</button>
+      <button class="tab" role="tab" id="step-switch" aria-controls="panel-switch" aria-selected="false" tabindex="-1"><span class="n">۳</span>تغییر DNS</button>
+      <button class="tab" role="tab" id="step-clean" aria-controls="panel-clean" aria-selected="false" tabindex="-1"><span class="n">۴</span>آزاد کردن فضا</button>
+    </div>
+
+    <div class="panel" role="tabpanel" id="panel-backup" aria-labelledby="step-backup">
+      <div>
+        <div class="where"><i class="ph ph-hard-drives" aria-hidden="true"></i>روی سرور قدیم</div>
+        <h3>بک‌آپ بگیرید و به اشتراک بگذارید</h3>
+        <p>با SSH و کاربر root یا کاربری که sudo دارد وارد سرور قدیم شوید و بزنید:</p>
+        <div class="cmd">
+          <code>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh</code>
+          <button class="copy" type="button" aria-label="کپی" data-label="کپی" data-copied="کپی شد" data-copy="curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh"><i class="ph ph-copy" aria-hidden="true"></i></button>
+        </div>
+        <ol class="screens">
+          <li><div><span class="q">What do you want to do?</span><span class="a">گزینه‌ی Back up apps</span></div></li>
+          <li><div><span class="q">Which app should be backed up?</span><span class="a">با کلیدهای جهت روی اپ بروید و Enter. چند اپ: روی هر کدام Space و بعد Enter.</span></div></li>
+          <li><div><span class="q">Also back up what they depend on?</span><span class="a">Yes</span></div></li>
+          <li><div><span class="q">Backup settings</span><span class="a">Recommended</span></div></li>
+          <li><div><span class="q">How should the other server get this backup?</span><span class="a">Share a link through Coolify's proxy on port 443</span></div></li>
+          <li><div><span class="q">On the other Coolify server, run this one command</span><span class="a">خط سبزی را که با <code>curl</code> شروع می‌شود کپی کنید.</span></div></li>
+        </ol>
+        <p class="note"><i class="ph ph-info" aria-hidden="true"></i><span>تا سرور جدید دانلود کند این پنجره را باز بگذارید، یا <kbd>b</kbd> بزنید تا اشتراک ۲۴ ساعت در پس‌زمینه بماند.</span></p>
+      </div>
+      <div class="gallery">
+        <figure>
+          <img class="shot main" src="../assets/img/01-menu.webp" width="2024" height="1087" alt="نصب و منوی اصلی" loading="lazy">
+          <figcaption>نصب و شروع: یک دستور، بعد منو.</figcaption>
+        </figure>
+        <div class="thumbs" aria-label="صفحه‌های این مرحله">
+          <button class="thumb" type="button" aria-pressed="true" data-src="../assets/img/01-menu.webp" data-w="2024" data-h="1087" data-alt="نصب و منوی اصلی" data-cap="نصب و شروع: یک دستور، بعد منو.">شروع</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/02-select.webp" data-w="1807" data-h="614" data-alt="لیست اپ‌ها با دامنه، نوع، پروژه و وضعیت" data-cap="انتخاب اپ: روی آن بروید و Enter بزنید.">انتخاب اپ</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/03-deps.webp" data-w="1390" data-h="469" data-alt="سؤال وابستگی برای shop-db" data-cap="دیتابیس اپ خودش پیدا می‌شود. Yes بزنید.">دیتابیس اپ</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/04-options.webp" data-w="1824" data-h="469" data-alt="تنظیمات بک‌آپ با گزینه‌ی Recommended" data-cap="Recommended: pause کوتاه، imageهای اپ داخل بک‌آپ.">تنظیمات</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/05-progress.webp" data-w="1990" data-h="760" data-alt="پیشرفت بک‌آپ" data-cap="هر مرحله با حجم، سرعت و زمان باقی‌مانده.">پیشرفت</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/06-done.webp" data-w="1924" data-h="1197" data-alt="پایان بک‌آپ و سؤال اشتراک" data-cap="بک‌آپ تمام شد. اشتراک از پورت 443.">اشتراک</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/07-share.webp" data-w="2024" data-h="833" data-alt="دستور و کد اشتراک برای سرور جدید" data-cap="خط سبز را برای سرور جدید کپی کنید.">دستور مقصد</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" role="tabpanel" id="panel-restore" aria-labelledby="step-restore" hidden>
+      <div>
+        <div class="where"><i class="ph ph-hard-drives" aria-hidden="true"></i>روی سرور جدید</div>
+        <h3>خط را Paste کنید و Yes بزنید</h3>
+        <p>با SSH وارد سرور جدید شوید و خطی را که کپی کردید Paste کنید. شبیه این است:</p>
+        <div class="cmd">
+          <code>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore 203.0.113.10/hi4i-2dzx-hmeg-42qp-palx-52s7-zq</code>
+          <span class="tag">example</span>
+        </div>
+        <ol class="screens">
+          <li><div><span class="q">Getting the backup</span><span class="a">نصب، دانلود و بررسی همه‌ی داده‌ها. هنوز هیچ تغییری نمی‌کند.</span></div></li>
+          <li><div><span class="q">Restore these resources into this Coolify?</span><span class="a">فهرست را بخوانید و Yes بزنید.</span></div></li>
+          <li><div><span class="q">Domains</span><span class="a">Enter یعنی همان دامنه بماند؛ یا دامنه‌ی جدید را بنویسید.</span></div></li>
+          <li><div><span class="q">Rebuild N application(s) once now?</span><span class="a">Yes ثابت می‌کند deployهای بعدی هم کار می‌کنند. اینترنت کند: No.</span></div></li>
+          <li><div><span class="q">Restore complete · everything verified</span><span class="a">تمام. Coolify جدید را باز کنید.</span></div></li>
+        </ol>
+        <p class="note"><i class="ph ph-info" aria-hidden="true"></i><span>سؤال rebuild فقط برای اپ‌هایی می‌آید که Coolify از Git می‌سازد. اگر برنامه روی این سرور نصب است: <code>sudo coolify-mirror</code> و بعد Restore a backup.</span></p>
+      </div>
+      <div class="gallery">
+        <figure>
+          <img class="shot main" src="../assets/img/08-paste.webp" width="2024" height="1197" alt="دستور Paste‌شده که برنامه را نصب و بک‌آپ را بررسی می‌کند" loading="lazy">
+          <figcaption>Paste: نصب، دانلود و بررسی، قبل از هر تغییری.</figcaption>
+        </figure>
+        <div class="thumbs" aria-label="صفحه‌های این مرحله">
+          <button class="thumb" type="button" aria-pressed="true" data-src="../assets/img/08-paste.webp" data-w="2024" data-h="1197" data-alt="دستور Paste‌شده که برنامه را نصب و بک‌آپ را بررسی می‌کند" data-cap="Paste: نصب، دانلود و بررسی، قبل از هر تغییری.">Paste</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/10-confirm.webp" data-w="1924" data-h="614" data-alt="سؤال Restore these resources into this Coolify" data-cap="اول یک import آزمایشی اجرا می‌شود، بعد می‌پرسد.">تأیید</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/12-domains.webp" data-w="1990" data-h="1087" data-alt="پیشرفت ریستور و مرحله‌ی دامنه‌ها" data-cap="فایل‌ها، volumeها، imageها، dumpها و بعد دامنه‌ها.">دامنه‌ها</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/13-complete.webp" data-w="2007" data-h="905" data-alt="ریستور کامل و همه‌چیز بررسی‌شده" data-cap="روشن‌شده با Coolify، بررسی‌شده واقعی.">بررسی‌شده</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" role="tabpanel" id="panel-switch" aria-labelledby="step-switch" hidden>
+      <div>
+        <div class="where"><i class="ph ph-globe" aria-hidden="true"></i>DNS و سرور قدیم</div>
+        <h3>دامنه‌ها را به سرور جدید ببرید</h3>
+        <ol class="screens">
+          <li><div><span class="q">Open Coolify: http://&lt;new-server&gt;:8000</span><span class="a">اپ‌ها را در Coolify جدید چک کنید. آدرسش آخر کار نوشته می‌شود.</span></div></li>
+          <li><div><span class="q">DNS</span><span class="a">رکورد A هر دامنه را به IP سرور جدید تغییر دهید.</span></div></li>
+          <li><div><span class="q">سرور قدیم</span><span class="a">اپ‌های منتقل‌شده را خاموش و تسک‌ها و بک‌آپ‌های زمان‌بندی‌شده‌شان را غیرفعال کنید.</span></div></li>
+        </ol>
+        <p class="note"><i class="ph ph-info" aria-hidden="true"></i><span>کل انتقال به‌صورت راهنما داخل منو هم هست: <code>sudo coolify-mirror</code> و بعد How it works.</span></p>
+      </div>
+      <div class="gallery">
+        <figure>
+          <img class="shot main" src="../assets/img/15-guide.webp" width="1857" height="1269" alt="راهنمای داخلی How a move works" loading="lazy">
+          <figcaption>راهنمای داخلی برنامه، از بک‌آپ تا آزاد کردن فضا.</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <div class="panel" role="tabpanel" id="panel-clean" aria-labelledby="step-clean" hidden>
+      <div>
+        <div class="where"><i class="ph ph-broom" aria-hidden="true"></i>روی هر دو سرور</div>
+        <h3>بک‌آپ‌هایی را که لازم ندارید پاک کنید</h3>
+        <div class="cmd">
+          <code>sudo coolify-mirror</code>
+          <button class="copy" type="button" aria-label="کپی" data-label="کپی" data-copied="کپی شد" data-copy="sudo coolify-mirror"><i class="ph ph-copy" aria-hidden="true"></i></button>
+        </div>
+        <ol class="screens">
+          <li><div><span class="q">What do you want to do?</span><span class="a">گزینه‌ی Saved files &amp; disk space</span></div></li>
+          <li><div><span class="q">What do you want to clean up?</span><span class="a">All backups</span></div></li>
+          <li><div><span class="q">Which backups should be deleted?</span><span class="a">خط اول ALL همه را برمی‌دارد. یا روی یکی Enter، یا روی چندتا Space.</span></div></li>
+          <li><div><span class="q">Delete N backup(s) and free X?</span><span class="a">Yes. پیش‌فرض No است.</span></div></li>
+        </ol>
+        <p class="note"><i class="ph ph-info" aria-hidden="true"></i><span>روی سرور جدید، وقتی مطمئن شدید همه‌چیز کار می‌کند، نسخه‌های ایمنی را هم از Everything kept here پاک کنید. بدون منو: <code>sudo coolify-mirror files delete --backups</code></span></p>
+      </div>
+      <div class="gallery">
+        <figure>
+          <img class="shot main" src="../assets/img/14-files.webp" width="1640" height="651" alt="خلاصه‌ی فایل‌های ذخیره‌شده و سؤال پاک‌سازی" loading="lazy">
+          <figcaption>چیزهایی که برنامه این‌جا نگه داشته و فضای آزاد دیسک.</figcaption>
+        </figure>
+        <div class="thumbs" aria-label="صفحه‌های این مرحله">
+          <button class="thumb" type="button" aria-pressed="true" data-src="../assets/img/14-files.webp" data-w="1640" data-h="651" data-alt="خلاصه‌ی فایل‌های ذخیره‌شده و سؤال پاک‌سازی" data-cap="چیزهایی که برنامه این‌جا نگه داشته و فضای آزاد دیسک.">خلاصه</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/16-all-backups.webp" data-w="1957" data-h="469" data-alt="لیست All backups با خط ALL" data-cap="ALL همه‌ی بک‌آپ‌ها را یک‌جا برمی‌دارد.">All backups</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/17-delete.webp" data-w="1190" data-h="506" data-alt="تأیید حذف ۳ بک‌آپ" data-cap="فهرست چیزهایی که پاک می‌شود. پیش‌فرض No.">تأیید</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="../assets/img/18-freed.webp" data-w="1174" data-h="396" data-alt="81.3 MB آزاد شد" data-cap="فضای آزادشده و فضای آزاد جدید دیسک.">آزاد شد</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="keys reveal" aria-label="کلیدها">
+      <span><kbd>↑</kbd><kbd>↓</kbd>حرکت</span>
+      <span><kbd>enter</kbd>انتخاب</span>
+      <span><kbd>space</kbd>تیک چند خط</span>
+      <span><kbd>/</kbd>جستجو</span>
+      <span><kbd>esc</kbd>برگشت</span>
+      <span><kbd>ctrl+c</kbd>توقف</span>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="verified" aria-labelledby="ver-h" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2 id="ver-h">«ریستور کامل» یعنی واقعاً کار می‌کند</h2>
+      <p>Coolify همه‌چیز را روشن می‌کند. بعد برنامه بررسی می‌کند واقعاً چه شد، و اگر چیزی کار نکند صریح می‌گوید.</p>
+    </div>
+    <figure class="proof-shot reveal" style="margin-inline:auto">
+      <img class="shot" src="../assets/img/13-complete.webp" width="2007" height="905" alt="ریستور کامل و بررسی‌شده: shop-db و shop-web روشن و دامنه‌ها از پروکسی جواب می‌دهند" loading="lazy">
+    </figure>
+    <div class="checks">
+      <div class="reveal"><h3><i class="ph ph-check-circle" aria-hidden="true"></i>همان سرویس‌ها</h3><p>هر سرویسی که روی سرور قدیم روشن بود روی سرور جدید هم بالاست.</p></div>
+      <div class="reveal"><h3><i class="ph ph-check-circle" aria-hidden="true"></i>۳۰ ثانیه پایدار</h3><p>همه‌ی کانتینرها سالم، بدون حتی یک ری‌استارت.</p></div>
+      <div class="reveal"><h3><i class="ph ph-check-circle" aria-hidden="true"></i>دامنه‌ها جواب می‌دهند</h3><p>هر دامنه واقعاً از Traefik همان سرور باز می‌شود، نه فقط در تنظیمات.</p></div>
+      <div class="reveal"><h3><i class="ph ph-check-circle" aria-hidden="true"></i>deploy بعدی کار می‌کند</h3><p>rebuild اختیاری از همان commit و بدون cache.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="case-studies" aria-labelledby="cases-h" style="background:var(--bg-2);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2 id="cases-h">انتقال‌های واقعی</h2>
+      <p>سه اجرا روی Coolify 4.3.23 واقعی، با چیزهایی که اندازه گرفته شد.</p>
+    </div>
+    <div class="cases">
+      <article class="case lead-case reveal">
+        <h3>اپ Compose با ۷ سرویس روی اینترنت کند</h3>
+        <p>یک اپ واقعی Docker Compose با ۷ سرویس، Postgres، ۶ volume و یک اسکریپت build روی میزبان، به سروری با اینترنت کند منتقل شد.</p>
+        <div class="metric">~۱ دقیقه<small>تا روشن شدن، بدون clone و build</small></div>
+        <div class="compare">
+          <div><b>deploy خود Coolify</b><span>۱۱ دقیقه فقط clone، بعد ساعت‌ها build</span></div>
+          <div class="after"><b>Coolify Mirror</b><span>حدود یک دقیقه، از imageهای منتقل‌شده</span></div>
+        </div>
+        <ul>
+          <li>۶ کانتینر سالم، و در Coolify وضعیت <code>running:healthy</code></li>
+          <li>دامنه از Traefik سرور جدید جواب 200 داد</li>
+          <li>یک deployment ثبت‌شده با شناسه‌های سرور جدید</li>
+        </ul>
+      </article>
+      <article class="case reveal">
+        <h3>پنج نوع اپ، صفر دخالت دستی</h3>
+        <div class="metric">۰<small>کار دستی</small></div>
+        <p>اپ Compose با اسکریپت build روی میزبان و builder نام‌دار، اپ Dockerfile، اپ image، WordPress با MariaDB و Postgres. همان secretها، داده‌ی volume و ردیف‌های دیتابیس (md5) مبدأ، همه‌ی دامنه‌ها در حال جواب، و یک rebuild کامل روی سرور جدید.</p>
+      </article>
+      <article class="case reveal">
+        <h3>از Paste تا بررسی کامل</h3>
+        <div class="metric">2m 39s<small>از ریستور تا بررسی کامل</small></div>
+        <p>همین آموزش بالا: یک اپ و Postgres آن از پورت 443 به یک Coolify تازه‌نصب منتقل شد. دانلود ۴۷٫۵ مگابایت و بررسی آن در شبکه‌ی آزمایشگاه یک ثانیه طول کشید.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="safety" aria-labelledby="safe-h">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2 id="safe-h">ساخته‌شده تا چیزی از دست نرود</h2>
+    </div>
+    <div class="safety">
+      <div class="reveal"><i class="ph ph-lock-key" aria-hidden="true"></i><h3>رمزنگاری از اول تا آخر</h3><p>بک‌آپ یک فایل رمزشده با age است. با HTTPS و گواهی‌ای منتقل می‌شود که کد اشتراک آن را pin کرده. HTTP ساده هرگز.</p></div>
+      <div class="reveal"><i class="ph ph-shield-check" aria-hidden="true"></i><h3>بررسی قبل از هر تغییر</h3><p>نسخه‌ی یکسان Coolify، فضای دیسک، اعتبارسنجی bundle با خود Coolify، تداخل‌ها، و یک import آزمایشی در تراکنشی که برگردانده می‌شود.</p></div>
+      <div class="reveal"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><h3>برگشت (Rollback)</h3><p>اگر import شکست بخورد، هر چیزی که ساخته شده پاک می‌شود. ریستور کامل دیتابیس و <code>.env</code> قبلی Coolify را برمی‌گرداند.</p></div>
+      <div class="reveal"><i class="ph ph-archive" aria-hidden="true"></i><h3>هیچ چیز پنهانی پاک نمی‌شود</h3><p>volume موجود داده‌اش را با اسم <code>&lt;name&gt;.cm-old-&lt;time&gt;</code> نگه می‌دارد. پوشه‌های جایگزین‌شده تا وقتی خودتان پاک کنید می‌مانند.</p></div>
+      <div class="reveal"><i class="ph ph-traffic-signal" aria-hidden="true"></i><h3>هر بار فقط یک اجرا</h3><p>یک قفل جلوی دو بک‌آپ یا ریستور هم‌زمان را می‌گیرد. کانتینرهای pause‌شده همیشه ادامه می‌دهند، حتی بعد از ctrl+c.</p></div>
+      <div class="reveal"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><h3>آماده‌ی آپدیت‌های Coolify</h3><p>هر اجرا بخش‌هایی از Coolify را که لازم دارد بررسی می‌کند. یک تست روزانه اپ‌های واقعی را بین دو نصب تازه‌ی هر نسخه‌ی جدید Coolify جابه‌جا می‌کند.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="stack" aria-labelledby="stack-h" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2 id="stack-h">پشت صحنه</h2>
+      <p>یک فایل از یک سرور به سرور دیگر می‌رود. در هر طرف این اتفاق می‌افتد.</p>
+    </div>
+    <div class="flow reveal">
+      <div class="flow-side">
+        <h3><i class="ph ph-upload-simple" aria-hidden="true"></i>سرور قدیم</h3>
+        <ol>
+          <li>Coolify rows of the picked apps</li>
+          <li>volumes, files, images, dumps</li>
+          <li>Coolify's own transfer bundle</li>
+          <li>tar, zstd, age: backup.cmb</li>
+        </ol>
+      </div>
+      <div class="flow-mid">
+        <i class="ph ph-lock-key" aria-hidden="true"></i>
+        <div class="pipe"></div>
+        <span>HTTPS روی پورت 443 با گواهی pin‌شده</span>
+      </div>
+      <div class="flow-side">
+        <h3><i class="ph ph-download-simple" aria-hidden="true"></i>سرور جدید</h3>
+        <ol>
+          <li>download, resume, verify</li>
+          <li>preflight and trial import</li>
+          <li>restore and import, new IDs</li>
+          <li>start through Coolify, verify</li>
+        </ol>
+      </div>
+    </div>
+    <div class="stack">
+      <div class="reveal">
+        <h3>خود برنامه</h3>
+        <ul>
+          <li><b>Go 1.26</b>، یک فایل اجرایی برای لینوکس amd64 و arm64</li>
+          <li><b>Bubble Tea، huh و Lip Gloss</b> برای رابط ترمینال</li>
+          <li>رمزنگاری <b>age</b> (رمز با scrypt) و فشرده‌سازی <b>zstd</b></li>
+        </ul>
+      </div>
+      <div class="reveal">
+        <h3>داخل Coolify</h3>
+        <ul>
+          <li><b>Server Transfer bundle</b> (schema_version 1) که کد خود Coolify می‌سازد و بررسی می‌کند</li>
+          <li><b>رمزها</b> با APP_KEY قدیمی باز و با کلید جدید دوباره رمزنگاری می‌شوند</li>
+          <li><b>Traefik TLS passthrough</b> اشتراک را روی پورت 443 می‌برد</li>
+        </ul>
+      </div>
+      <div class="reveal">
+        <h3>انتشار</h3>
+        <ul>
+          <li><b>GitHub Actions</b> هر نسخه و SHA-256 آن را می‌سازد</li>
+          <li><b>نصب‌کننده</b> قبل از اجرا checksum را بررسی می‌کند</li>
+          <li><b>تست روزانه</b> یک انتقال کامل روی هر نسخه‌ی جدید Coolify</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="changelog" aria-labelledby="log-h" style="background:var(--bg-2);border-block:1px solid var(--line)">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2 id="log-h">تاریخچه‌ی نسخه‌ها</h2>
+      <p>همه‌ی نسخه‌ها با فایل‌ها و checksum در <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> هستند.</p>
+    </div>
+    <div class="timeline">
+      <div class="rel reveal"><div><span class="v">1.7.1</span><span class="d">2026-10-07</span></div><div><h3>راهنمای قدم‌به‌قدم</h3><p>شروع سریع ۴ قدمی و همه‌ی اسکرین‌شات‌ها از یک انتقال واقعی. پشت پروکسی Coolify، صفحه‌ی اشتراک به‌جای آدرس پروکسی می‌نویسد The other server.</p></div></div>
+      <div class="rel reveal"><div><span class="v">1.7.0</span><span class="d">2026-10-06</span></div><div><h3>همه‌ی بک‌آپ‌ها یک‌جا</h3><p>خط ALL همه‌ی بک‌آپ‌ها را یک‌جا پاک می‌کند، یا چندتا را انتخاب کنید. در خط فرمان: <code>files delete --backups</code>.</p></div></div>
+      <div class="rel reveal"><div><span class="v">1.6.0</span><span class="d">2026-10-06</span></div><div><h3>فایل‌های ذخیره‌شده و فضای دیسک</h3><p>دیدن و پاک کردن چیزهایی که برنامه روی هر دو سرور نگه داشته. Enter همان اپ انتخاب‌شده را برمی‌دارد، تنظیمات Recommended و راهنمای داخلی.</p></div></div>
+      <div class="rel reveal"><div><span class="v">1.5.0</span><span class="d">2026-10-06</span></div><div><h3>کد اشتراک و یک دستور</h3><p>روی هر سرور یک دستور کوتاه. بررسی در برابر هر آپدیت Coolify، و <code>coolify-mirror update</code>.</p></div></div>
+      <div class="rel reveal"><div><span class="v">1.4.0</span><span class="d">2026-10-06</span></div><div><h3>اپ‌های Compose بدون build</h3><p>اپ‌های Docker Compose بدون clone و build از imageهای منتقل‌شده روشن می‌شوند.</p></div></div>
+      <div class="rel reveal"><div><span class="v">1.3.1</span><span class="d">2026-10-06</span></div><div><h3>ریستور بررسی‌شده</h3><p>موفقیت فقط وقتی سرور جدید واقعاً اپ‌ها را اجرا کند. وابستگی‌های build روی میزبان هم منتقل می‌شوند و <code>--verify-redeploy</code> deploy بعدی را ثابت می‌کند.</p></div></div>
+      <div class="rel reveal"><div><span class="v">1.2.0</span><span class="d">2026-10-05</span></div><div><h3>HTTPS با pin و dump واقعی</h3><p>انتقال فقط با HTTPS و گواهی pin‌شده، dump واقعی دیتابیس‌ها، بررسی‌های اجباری قبل از ریستور، و bundle رسمی Coolify داخل بک‌آپ.</p></div></div>
+      <div class="rel reveal"><div><span class="v">1.1.0</span><span class="d">2026-10-04</span></div><div><h3>دامنه‌ها آخر کار، متن‌باز</h3><p>مرحله‌ی دامنه‌ها در پایان هر ریستور. انتشار با لایسنس MIT و نصب‌کننده‌ی یک‌خطی.</p></div></div>
+      <div class="rel reveal"><div><span class="v">1.0.0</span><span class="d">2026-10-01</span></div><div><h3>نسخه‌ی اول</h3><p>بک‌آپ انتخابی و کامل، اشتراک، ریستور با rollback و منوی تعاملی.</p></div></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="faq" aria-labelledby="faq-h">
+  <div class="wrap">
+    <div class="section-head reveal">
+      <h2 id="faq-h">پرسش‌ها</h2>
+    </div>
+    <div class="faq reveal">
+      <details><summary>با کدام نسخه‌های Coolify کار می‌کند؟<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify 4.3.x، و هر دو سرور باید دقیقاً یک نسخه باشند. برنامه در شروع می‌گوید این نسخه تست شده یا نه. اگر نسخه‌ها فرق داشته باشند، می‌گوید کدام سرور را آپدیت کنید.</p></details>
+      <details><summary>سرور قدیم هنگام بک‌آپ از کار می‌افتد؟<i class="ph ph-plus" aria-hidden="true"></i></summary><p>نه. با تنظیمات Recommended کانتینرها فقط چند ثانیه‌ای که کپی volumeشان طول می‌کشد pause می‌شوند و دیتابیس‌ها در حال کار dump می‌شوند. روی سرور قدیم چیزی پاک نمی‌شود.</p></details>
+      <details><summary>سرور جدید می‌تواند پروژه‌های دیگری هم داشته باشد؟<i class="ph ph-plus" aria-hidden="true"></i></summary><p>بله. بک‌آپ اپ‌ها با Coolify جدید ادغام می‌شود و هر چه آن‌جاست می‌ماند. اپی که از قبل هست را می‌شود به‌صورت کپی ریستور کرد یا رد کرد. بک‌آپ کل سرور فقط روی Coolify تازه و خالی می‌نشیند.</p></details>
+      <details><summary>سرور جدید به سرور قدیم وصل نمی‌شود.<i class="ph ph-plus" aria-hidden="true"></i></summary><p>پورت 443 سرور قدیم بسته است. روی سرور قدیم q بزنید، بعد Share a saved backup، همان بک‌آپ، و Share a link on port 8123. پورت 8123 را در فایروال دیتاسنتر هم باز کنید و دستور جدیدی را که نشان می‌دهد روی سرور جدید بزنید.</p></details>
+      <details><summary>SSH وسط دانلود قطع شد.<i class="ph ph-plus" aria-hidden="true"></i></summary><p>اشتراک سرور قدیم را باز نگه دارید و همان دستور را دوباره بزنید؛ دانلود از همان‌جا ادامه پیدا می‌کند. روی سرورهای بزرگ برنامه را داخل tmux اجرا کنید.</p></details>
+      <details><summary>سرور جدید به GitHub دسترسی ندارد.<i class="ph ph-plus" aria-hidden="true"></i></summary><p>سرور قدیم یک دستور دوم هم نشان می‌دهد که برنامه را از خود سرور قدیم و از همان اتصال pin‌شده دانلود می‌کند.</p></details>
+      <details><summary>چه چیزهایی منتقل نمی‌شود؟<i class="ph ph-plus" aria-hidden="true"></i></summary><p>ریسورس‌های روی سرورهای remote، preview deploymentها و Swarm. webhookها و DNS تا وقتی خودتان عوض نکنید به سرور قدیم اشاره می‌کنند. بین معماری‌های مختلف CPU، Coolify اپ‌ها را دوباره build می‌کند.</p></details>
+      <details><summary>این ابزار رسمی Coolify است؟<i class="ph ph-plus" aria-hidden="true"></i></summary><p>نه. یک پروژه‌ی متن‌باز مستقل با لایسنس MIT است و به Coolify یا coolLabs وابسته نیست.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="final" aria-labelledby="final-h">
+  <div class="wrap">
+    <h2 id="final-h" class="reveal">انتقال بعدی شما دو دستور است.</h2>
+    <div class="cmd reveal">
+      <code><span class="p">$ </span>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh</code>
+      <button class="copy" type="button" aria-label="کپی" data-label="کپی" data-copied="کپی شد" data-copy="curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh"><i class="ph ph-copy" aria-hidden="true"></i></button>
+    </div>
+    <div class="hero-cta reveal">
+      <a class="btn btn-primary" href="#tutorial">شروع انتقال<i class="ph ph-arrow-left" aria-hidden="true"></i></a>
+      <a class="btn btn-ghost" href="https://github.com/mtalavi/coolify-mirror"><i class="ph ph-github-logo" aria-hidden="true"></i>دیدن در GitHub</a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Coolify Mirror، لایسنس MIT. وابسته به Coolify یا coolLabs نیست. «Coolify» علامت تجاری آن‌هاست.</span>
+    <nav aria-label="پانویس">
+      <a href="https://github.com/mtalavi/coolify-mirror">GitHub</a>
+      <a href="https://github.com/mtalavi/coolify-mirror/releases">Releases</a>
+      <a href="https://github.com/mtalavi/coolify-mirror/blob/main/README.fa.md">راهنمای کامل فارسی</a>
+      <a href="../" hreflang="en" lang="en">English</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>
