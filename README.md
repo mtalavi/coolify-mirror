@@ -17,6 +17,7 @@
 </p>
 
 <p align="center">
+  <a href="https://coolify-mirror.pages.dev"><b>Website</b></a> ·
   <a href="#-quick-start--move-apps-in-4-steps"><b>Quick start</b></a> ·
   <a href="#-install">Install</a> ·
   <a href="#-walkthrough--every-screen">Walkthrough</a> ·
@@ -421,6 +422,7 @@ internal/coolify       Coolify detection, psql, PHP runner, Laravel encryption
 internal/archive       tar + zstd + age stream format
 internal/transfer      share server + resumable download
 lab/                   Docker lab with real Coolify servers
+site/                  the website (static, Cloudflare Pages): coolify-mirror.pages.dev
 ```
 
 Contributions and issues are welcome. **Not affiliated with Coolify / coolLabs** — “Coolify” is their trademark.
