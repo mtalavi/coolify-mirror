@@ -1,0 +1,9 @@
+Third-party files bundled with this website
+
+fonts/geist-latin-wght-normal.woff2           Geist, by Vercel. SIL Open Font License 1.1.
+fonts/jetbrains-mono-latin-wght-normal.woff2  JetBrains Mono, by JetBrains. SIL Open Font License 1.1.
+fonts/vazirmatn-arabic-wght-normal.woff2      Vazirmatn, by Saber Rastikerdar. SIL Open Font License 1.1.
+icons/Phosphor.woff2, icons/phosphor.min.css  Phosphor Icons, by Phosphor Icons. MIT License.
+
+The font files are the variable WOFF2 subsets published by Fontsource (fontsource.org).
+The SIL Open Font License 1.1: https://openfontlicense.org
