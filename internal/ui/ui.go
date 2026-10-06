@@ -1,5 +1,5 @@
-// Package ui is the interactive terminal interface (arrow keys, space to
-// select, enter to confirm). Everything it does is also available as plain
+// Package ui is the interactive terminal interface (arrow keys and enter;
+// space ticks several lines in a list). Everything it does is also available as plain
 // commands (see main.go), which share the same engine.
 package ui
 
@@ -25,8 +25,15 @@ const (
 	actBackupFull     = "full"
 	actRestore        = "restore"
 	actShare          = "share"
+	actFiles          = "files"
+	actGuide          = "guide"
 	actQuit           = "quit"
 )
+
+// menuOption is one line of the main menu: a short name and what it does.
+func menuOption(name, what, value string) huh.Option[string] {
+	return huh.NewOption(fmt.Sprintf("%-26s %s", name, what), value)
+}
 
 // Run starts the interactive menu.
 func Run(ctx context.Context) error {
@@ -42,15 +49,18 @@ func Run(ctx context.Context) error {
 		err := huh.NewForm(huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("What do you want to do?").
+				Description("Old server: back up and share · new server: restore with the code").
 				Options(
-					huh.NewOption("Make a backup  —  pick domains / resources", actBackupSelected),
-					huh.NewOption("Make a FULL backup  —  the whole Coolify server", actBackupFull),
-					huh.NewOption("Restore a backup  —  type the share code from the other server", actRestore),
-					huh.NewOption("Share or delete an existing backup file", actShare),
-					huh.NewOption("Quit", actQuit),
+					menuOption("Back up apps", "pick the domains / resources to move", actBackupSelected),
+					menuOption("Back up the whole server", "Coolify itself, its settings and every app", actBackupFull),
+					menuOption("Restore a backup", "type the share code from the other server", actRestore),
+					menuOption("Share a saved backup", "send a backup made earlier to another server", actShare),
+					menuOption(filesMenuName, "see and delete old backups, downloads, safety copies", actFiles),
+					menuOption("How it works", "step-by-step guide", actGuide),
+					menuOption("Quit", "", actQuit),
 				).
 				Value(&action),
-		)).WithTheme(theme()).WithShowHelp(true).RunWithContext(ctx)
+		)).WithTheme(theme()).WithKeyMap(keys()).WithShowHelp(true).RunWithContext(ctx)
 		if errors.Is(err, huh.ErrUserAborted) || action == actQuit {
 			return nil
 		}
@@ -70,6 +80,10 @@ func Run(ctx context.Context) error {
 			}
 		case actShare:
 			err = shareExisting(ctx, in)
+		case actFiles:
+			err = savedFiles(ctx)
+		case actGuide:
+			printGuide()
 		}
 		if errors.Is(err, errNotRestored) {
 			printNotRestored()
@@ -154,6 +168,9 @@ func checkServer(ctx context.Context) (*coolify.Instance, error) {
 	for _, w := range compat.Warnings {
 		fmt.Println("  " + sWarn.Render("! "+w))
 	}
+	if u := usageLine(); u != "" {
+		fmt.Println(u)
+	}
 	select {
 	case v := <-newer:
 		if v != "" {
@@ -163,6 +180,42 @@ func checkServer(ctx context.Context) (*coolify.Instance, error) {
 	}
 	fmt.Println()
 	return in, nil
+}
+
+// printGuide explains a move from start to end.
+func printGuide() {
+	step := func(n, title string) string { return sAccent.Render(n) + "  " + sBold.Render(title) }
+	cmd := func(s string) string { return "     " + sLink.Render(s) }
+	note := func(s string) string { return "     " + sMuted.Render(s) }
+	lines := []string{
+		sTitle.Render("How a move works"),
+		"",
+		step("1", "On the OLD server - make the backup"),
+		cmd("sudo coolify-mirror"),
+		note("→ Back up apps (or the whole server) → ↑/↓ to the app, enter"),
+		note("  several apps: tick each with space, then enter"),
+		note("→ settings: Recommended → share through port 443"),
+		note("→ a share code and one command for the new server are shown"),
+		"",
+		step("2", "On the NEW server - restore"),
+		note("run the one command the old server showed:"),
+		cmd("curl -fsSL …/install.sh | sudo sh -s restore 1.2.3.4/abcd-efgh-…"),
+		note("or: sudo coolify-mirror → Restore a backup → type the code"),
+		note("it downloads, verifies, restores, starts and checks every app"),
+		note("domains can be changed at the end; nothing changes before you answer Yes"),
+		"",
+		step("3", "Switch"),
+		note("check the apps in the new Coolify, then point the domains' DNS to the new server"),
+		note("turn off scheduled tasks / backups on the old server"),
+		"",
+		step("4", "Free the disk space - on both servers"),
+		note("sudo coolify-mirror → " + filesMenuName),
+		note("old server: the backup file · new server: safety copies, once everything works"),
+		"",
+		sMuted.Render("Keys: ↑/↓ move · enter choose · space tick · / search · esc back (in the menu: quit) · ctrl+c stop"),
+		sMuted.Render("Without the menu: coolify-mirror help"),
+	}
+	fmt.Println(boxed(sBox, strings.Join(lines, "\n")))
 }
 
 func printNotRestored() {
@@ -209,7 +262,7 @@ func confirm(ctx context.Context, title, desc string, def bool) (bool, error) {
 	ok := def
 	err := huh.NewForm(huh.NewGroup(
 		huh.NewConfirm().Title(title).Description(desc).Affirmative("Yes").Negative("No").Value(&ok),
-	)).WithTheme(theme()).RunWithContext(ctx)
+	)).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx)
 	return ok, err
 }
 

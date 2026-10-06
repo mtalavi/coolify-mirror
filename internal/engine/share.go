@@ -42,6 +42,9 @@ type ShareOptions struct {
 	Host         string // public address to put in the link (default: detected)
 	OpenFirewall bool   // add a temporary ufw rule when ufw is active
 	Secret       string // reuse a share secret (keeps the code the same); random when empty
+	// Dedicated: this process only shares (the serve command, or a background
+	// share), so another run may stop it to delete the file.
+	Dedicated bool
 }
 
 // SecretEnv carries the share secret to a background share (not argv).
@@ -65,6 +68,7 @@ type Share struct {
 	certDir   string
 	ufwPort   int
 	secret    string
+	id        string // its record in shares/ (see ListStored)
 	cancel    context.CancelFunc
 }
 
@@ -231,6 +235,10 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 		s.Link = transfer.Link(s.hostPort, token, key, cert.Pin)
 		s.Code = transfer.FormatCode(s.hostPort, secret)
 	}
+	abs, _ := filepath.Abs(file)
+	s.id = token[:8]
+	registerShare(ShareInfo{ID: s.id, PID: os.Getpid(), File: abs, Container: s.container, CertDir: s.certDir,
+		Log: CurrentLog, Dedicated: opt.Dedicated, Since: time.Now()})
 	return s, nil
 }
 
@@ -280,6 +288,7 @@ func (s *Share) Stop() {
 		_ = os.RemoveAll(s.certDir)
 	}
 	s.closeFirewall()
+	unregisterShare(s.id)
 }
 
 // Detach keeps sharing in a background process for ttl and returns its PID.
@@ -318,7 +327,9 @@ func Detach(file, key string, opt ShareOptions, ttl time.Duration) (int, string,
 		return 0, "", err
 	}
 	pid := cmd.Process.Pid
-	_ = cmd.Process.Release()
+	// Reap it when it ends (while this process still runs), so it does not
+	// stay behind as a zombie.
+	go func() { _ = cmd.Wait() }()
 	return pid, logPath, nil
 }
 

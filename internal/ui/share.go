@@ -35,7 +35,7 @@ func offerShare(ctx context.Context, in *coolify.Instance, file, key string) err
 	mode := opts[0].Value
 	err := huh.NewForm(huh.NewGroup(
 		huh.NewSelect[string]().Title("How should the other server get this backup?").Options(opts...).Value(&mode),
-	)).WithTheme(theme()).RunWithContext(ctx)
+	)).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx)
 	if err != nil {
 		return err
 	}
@@ -216,50 +216,37 @@ func (m *shareModel) View() string {
 	}
 	if m.completed > 0 {
 		b.WriteString("\n  " + sOK.Render("The other server has the backup.") + " It verifies and restores it on its own - you can stop sharing now.\n")
+		b.WriteString(sMuted.Render("  Once the restore there is done, free the space here: menu → "+filesMenuName) + "\n")
 	}
 	b.WriteString(sMuted.Render("\n  q stop sharing · b keep sharing in the background (24 h) and exit") + "\n")
 	return b.String()
 }
 
-// shareExisting lets the user pick a backup file created earlier.
+// shareExisting lets the user pick a backup made earlier and shares it.
 func shareExisting(ctx context.Context, in *coolify.Instance) error {
-	files, _ := filepath.Glob(filepath.Join(engine.BackupsDir, "*.cmb"))
-	if len(files) == 0 {
-		fmt.Println(sWarn.Render("  No backups found in " + engine.BackupsDir))
-		return errBack
-	}
-	sort.Slice(files, func(i, j int) bool {
-		a, _ := os.Stat(files[i])
-		b, _ := os.Stat(files[j])
-		return a.ModTime().After(b.ModTime())
+	all, err := withSpinner(ctx, "Reading the saved backups", func(ctx context.Context) ([]engine.StoredFile, error) {
+		return engine.ListStored(ctx)
 	})
-	var opts []huh.Option[string]
-	for _, f := range files {
-		st, _ := os.Stat(f)
-		opts = append(opts, huh.NewOption(fmt.Sprintf("%s  %s  %s", filepath.Base(f), engine.HumanBytes(st.Size()), st.ModTime().Format("2006-01-02 15:04")), f))
-	}
-	file := files[0]
-	action := "share"
-	if err := huh.NewForm(huh.NewGroup(
-		huh.NewSelect[string]().Title("Which backup?").Options(opts...).Value(&file),
-		huh.NewSelect[string]().Title("Do what with it?").Options(
-			huh.NewOption("Share it (show a link for the other server)", "share"),
-			huh.NewOption("Delete it (free the disk space)", "delete"),
-		).Value(&action),
-	)).WithTheme(theme()).RunWithContext(ctx); err != nil {
+	if err != nil {
 		return err
 	}
-	if action == "delete" {
-		ok, err := confirm(ctx, "Delete "+filepath.Base(file)+"?", "This cannot be undone.", false)
-		if err != nil || !ok {
-			return errBack
-		}
-		_ = os.Remove(file + ".key")
-		if err := os.Remove(file); err != nil {
-			return err
-		}
-		fmt.Println(sOK.Render("  ✓ ") + "deleted " + filepath.Base(file))
-		return nil
+	backups := engine.StoredOf(all, engine.StoredBackup)
+	if len(backups) == 0 {
+		fmt.Println(sWarn.Render("  No backups on this server yet - make one first (Back up apps)."))
+		return errBack
+	}
+	var opts []huh.Option[string]
+	for _, f := range backups {
+		opts = append(opts, huh.NewOption(truncate(fmt.Sprintf("%s  %9s  %s  · %s", f.ModTime.Format("2006-01-02 15:04"),
+			engine.HumanBytes(f.Size), f.About, f.Name), termWidth()-10), f.Path))
+	}
+	file := backups[0].Path
+	if err := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().Title("Which backup should the other server get?").
+			Description("Newest first · to delete backups: menu → " + filesMenuName).
+			Options(opts...).Value(&file),
+	)).WithTheme(theme()).WithKeyMap(keys()).WithShowHelp(true).RunWithContext(ctx); err != nil {
+		return err
 	}
 	key := ""
 	if b, err := os.ReadFile(file + ".key"); err == nil {
@@ -267,7 +254,7 @@ func shareExisting(ctx context.Context, in *coolify.Instance) error {
 	}
 	if key == "" {
 		if err := huh.NewForm(huh.NewGroup(huh.NewInput().Title("Key of this backup").
-			Description("It was shown when the backup was created").Value(&key))).WithTheme(theme()).RunWithContext(ctx); err != nil {
+			Description("It was shown when the backup was created").Value(&key))).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
 			return err
 		}
 	}

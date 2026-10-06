@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -41,6 +42,29 @@ func boxed(st lipgloss.Style, s string) string {
 		st = st.Width(w - 2)
 	}
 	return st.Render(s)
+}
+
+// keys: esc goes back (ends the form like ctrl+c), as the screens say.
+func keys() *huh.KeyMap {
+	km := huh.NewDefaultKeyMap()
+	km.Quit = key.NewBinding(key.WithKeys("ctrl+c", "esc"), key.WithHelp("esc", "back"))
+	km.Select.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "choose"))
+	km.Select.Next = key.NewBinding(key.WithKeys("enter", "tab"), key.WithHelp("enter", "choose"))
+	// The single-choice lists are short; no search there, so esc never
+	// has to mean "leave the search".
+	km.Select.Filter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search"), key.WithDisabled())
+	return km
+}
+
+// listKeys: the keys of a multi-select list, with the help line naming space
+// (what the descriptions say) and enter as continue.
+func listKeys() *huh.KeyMap {
+	km := keys()
+	km.MultiSelect.Toggle = key.NewBinding(key.WithKeys(" ", "x"), key.WithHelp("space", "tick"))
+	km.MultiSelect.Submit = key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "continue"))
+	km.MultiSelect.Next = key.NewBinding(key.WithKeys("enter", "tab"), key.WithHelp("enter", "continue"))
+	km.MultiSelect.Filter = key.NewBinding(key.WithKeys("/"), key.WithHelp("/", "search"))
+	return km
 }
 
 func theme() *huh.Theme {
