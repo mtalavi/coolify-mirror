@@ -17,14 +17,98 @@
 </p>
 
 <p align="center">
+  <a href="#-quick-start--move-apps-in-4-steps"><b>Quick start</b></a> ·
   <a href="#-install">Install</a> ·
-  <a href="#-walkthrough">Walkthrough</a> ·
+  <a href="#-walkthrough--every-screen">Walkthrough</a> ·
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-command-line">CLI</a> ·
   <a href="#-safety">Safety</a> ·
   <a href="#-limitations">Limitations</a> ·
   <a href="README.fa.md">فارسی</a>
 </p>
+
+---
+
+## ⚡ Quick start — move apps in 4 steps
+
+> [!NOTE]
+> **You need:** two servers with **Coolify v4.3.x on the same version** (the tool checks it and says which one to upgrade) · SSH as `root` or a `sudo` user on both · the new server must reach the old one on **port 443** (Coolify's proxy port — already open). On big servers, run inside `tmux` so a dropped SSH connection can't stop a long copy.
+
+### ① Old server — make the backup
+
+SSH into the **old** server and run:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh
+```
+
+The menu opens. Answer the screens like this:
+
+| Screen | What to do |
+|---|---|
+| *What do you want to do?* | **Back up apps** → `enter` &nbsp;(everything at once: *Back up the whole server*) |
+| *Which app should be backed up?* | `↑` `↓` to the app → `enter` &nbsp;·&nbsp; several apps: `space` on each, then `enter` |
+| *Also back up what they depend on?* | **Yes** — its database comes along |
+| *Backup settings* | **Recommended** |
+| *How should the other server get this backup?* | **Share a link through Coolify's proxy on port 443** |
+
+A green line starting with `curl` appears — **copy it**. It ends with the **share code** (`203.0.113.10/hi4i-2dzx-…`). Keep this window open while the new server downloads (it shows the progress), or press `b` to keep sharing in the background for 24 h.
+
+<img src="docs/shots/07-share.png" width="760" alt="the command for the new server">
+
+### ② New server — restore
+
+SSH into the **new** server and **paste the line you copied**. It looks like this:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore 203.0.113.10/hi4i-2dzx-hmeg-42qp-palx-52s7-zq
+```
+
+It installs the tool, downloads the backup and verifies it. **Nothing changes on this server until you answer Yes:**
+
+| Screen | What to do |
+|---|---|
+| *Restore these resources into this Coolify?* | read the list → **Yes** |
+| *Domains* | `enter` on each line keeps the domain — or type the new one |
+| *Rebuild N application(s) once now?* (only for apps Coolify builds) | **Yes** proves the next deploy works here · on a slow connection **No** (redeploy later from Coolify) |
+
+Wait for the green **Restore complete · everything verified**, then open the new Coolify: the project is there, running.
+
+<img src="docs/shots/13-complete.png" width="760" alt="restore complete">
+
+### ③ Switch over
+
+- Point each domain's DNS **A record** to the new server's IP.
+- On the old server, stop the moved apps and turn off their scheduled tasks and backups.
+
+### ④ Free the disk space — on both servers
+
+```bash
+sudo coolify-mirror
+```
+
+**Saved files & disk space** → **All backups** → first line **ALL** → `enter` → **Yes**. On the new server, once everything works, also delete the safety copies (*Everything kept here*). Without the menu: `sudo coolify-mirror files delete --backups`.
+
+<details>
+<summary><b>Keys</b> · <b>if something goes wrong</b></summary>
+
+| Key | Does |
+|---|---|
+| `↑` `↓` | move |
+| `enter` | choose / continue |
+| `space` | tick several lines |
+| `/` | search a list |
+| `esc` | back (in the main menu: quit) |
+| `ctrl+c` | stop |
+
+| You see | Do this |
+|---|---|
+| the Coolify versions differ | upgrade the older Coolify to the same version, then run the same command again |
+| the new server can't connect | port 443 of the old server is blocked. On the old server press `q`, then *Share a saved backup* → the same backup → *Share a link on port 8123* (the tool offers to open it in `ufw`), allow 8123 in your provider's firewall too, and run the **new** command it shows |
+| SSH dropped during the download | keep the old server sharing and run the same command again — the download continues where it stopped |
+| the new server has no GitHub access | use the second command the old server shows (*No GitHub access there?*) |
+| *Restored, but NOT operational* | the reason is printed right above it; full log in `/data/coolify-mirror/logs/` |
+</details>
 
 ---
 
@@ -81,33 +165,96 @@ Needs Go 1.26+. The binaries are static (no CGO) and have no runtime dependencie
 
 ---
 
-## 🎬 Walkthrough
+## 🎬 Walkthrough — every screen
 
-Real screenshots from two Coolify 4.3.23 servers (IP addresses replaced with documentation ranges).
+A real move of `shop.cmlab.test` (an app and the Postgres it uses) from an old server to a **brand-new Coolify 4.3.23**, with the released 1.7.0 and the commands above. The screens are not edited; the lab servers use documentation IP addresses.
 
-### On the source server
+### On the old server
 
-**1 · Start** — the tool checks Docker, Coolify and its version, and says how much disk space its saved files use. *How it works* shows the whole move step by step.
+**1 · Install and start.** One command downloads the release, checks its SHA-256 and opens the menu. It also checks Docker, Coolify and its version (*✓ tested with this version*).
 
-<img src="docs/shots/01-menu.png" width="760" alt="main menu">
+<img src="docs/shots/01-menu.png" width="760" alt="install and main menu">
+
+**2 · Pick the app.** Every resource with its domain, type, project and state. Move to the app and press `enter` — that's it. Several apps: `space` on each, then `enter`. `/` searches.
+
+<img src="docs/shots/02-select.png" width="760" alt="pick the app">
+
+**3 · Its database comes along.** The Postgres that `shop-web` uses through `DATABASE_URL` is found by itself — answer **Yes**.
+
+<img src="docs/shots/03-deps.png" width="760" alt="dependencies">
+
+**4 · Settings.** **Recommended** pauses containers for the few seconds their data is copied and puts the app's image in the backup, so the new server doesn't build anything. *Choose them myself* offers the other modes ([tables below](#backup-settings)).
+
+<img src="docs/shots/04-options.png" width="760" alt="backup settings">
+
+**5 · Live progress** — every step with ✓, sizes, speed and time left. Databases are dumped with their own tools while they keep running.
+
+<img src="docs/shots/05-progress.png" width="760" alt="backup progress">
+
+**6 · Done — now share it.** The backup is one encrypted file. Choose **Share a link through Coolify's proxy on port 443** — that port is already open.
+
+<img src="docs/shots/06-done.png" width="760" alt="backup complete">
+
+**7 · The command for the new server.** The green line is all the new server needs: it installs the tool and restores the **share code** at its end. Below it: the bare code, and a fallback that fetches the tool from this server when the new one can't reach GitHub. This screen shows the download live; `b` keeps sharing in the background for 24 h.
+
+<img src="docs/shots/07-share.png" width="760" alt="share code">
+
+### On the new server
+
+**8 · Paste the command.** The tool installs, connects to the old server (it accepts only that server's certificate), downloads — resumable — and verifies every checksum **before** anything changes.
+
+<img src="docs/shots/08-paste.png" width="760" alt="paste the command">
+
+**9 · Check, then confirm.** It tries the encryption with this Coolify and runs the whole import once in a transaction that is rolled back. Then it lists what will be added, with anything to know — and waits for your **Yes**.
+
+<img src="docs/shots/10-confirm.png" width="760" alt="confirm the restore">
+
+**10 · Restore, then domains — last.** Files, volumes, images and database dumps are restored and the resources are added to Coolify in one transaction. Then each domain: `enter` keeps it, or type a new one (several: comma-separated; empty: none).
+
+<img src="docs/shots/12-domains.png" width="760" alt="restore and domains">
+
+**11 · Running — and proven.** Coolify itself starts everything. The tool then checks the real state: the same services as on the old server, every container stable for 30 s, every domain answering through the proxy. Anything else would end as *Restored, but NOT operational* with the reason.
+
+<img src="docs/shots/13-complete.png" width="760" alt="restore complete">
+
+Refresh Coolify — the project is there with its environments, variables, storages, tags, scheduled tasks and backups.
+
+### Afterwards · free the disk space (both servers)
+
+Nothing is deleted behind your back. `sudo coolify-mirror` → **Saved files & disk space** shows what the tool keeps on the server and asks what to clean up: **All backups** (only the ready backups — made here or downloaded) or **Everything kept here** (also safety copies, old volumes and logs).
+
+<img src="docs/shots/14-files.png" width="760" alt="saved files">
+
+In **All backups** the first line, **ALL**, takes every backup at once — or press `enter` on one, or tick several with `space`, then `enter`.
+
+<img src="docs/shots/16-all-backups.png" width="760" alt="all backups">
+
+Every deletion lists what goes and needs a **Yes** (the default is *No*):
+
+<img src="docs/shots/17-delete.png" width="760" alt="confirm delete">
+
+<img src="docs/shots/18-freed.png" width="760" alt="space freed">
+
+| Kind | Where | What | Delete it when |
+|---|---|---|---|
+| `backup` | old server | backups made here (`.cmb` + key) — the apps inside are named | the new server has restored it |
+| `download` | new server | a downloaded backup whose restore did not finish (removed automatically after a successful one) | you won't restore it again |
+| `unfinished` | both | interrupted backups / downloads (`.part`) | any time |
+| `safety copy` | new server | `pre-restore-*` (previous Coolify database + `.env`), `replaced-*` (folders a restore replaced) | everything works |
+| `old volume` | new server | `<name>.cm-old-<time>` — previous data of a volume that already existed | everything works |
+| `logs`, `leftover` | both | logs of earlier runs, remains of interrupted runs | any time |
+
+**ALL** leaves anything in use alone and deletes the rest. In use means: a backup or restore is running, a container uses the volume, or the backup is being shared from another menu window. A backup shared in the background is unshared first. Only the tool's own folder (`/data/coolify-mirror`) and its own `*.cm-old-*` volumes are ever touched. Without the menu: `coolify-mirror files`, `coolify-mirror files delete --backups`.
 
 <details>
-<summary>The built-in guide</summary>
+<summary>The built-in guide (<i>How it works</i> in the menu)</summary>
 
 <img src="docs/shots/15-guide.png" width="760" alt="How it works">
 </details>
 
-**2 · Pick what to move** — every resource with its domain, type, project and state. Move to an app and press `enter` — that's it. Several apps: `space` on each, then `enter`. `/` filters, `ctrl+a` selects all.
-
-<img src="docs/shots/02-select.png" width="760" alt="select domains">
-
-**3 · Dependencies** — the Postgres that `shop-web` uses through `DATABASE_URL` is suggested automatically.
-
-<img src="docs/shots/03-deps.png" width="760" alt="dependencies">
-
-**4 · Options** — *Recommended* is one keypress (pause for a moment, include application images). *Choose them myself* asks how to keep running databases consistent while their data is copied, and which Docker images to include.
-
-<img src="docs/shots/04-options.png" width="760" alt="options">
+<a id="backup-settings"></a>
+<details>
+<summary><b>Backup settings</b> (<i>Choose them myself</i>)</summary>
 
 | Consistency | What happens |
 |---|---|
@@ -120,59 +267,7 @@ Real screenshots from two Coolify 4.3.23 servers (IP addresses replaced with doc
 | **Application images** *(default)* | Apps built by Coolify start from the shipped image — no rebuild. Public images (postgres, wordpress…) are pulled. |
 | **All images** | Everything is in the file — works without internet / Docker Hub. Bigger file. |
 | **No images** | Smallest file; Coolify pulls everything and **rebuilds** apps from Git. |
-
-**5 · Live progress** — every step with ✓ / ✗, bytes, speed and ETA.
-
-<img src="docs/shots/05-progress.png" width="760" alt="progress">
-
-**6 · Share** — one command for the other server appears (it installs the tool and restores the **share code** at its end), plus the bare code and a fallback that needs no GitHub.
-
-<img src="docs/shots/07-share.png" width="760" alt="share link">
-
-### On the target server
-
-**7 · Run the command** — or choose *Restore a backup* in the menu and type the code.
-
-<img src="docs/shots/08-paste.png" width="760" alt="paste link">
-
-**8 · Verify** — the file is downloaded (resumable), decrypted and every checksum verified **before** anything changes.
-
-<img src="docs/shots/09-summary.png" width="760" alt="summary">
-
-**9 · Review** — conflicts, existing volumes, shared host folders and domain clashes are listed. Nothing has changed yet.
-
-<img src="docs/shots/10-confirm.png" width="760" alt="confirm">
-
-**10 · Domains, last** — keep or change every domain. Comma-separate several; empty removes it.
-
-<img src="docs/shots/12-domains.png" width="760" alt="domains step">
-
-**11 · Running** — Coolify itself starts databases, then services, then apps. The tool then checks the real state: the same services as on the source, all containers healthy for 30 s without restarts, and every domain answering through the proxy. Anything else ends as *Restored, but NOT operational* with the reason and a non-zero exit code.
-
-<img src="docs/shots/13-complete.png" width="760" alt="restore complete">
-
-Refresh Coolify — the project is there with all its environments, variables, storages, tags, scheduled tasks and backups.
-
-### Afterwards · free the disk space (both servers)
-
-Nothing is deleted behind your back, so the menu's **Saved files & disk space** (or `coolify-mirror files`) shows everything the tool keeps on a server, with size, date and contents — and deletes what you pick. *All backups* lists only the ready backups (made here or downloaded); *Everything kept here* also lists safety copies, old volumes and logs:
-
-<img src="docs/shots/14-files.png" width="760" alt="saved files">
-
-In *All backups*, the first line **ALL** deletes every backup at once; or press `enter` on one, or tick several with `space` and press `enter`:
-
-<img src="docs/shots/16-all-backups.png" width="760" alt="all backups">
-
-| Kind | Where | What | Delete it when |
-|---|---|---|---|
-| `backup` | source | backups made here (`.cmb` + key) — the apps inside are named | the target has restored it |
-| `download` | target | a downloaded backup whose restore did not finish (removed automatically after a successful one) | you won't restore it again |
-| `unfinished` | both | interrupted backups / downloads (`.part`) | any time |
-| `safety copy` | target | `pre-restore-*` (previous Coolify database + `.env`), `replaced-*` (folders a restore replaced) | everything works |
-| `old volume` | target | `<name>.cm-old-<time>` — previous data of a volume that already existed | everything works |
-| `logs`, `leftover` | both | logs of earlier runs, remains of interrupted runs | any time |
-
-Every deletion lists what goes and what is lost, and needs a *Yes* (default *No*). **ALL** leaves anything in use alone and deletes the rest. Anything in use is protected: while a backup/restore runs, a volume a container uses, a backup shared from another menu window. A backup shared in the background is unshared first. Only the tool's own folder and its own `*.cm-old-*` volumes are ever touched.
+</details>
 
 ---
 
@@ -311,7 +406,7 @@ Coolify ships often, and the tool relies on parts of it (database tables, PHP cl
 
 ## 🧪 Tested
 
-Automatically, for every new Coolify release: [`lab/e2e.sh`](lab/e2e.sh) (two fresh servers, official installer, a git compose app + Postgres + an image app with a volume and domains, backup → share code → restore, data compared through the proxy) — passing on 4.3.23. By hand on real Coolify 4.3.23 installs (lab in [`lab/`](lab)): **a real migration with zero manual fixes** — healthy source → new backup → freshly installed Coolify → selective and full restore with `--verify-redeploy` (a multi-service compose app whose build uses a host policy script and a named buildx builder, a Dockerfile app, an image app, WordPress + MariaDB, Postgres): `SUCCESS`, the same secrets, volume data and database rows as the source, every domain answering through Traefik, and a full rebuild on the target; merge into an existing Coolify without touching its other resources; an app that exits and one that turns unhealthy after the restore reported as *NOT operational*; rollback leaving the target exactly as before; backups made by 1.2.0. Also: native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals (a single-container app restored as a copy is checked under its new name), saved-file cleanup on both servers (all backups at once, some, or one; a backup shared in the background is unshared first; one shared from another window and a volume in use are refused), restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
+The [walkthrough](#-walkthrough--every-screen) is a real run of the released 1.7.0: the one-line installer on both servers, an app with its Postgres moved to a freshly installed Coolify 4.3.23 through port 443, verified and running, then every backup deleted with **ALL**. Automatically, for every new Coolify release: [`lab/e2e.sh`](lab/e2e.sh) (two fresh servers, official installer, a git compose app + Postgres + an image app with a volume and domains, backup → share code → restore, data compared through the proxy) — passing on 4.3.23. By hand on real Coolify 4.3.23 installs (lab in [`lab/`](lab)): **a real migration with zero manual fixes** — healthy source → new backup → freshly installed Coolify → selective and full restore with `--verify-redeploy` (a multi-service compose app whose build uses a host policy script and a named buildx builder, a Dockerfile app, an image app, WordPress + MariaDB, Postgres): `SUCCESS`, the same secrets, volume data and database rows as the source, every domain answering through Traefik, and a full rebuild on the target; merge into an existing Coolify without touching its other resources; an app that exits and one that turns unhealthy after the restore reported as *NOT operational*; rollback leaving the target exactly as before; backups made by 1.2.0. Also: native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals (a single-container app restored as a copy is checked under its new name), saved-file cleanup on both servers (all backups at once, some, or one; a backup shared in the background is unshared first; one shared from another window and a volume in use are refused), restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
 
 ---
 
