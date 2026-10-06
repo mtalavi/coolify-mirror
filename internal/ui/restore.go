@@ -17,30 +17,40 @@ import (
 )
 
 func restoreFlow(ctx context.Context, in *coolify.Instance) error {
-	restoreStarted = time.Now()
-	link := ""
-	err := huh.NewForm(huh.NewGroup(
-		huh.NewInput().
-			Title("Paste the link shown on the source server").
-			Description("It looks like https://1.2.3.4/cm/…/backup.cmb#key=…&pin=… (a local .cmb file path also works)").
-			Value(&link).
-			Validate(func(s string) error {
-				loc, key, isURL, err := transfer.ParseSource(s)
-				if err != nil {
-					return err
-				}
-				if isURL && key == "" {
-					return errors.New("the link must include the #key=… part at the end")
-				}
-				if !isURL && !strings.HasSuffix(loc, ".cmb") {
-					return errors.New("paste the https://… link (or the path of a .cmb file)")
-				}
-				return nil
-			}),
-	)).WithTheme(theme()).RunWithContext(ctx)
+	return restoreSource(ctx, in, "")
+}
+
+func checkSource(s string) error {
+	loc, key, isURL, err := transfer.ParseSource(s)
 	if err != nil {
 		return err
 	}
+	if isURL && key == "" {
+		return errors.New("the link must include the #key=… part at the end (or use the share code)")
+	}
+	if !isURL && !strings.HasSuffix(loc, ".cmb") {
+		return errors.New("type the share code (1.2.3.4/abcd-…), or paste the https://… link or the path of a .cmb file")
+	}
+	return nil
+}
+
+// restoreSource restores the given share code / link / file, or asks for it.
+func restoreSource(ctx context.Context, in *coolify.Instance, link string) error {
+	restoreStarted = time.Now()
+	if link != "" {
+		if err := checkSource(link); err != nil {
+			return err
+		}
+	} else if err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Type or paste the share code shown on the source server").
+			Description("It looks like 1.2.3.4/abcd-efgh-ijkl-mnop-qrst-uvwx-yz (a full https://… link or a local .cmb file path also works)").
+			Value(&link).
+			Validate(checkSource),
+	)).WithTheme(theme()).RunWithContext(ctx); err != nil {
+		return err
+	}
+	var err error
 
 	key := ""
 	if loc, k, isURL, _ := transfer.ParseSource(link); !isURL && k == "" {
@@ -319,7 +329,7 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	b.WriteString("\n" + sMuted.Render("Point your domains' DNS to this server when you are ready to switch."))
 	fmt.Println(boxed(sBox, head+"\n"+b.String()))
 	if verdict != "" {
-		return nil
+		return errShown
 	}
 	builds := 0
 	for _, r := range rep.Resources {
@@ -331,7 +341,7 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 		return nil
 	}
 	ok, err := confirm(ctx, fmt.Sprintf("Rebuild %d application(s) once now?", builds),
-		"They run from the restored images. One rebuild here (same commit, no cache) proves that the next deploy works on this server without the old one.", true)
+		"They run from the restored images. One rebuild here (same commit, no cache) proves that the next deploy works on this server without the old one.\nLike any first deploy it downloads base images and packages - on a slow connection answer No and redeploy later from Coolify.", true)
 	if err != nil || !ok {
 		return err
 	}

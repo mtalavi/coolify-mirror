@@ -21,9 +21,12 @@ func versionBlocker(in *coolify.Instance, man *Manifest) string {
 		return "the backup does not say which Coolify version it comes from"
 	case in.Version == "":
 		return "the Coolify version of this server could not be read"
-	case strings.TrimPrefix(src, "v") != strings.TrimPrefix(in.Version, "v"):
-		return fmt.Sprintf("this server runs Coolify %s but the backup comes from Coolify %s - both servers must run exactly the same version (install %s here: curl -fsSL https://cdn.coollabs.io/coolify/install.sh | bash -s %s)",
+	case CompareVersions(in.Version, src) < 0:
+		return fmt.Sprintf("this server runs Coolify %s but the backup comes from Coolify %s - both must run the same version. Upgrade this server to %s (curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash -s %s), then run the restore again",
 			in.Version, src, src, src)
+	case CompareVersions(in.Version, src) > 0:
+		return fmt.Sprintf("this server runs Coolify %s but the backup comes from the older Coolify %s - both must run the same version. Upgrade the source server to %s (Coolify > Settings > Update, or curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash -s %s), make a new backup there and restore that",
+			in.Version, src, in.Version, in.Version)
 	}
 	return ""
 }
@@ -109,6 +112,7 @@ func PreflightFull(ctx context.Context, in *coolify.Instance, f *Fetched) []stri
 	if b := versionBlocker(in, f.Manifest); b != "" {
 		out = append(out, b)
 	}
+	out = append(out, CheckCompat(ctx, in).Blockers...)
 	if len(out) == 0 {
 		b, _ := checkBundle(ctx, in, f)
 		out = append(out, b...)
@@ -151,6 +155,7 @@ func PreflightSelective(ctx context.Context, in *coolify.Instance, f *Fetched) [
 	if b := versionBlocker(in, f.Manifest); b != "" {
 		out = append(out, b)
 	}
+	out = append(out, CheckCompat(ctx, in).Blockers...)
 	if s := SpaceWarning(in.DockerRoot, f.Manifest); s != "" {
 		out = append(out, "not enough disk space: "+s)
 	}
@@ -167,6 +172,12 @@ func PreflightSelective(ctx context.Context, in *coolify.Instance, f *Fetched) [
 // bundle (what to update after the move).
 func BundleWarnings(ctx context.Context, in *coolify.Instance, f *Fetched) []string {
 	_, w := checkBundle(ctx, in, f)
+	w = append(w, CheckCompat(ctx, in).Warnings...)
+	if f.Export != nil {
+		for _, d := range f.Export.Drift {
+			w = append(w, "from the source: "+d)
+		}
+	}
 	return w
 }
 
