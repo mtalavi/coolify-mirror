@@ -133,6 +133,7 @@ Run it as root on a Coolify server:
   ./coolify-mirror files                list what coolify-mirror keeps here (backups, downloads,
                                         safety copies of restores, logs) with sizes
   ./coolify-mirror files delete NAME…   delete them to free disk space (NAME as listed)
+        --backups                       every backup (made here or downloaded) not in use
         --all                           everything that is not in use
         --yes                           do not ask for confirmation
   ./coolify-mirror update               install the latest release of coolify-mirror (checksum verified)
@@ -210,6 +211,7 @@ func cmdFiles(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("files", flag.ContinueOnError)
 	yes := fs.Bool("yes", false, "")
 	all := fs.Bool("all", false, "")
+	backups := fs.Bool("backups", false, "")
 	var names []string
 	for {
 		if err := fs.Parse(args); err != nil {
@@ -248,7 +250,9 @@ func cmdFiles(ctx context.Context, args []string) error {
 			}
 			fmt.Printf("%-12s %-48s %10s  %-16s  %s\n", engine.KindLabel(f.Kind), f.Name, engine.HumanBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"), about)
 		}
-		fmt.Println("\nDelete with: coolify-mirror files delete NAME [NAME...]   (or --all for everything not in use)")
+		fmt.Println("\nDelete with: coolify-mirror files delete NAME [NAME...]")
+		fmt.Println("        or: coolify-mirror files delete --backups   (every backup not in use)")
+		fmt.Println("        or: coolify-mirror files delete --all       (everything not in use)")
 		return nil
 	case "delete", "rm":
 	default:
@@ -256,9 +260,13 @@ func cmdFiles(ctx context.Context, args []string) error {
 	}
 	var todo []engine.StoredFile
 	byName := map[string]engine.StoredFile{}
+	ready := map[string]bool{}
+	for _, f := range engine.ReadyBackups(list) {
+		ready[f.Name] = true
+	}
 	for _, f := range list {
 		byName[f.Name] = f
-		if *all && f.Busy == "" {
+		if (*all || *backups && ready[f.Name]) && f.Busy == "" {
 			todo = append(todo, f)
 		}
 	}
@@ -273,12 +281,16 @@ func cmdFiles(ctx context.Context, args []string) error {
 		if f.Busy != "" {
 			return fmt.Errorf("%s cannot be deleted now: %s", f.Name, f.Busy)
 		}
-		if !*all {
+		// Not already in the list from --all / --backups.
+		if !*all && !(*backups && ready[f.Name]) {
 			todo = append(todo, f)
 		}
 	}
+	if len(todo) == 0 && *backups && len(names) == 0 {
+		return errors.New("no backups to delete here (not in use) - see: coolify-mirror files")
+	}
 	if len(todo) == 0 {
-		return errors.New("nothing to delete: name the files (see: coolify-mirror files) or use --all")
+		return errors.New("nothing to delete: name the files (see: coolify-mirror files), or use --backups or --all")
 	}
 	for _, f := range todo {
 		fmt.Printf("  - %-12s %s (%s)\n", engine.KindLabel(f.Kind), f.Name, engine.HumanBytes(f.Size))
