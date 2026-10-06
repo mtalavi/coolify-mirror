@@ -547,6 +547,14 @@ func prepareVolume(ctx context.Context, vs *volState, xp extractPlan, undo *undo
 			return nil
 		}
 	}
+	if vs.entry.Dumped {
+		// The data comes from the database dump, loaded later.
+		vs.skip = true
+		if vs.step != nil {
+			vs.step.Finish("filled from the database dump")
+		}
+		return nil
+	}
 	v := struct{ Mountpoint string }{mount}
 	ex, err := archive.NewExtractor(v.Mountpoint)
 	if err != nil {

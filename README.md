@@ -39,7 +39,7 @@ Coolify's own backup covers its database. Moving **one app** to a new server —
 | 🔗 **One link transfer** | A temporary, random-token HTTPS link — through Coolify's own proxy on port 443 (TLS passthrough), or a direct port. Plain HTTP is never served. |
 | 🗄️ **Native database dumps** | PostgreSQL, MySQL and MariaDB are saved with `pg_dumpall` / `mysqldump` while they keep running, and loaded with the same image on the target. |
 | 🧾 **Coolify's own format inside** | Every backup also carries Coolify's official *Server Transfer* bundle (`schema_version 1`, made by Coolify's exporter) and the target validates it with Coolify's own validator. |
-| ⚡ **No rebuild** | The exact image your app runs is shipped, so Coolify on the target logs *“Build step skipped”* and starts the same commit. |
+| ⚡ **No rebuild** | The exact images your app runs are shipped. Dockerfile apps: Coolify logs *“Build step skipped”*. Docker Compose apps: started from those images without cloning or building (Coolify would rebuild them on every deploy). |
 | 🧰 **Host dependencies travel too** | Files on the host that custom build/start commands or helper files use (a build policy script under `/data/coolify/ops`, …) and named `docker buildx` builders are carried and restored; system files are checked on the target before anything changes. A selective restore keeps an identical file already on the target and never replaces a different one (it stops before changing anything). |
 | ✅ **SUCCESS means it really works** | A resource counts as running only when the services that ran on the source are up, stay healthy for 30 s without restarting, and each domain answers through the local Traefik. `--verify-redeploy` also rebuilds every app once on the target to prove later deploys work. |
 | 🌐 **Domains last** | Right before anything starts you can keep or change every domain. |
@@ -257,7 +257,7 @@ coolify-mirror start-all                                # ask Coolify to start a
 - **GitHub webhooks**, **DNS** and **scheduled tasks/backups** still point to / run on the old server — switch them when you move.
 - Different CPU architecture (amd64 → arm64): shipped images can't be used, Coolify rebuilds.
 - Host dependencies are found in Coolify's settings and the resource's folder on the source. A host file referenced only from inside the git repository can't be seen; `--verify-redeploy` proves (or disproves) the build on the target.
-- Docker Compose applications are always built by Coolify on deploy (its own behaviour), so their build dependencies must be on the target — which is why they are carried and checked.
+- Coolify builds Docker Compose applications on every deploy (it clones the repository even when the images are there). After a restore the tool starts them from the shipped images instead — with the compose file and `.env` Coolify generates for the target and Coolify's own start command — so a slow or offline target is no problem. Later deploys are Coolify's again, which is why build dependencies are carried and checked too.
 
 ---
 

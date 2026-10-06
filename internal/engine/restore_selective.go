@@ -205,8 +205,17 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 
 	pathSteps := map[string]*Step{}
 	for _, p := range man.Paths {
-		if !s.skipOwner(p.Owner) {
-			pathSteps[p.Path] = pr.Add("Files  "+plan.Rename(p.Path), p.Size)
+		if s.skipOwner(p.Owner) {
+			continue
+		}
+		st := pr.Add("Files  "+plan.Rename(p.Path), p.Size)
+		switch {
+		case sameHostFile(man, p.Path):
+			st.SkipStep("identical here - kept")
+		case s.shared[p.Path]:
+			st.SkipStep("shared with the original - kept as it is")
+		default:
+			pathSteps[p.Path] = st
 		}
 	}
 	volSteps := map[string]*Step{}

@@ -270,7 +270,7 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 
 ---
 
-## تست‌ها (1.0.0 تا 1.3.0)
+## تست‌ها (1.0.0 تا 1.4.0)
 
 روی دو Coolify 4.3.23 واقعی:
 
@@ -304,6 +304,8 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 | 1.3.0: خطای عمدی قبل از import با فایل میزبان و builder در بک‌آپ | ✓ وضعیت مقصد دقیقاً مثل قبل (دیتابیس، کانتینرها، volumeها، پوشه‌ها)، شامل پوشه‌های والدی که ریستور ساخته بود |
 | 1.3.0: پاسخ واقعی Traefik وقتی پروکسی از شبکه‌ی اپ جدا است / دامنه route ندارد | ✓ 504 و 404 شناخته شدند؛ بعد از وصل دوباره 200 |
 | 1.3.1: merge روی Coolify موجود که همان فایل سیاست build را دارد / همان فایل با محتوای دیگر | ✓ فایل یکسان دست نخورد و `SUCCESS` + rebuild موفق؛ فایل متفاوت ← «restore not allowed» و هیچ تغییری روی مقصد |
+| 1.4.0: **migration واقعی Lift** (اپ Compose با ۷ سرویس، Postgres، ۶ volume، اسکریپت build میزبان) روی سرور مقصد با اینترنت کند | ✓ بدون clone و build در حدود یک دقیقه بالا آمد؛ ۶ کانتینر healthy، دامنه از Traefik مقصد 200، در Coolify `running:healthy` با شناسه‌ی درست مقصد و یک deployment ثبت‌شده (قبلاً Coolify ۱۱ دقیقه فقط clone کرد و build ساعت‌ها طول می‌کشید) |
+| 1.4.0: ریستور اپ Compose در lab در حالی که **سرور git خاموش است** | ✓ `SUCCESS` — «started from the restored images, without a build»؛ بعد از آن یک deploy معمولی Coolify (clone + build) هم موفق |
 | 1.3.0: ریستور بک‌آپ ساخته‌شده با 1.2.0 با نسخه‌ی جدید + تغییر دامنه با `--set-domain` | ✓ `SUCCESS`؛ دامنه‌ی جدید از Traefik جواب داد (200) |
 | 1.1.0: تغییر دامنه در مرحله‌ی آخر (منو و CLI)، شامل اپ و سرویس WordPress، با ورودی نامعتبر | ✓ دامنه‌ی جدید در Coolify ذخیره شد، `SERVICE_URL_WORDPRESS` و برچسب Traefik به‌روز شدند، سایت روی دامنه‌ی جدید از پروکسی جواب داد (302)، دامنه‌ی حذف‌شده پاک شد، ورودی نامعتبر قبل از ریستور رد شد |
 | باینری arm64 (شبیه‌سازی QEMU) | ✓ اجرا می‌شود |
@@ -313,6 +315,13 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 ---
 
 ## تغییرات
+
+### 1.4.0 — ۲۰۲۶-۱۰-۰۶
+
+- **اپ‌های Docker Compose بدون clone و build بالا می‌آیند.** Coolify اپ Compose را در هر deploy از git clone و build می‌کند، حتی وقتی imageهای همان commit روی سرور هست؛ روی سروری با اینترنت کند همین ساعت‌ها طول می‌کشید. حالا اگر imageهای سرویس‌هایی که روی مبدأ بالا بودند منتقل شده باشند، `docker-compose.yaml` و `.env` را خود Coolify برای این سرور می‌سازد (شناسه‌ها، دامنه‌ها، env درست) و همان دستور start خود Coolify (یا start سفارشی اپ) با `--no-build` فقط برای همان سرویس‌ها اجرا می‌شود؛ یک deployment «finished» در تاریخچه‌ی Coolify ثبت می‌شود. اگر imageی نباشد یا start شکست بخورد، مثل قبل Coolify deploy می‌کند و علتش در گزارش می‌آید. `start-all` هم همین را برای اپ‌های Compose انجام می‌دهد.
+- **لغو ریستور واضح گزارش می‌شود.** «No» یا Esc در سؤال آخر قبلاً فقط «(back to the menu)» کم‌رنگ نشان می‌داد و شبیه پایان کار بود؛ حالا کادر «Not restored — Nothing was changed on this server» می‌آید.
+- پیشرفت ریستور: volume دیتابیسی که از dump پر می‌شود و فایل میزبانی که یکسان است و نگه داشته می‌شود دیگر «در حال انجام» نمی‌مانند.
+- ظاهر: لوگوی رنگی با انیمیشن کوتاه (فقط در ترمینال تعاملی)، نسخه، معرفی، قابلیت‌ها و آدرس ریپو در شروع برنامه.
 
 ### 1.3.1 — ۲۰۲۶-۱۰-۰۶
 

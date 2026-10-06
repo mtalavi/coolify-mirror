@@ -52,6 +52,8 @@ type startItem struct {
 	restarts    map[string]int
 	routeSince  time.Time
 	problem     string // last thing that was wrong (for the timeout message)
+	direct      bool   // started from the restored images, without a build
+	note        string // why Coolify had to build it after all
 }
 
 // startEnv is what the checks need besides the resource.
@@ -187,7 +189,22 @@ func dispatch(ctx context.Context, in *coolify.Instance, items []*startItem) err
 		return nil
 	}
 	var req []map[string]string
+	var queued []*startItem
 	for _, it := range items {
+		if it.res.Table == "applications" && it.res.BuildPack == "dockercompose" && !it.rebuild {
+			it.step.Begin("starting from the restored images")
+			it.started = time.Now()
+			dep, reason := directComposeStart(ctx, in, it.res.UUID, it.res.Commit, it.res.Expect)
+			if reason == "" {
+				it.direct, it.deployUUID, it.settled = true, dep, true
+				it.deadline = time.Now().Add(settleTimeout)
+				it.step.SetDetail("started from the restored images")
+				continue
+			}
+			it.note = "Coolify built it on this server: " + reason
+			run.Logf("%s: %s", it.res.Name, it.note)
+		}
+		queued = append(queued, it)
 		m := map[string]string{"uuid": it.res.UUID, "table": it.res.Table}
 		switch {
 		case it.res.IsDatabase():
@@ -207,6 +224,10 @@ func dispatch(ctx context.Context, in *coolify.Instance, items []*startItem) err
 		it.step.Begin("asking Coolify")
 		it.started = time.Now()
 	}
+	if len(req) == 0 {
+		return nil
+	}
+	items = queued
 	var res struct {
 		Items []struct {
 			UUID       string `json:"uuid"`
@@ -282,6 +303,9 @@ func waitAll(ctx context.Context, env *startEnv, items []*startItem, timeout tim
 					it.msg = it.problem + " - " + it.msg
 				}
 				it.msg += " - check it in Coolify"
+				if it.note != "" {
+					it.msg += " (" + it.note + ")"
+				}
 				it.step.Fail(fmt.Errorf("%s", it.msg))
 			}
 		}
@@ -418,6 +442,9 @@ func check(ctx context.Context, env *startEnv, it *startItem) {
 		case "failed", "cancelled-by-user":
 			it.done, it.ok = true, false
 			it.msg = "deployment " + st + " - open the deployment log in Coolify"
+			if it.note != "" {
+				it.msg += " (" + it.note + ")"
+			}
 			it.step.Fail(fmt.Errorf("%s", it.msg))
 			return
 		case "finished":
@@ -483,6 +510,12 @@ func check(ctx context.Context, env *startEnv, it *startItem) {
 	}
 	it.msg += ")"
 	it.step.Finish(strings.TrimPrefix(it.msg, "running "))
+	switch {
+	case it.direct:
+		it.msg += " - started from the restored images, without a build"
+	case it.note != "":
+		it.msg += " - " + it.note
+	}
 }
 
 func restarted(before, now map[string]int) bool {

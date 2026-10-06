@@ -751,7 +751,14 @@ func cmdStartAll(ctx context.Context) error {
 		if err == nil && len(cs) > 0 {
 			continue
 		}
-		todo = append(todo, dbx.PlannedResource{Resource: r, SourceUUID: r.UUID, WasRunning: true})
+		pr := dbx.PlannedResource{Resource: r, SourceUUID: r.UUID, WasRunning: true}
+		if r.Table == "applications" {
+			// The commit of its last successful deployment: its images are
+			// tagged with it (a restored application can start from them).
+			pr.Commit, _ = in.Scalar(ctx, "SELECT q.commit FROM application_deployment_queues q JOIN applications a ON a.id::text = q.application_id"+
+				" WHERE a.uuid = "+coolify.SQLString(r.UUID)+" AND q.status = 'finished' AND q.pull_request_id = 0 ORDER BY q.id DESC LIMIT 1")
+		}
+		todo = append(todo, pr)
 		fmt.Printf("  - %s (%s)\n", r.Name, r.Label())
 	}
 	if len(todo) == 0 {
