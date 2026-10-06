@@ -164,11 +164,11 @@ func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetch
 		lines = append(lines, sMuted.Render("coolify: "+w))
 	}
 	ok, err := confirm(ctx, "Restore these resources into this Coolify?", strings.Join(lines, "\n"), true)
+	if errors.Is(err, huh.ErrUserAborted) || (err == nil && !ok) {
+		return errNotRestored
+	}
 	if err != nil {
 		return err
-	}
-	if !ok {
-		return errBack
 	}
 	pr := engine.NewProgress("Restore")
 	var rep *engine.RestoreReport
@@ -222,6 +222,9 @@ func restoreFull(ctx context.Context, in *coolify.Instance, f *engine.Fetched) e
 			}
 			return nil
 		}))).WithTheme(theme()).RunWithContext(ctx)
+	if errors.Is(err, huh.ErrUserAborted) {
+		return errNotRestored
+	}
 	if err != nil {
 		return err
 	}

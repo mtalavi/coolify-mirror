@@ -29,8 +29,8 @@ const (
 
 // Run starts the interactive menu.
 func Run(ctx context.Context) error {
+	Banner()
 	fmt.Println()
-	fmt.Println(sTitle.Render("◆ Coolify Mirror "+engine.Version) + sMuted.Render("  ·  full backup & restore for Coolify"))
 	in, err := withSpinner(ctx, "Checking this server", func(ctx context.Context) (*coolify.Instance, error) {
 		return coolify.Detect(ctx)
 	})
@@ -78,6 +78,13 @@ func Run(ctx context.Context) error {
 		case actShare:
 			err = shareExisting(ctx, in)
 		}
+		if errors.Is(err, errNotRestored) {
+			fmt.Println(boxed(sErrBox, sWarn.Render("Not restored")+"\n"+
+				"Nothing was changed on this server: the restore was cancelled before it started.\n"+
+				sMuted.Render("To restore, choose Restore again and answer Yes.")))
+			fmt.Println()
+			continue
+		}
 		if err != nil {
 			if errors.Is(err, huh.ErrUserAborted) || errors.Is(err, errBack) {
 				fmt.Println(sMuted.Render("  (back to the menu)"))
@@ -93,7 +100,10 @@ func Run(ctx context.Context) error {
 	}
 }
 
-var errBack = errors.New("back")
+var (
+	errBack        = errors.New("back")
+	errNotRestored = errors.New("restore cancelled")
+)
 
 func showError(err error) {
 	msg := err.Error()
