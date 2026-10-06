@@ -63,23 +63,13 @@ func shareScreen(ctx context.Context, in *coolify.Instance, file, key string, op
 	if err != nil {
 		return err
 	}
-	fmt.Println()
-	fmt.Println(sBold.Render("  On the other Coolify server, run this tool, choose \"Restore a backup\" and paste:"))
-	fmt.Println()
-	fmt.Println("  " + sLink.Render(sh.Link))
-	fmt.Println()
-	fmt.Println(sMuted.Render("  The other server needs this tool too. As root there, this downloads it (checksum verified) and opens the menu:"))
-	fmt.Println("  " + sh.ToolCommand())
-	fmt.Println()
-	if sh.Mode == engine.ShareDirect {
-		fmt.Println(sMuted.Render(fmt.Sprintf("  If the other server cannot connect, open TCP port %d in your cloud firewall or share through the proxy instead.", engine.DefaultPort)))
-	}
+	printShareInstructions(sh)
 
 	m := newShareModel(sh)
 	_, err = tea.NewProgram(m, tea.WithContext(ctx)).Run()
 	if m.background {
 		sh.Stop()
-		opt.Token = sh.Token
+		opt.Secret = sh.Secret()
 		pid, logf, derr := engine.Detach(file, key, opt, 24*time.Hour)
 		if derr != nil {
 			return fmt.Errorf("could not keep sharing in the background: %w", derr)
@@ -94,6 +84,23 @@ func shareScreen(ctx context.Context, in *coolify.Instance, file, key string, op
 		return err
 	}
 	return nil
+}
+
+// printShareInstructions shows what to run on the other server. Commands are
+// printed on their own lines, never inside a box, so they copy cleanly.
+func printShareInstructions(sh *engine.Share) {
+	fmt.Println()
+	fmt.Println(sBold.Render("  On the other Coolify server, run this one command") + sMuted.Render(" (installs coolify-mirror and restores):"))
+	fmt.Println()
+	fmt.Println("  " + sLink.Render(sh.RestoreCommand()))
+	fmt.Println()
+	fmt.Println(sMuted.Render("  Share code: ") + sAccent.Render(sh.Code) + sMuted.Render("   (coolify-mirror already there? sudo coolify-mirror restore "+sh.Code+", or type the code in its menu)"))
+	fmt.Println(sMuted.Render("  No GitHub access there? This gets the tool from this server instead:"))
+	fmt.Println(sMuted.Render("  " + sh.ToolCommand()))
+	fmt.Println()
+	if sh.Mode == engine.ShareDirect {
+		fmt.Println(sMuted.Render(fmt.Sprintf("  If the other server cannot connect, open TCP port %d in your cloud firewall or share through the proxy instead.", engine.DefaultPort)))
+	}
 }
 
 type shareEvent transfer.Event

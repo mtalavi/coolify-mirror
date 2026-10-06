@@ -49,22 +49,24 @@ Coolify's own backup covers its database. Moving **one app** to a new server —
 
 ## 🚀 Install
 
-On **each** Coolify server (as root):
+Two commands in total. **On the source server**, this installs the tool and opens it:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh
 ```
 
-The installer picks `amd64`/`arm64`, downloads the [latest release](https://github.com/mtalavi/coolify-mirror/releases/latest), verifies its SHA-256 and installs `/usr/local/bin/coolify-mirror`. Pin a version with `… | sudo VERSION=v1.1.0 sh`.
-
-Then just run:
+After the backup it prints **one command for the target server** — paste it there, it installs the tool and restores:
 
 ```bash
-sudo coolify-mirror
+curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore 203.0.113.10/k7qf-2m9x-pwab-cdef-ghjk-mnpq-rs
 ```
 
+The last part is the **share code**: the source address and a 128-bit secret. The share token, the TLS key of the share (Ed25519 — the target accepts only that certificate) and the key that unlocks the backup's own key are all derived from it, so nothing else has to be copied. Once sharing stops, the code is useless.
+
+The installer picks `amd64`/`arm64`, downloads the [latest release](https://github.com/mtalavi/coolify-mirror/releases/latest), verifies its SHA-256 and installs `/usr/local/bin/coolify-mirror` (it retries GitHub hiccups). Pin a version with `… | sudo VERSION=v1.5.0 sh`, only install with `NO_RUN=1`. Later: `sudo coolify-mirror`, and `sudo coolify-mirror update` for a new release.
+
 > [!TIP]
-> The target server doesn't even need the installer: after a backup, the source prints a one-line `curl … | sha256sum -c` command that downloads the tool **from the source server itself**.
+> A target without GitHub access: the source also prints a command that downloads the tool **from the source server itself** over the same pinned connection and restores.
 
 <details>
 <summary><b>Build from source</b></summary>
@@ -117,13 +119,13 @@ Real screenshots from two Coolify 4.3.23 servers (IP addresses replaced with doc
 
 <img src="docs/shots/05-progress.png" width="760" alt="progress">
 
-**6 · Share** — an `https://` link appears (key + certificate pin after `#`). Paste it on the other server. The one-liner below it downloads the tool over the same pinned connection and checks its SHA-256.
+**6 · Share** — one command for the other server appears (it installs the tool and restores the **share code** at its end), plus the bare code and a fallback that needs no GitHub.
 
 <img src="docs/shots/07-share.png" width="760" alt="share link">
 
 ### On the target server
 
-**7 · Paste the link** — choose *Restore a backup*.
+**7 · Run the command** — or choose *Restore a backup* in the menu and type the code.
 
 <img src="docs/shots/08-paste.png" width="760" alt="paste link">
 
@@ -200,10 +202,12 @@ coolify-mirror backup --all                             # every resource
 coolify-mirror backup --full                            # the whole Coolify
 coolify-mirror backup --domain shop.com --serve --mode proxy
 coolify-mirror serve FILE.cmb --detach                  # share for 24 h in the background
-coolify-mirror restore 'http://…/backup.cmb#key=…'
+coolify-mirror restore 203.0.113.10/k7qf-2m9x-…       # share code (in a terminal: the menu's restore)
+coolify-mirror restore 203.0.113.10/k7qf-2m9x-… --yes # no questions
 coolify-mirror restore FILE.cmb --key KEY --yes \
   --set-domain shop.com=shop.new.com --set-domain www.shop.com=-
-coolify-mirror start-all                                # ask Coolify to start anything stopped
+coolify-mirror start-all                                # start anything stopped (compose apps from their images)
+coolify-mirror update                                   # install the latest release (SHA-256 checked)
 ```
 
 <details>
@@ -219,7 +223,8 @@ coolify-mirror start-all                                # ask Coolify to start a
 | | `--output DIR` | default `/data/coolify-mirror/backups` |
 | | `--serve --mode proxy\|direct --port 8123 --host IP --open-firewall` | share right after (HTTPS; proxy = port 443) |
 | `serve` | `--key`, `--mode`, `--port`, `--host`, `--open-firewall`, `--detach`, `--ttl 24h` | share an existing file |
-| `restore` | `--key KEY` | when the link has no `#key=` |
+| `restore` | `CODE` / link / file | a share code `HOST[:PORT]/xxxx-…`, a full link, or a `.cmb` file |
+| | `--key KEY` | for a file (or a link without `#key=`) |
 | | `--yes` | no questions |
 | | `--on-conflict copy\|skip` | resource already exists here |
 | | `--team ID` | target team (selective) |
@@ -234,8 +239,9 @@ coolify-mirror start-all                                # ask Coolify to start a
 ## 🛡️ Safety
 
 - **Everything sensitive is encrypted.** The backup is a single age-encrypted file (random 130-bit passphrase, scrypt): `APP_KEY`, environment variables and secrets, API tokens, private SSH keys, GitHub/GitLab app credentials, S3 access/secret keys, database users, passwords and connection strings, webhook secrets and registry logins never exist unencrypted outside the two servers. The key is written only to `<file>.key` (mode 600) and the link's `#fragment`.
-- **No plain HTTP.** Shares are HTTPS only, with a self-signed certificate made for that share and pinned in the link; the downloader accepts exactly that public key (a mismatch aborts). Through Coolify's proxy the TLS connection is passed through untouched (SNI routing), so it ends in this tool, not in Traefik. Links use a random 128-bit token and stop when you quit (or after `--ttl`, 24 h max in the background).
-- **Same Coolify version only.** Restores require exactly the same Coolify version on both servers.
+- **No plain HTTP.** Shares are HTTPS only. The certificate's Ed25519 key is derived from the share code's 128-bit secret, so the downloader accepts exactly that public key (a mismatch aborts). Through Coolify's proxy the TLS connection is passed through untouched (SNI routing), so it ends in this tool, not in Traefik. The code does not contain the backup key: the target fetches it, encrypted with the code, from the running share. Sharing stops when you quit (or after `--ttl`, 24 h max in the background).
+- **Same Coolify version only.** Restores require exactly the same Coolify version on both servers; the message says which server to upgrade to which version.
+- **Coolify updates are checked, not trusted.** See below.
 - **Full restore only onto an empty Coolify.** A target with projects, resources, extra servers or S3 storages is refused — use a selective (merge) restore.
 - **Mandatory preflight.** Version, disk space, Coolify's bundle validation, conflicts (same resources, volumes, host folders, domains) and a trial import in a rolled-back transaction run before anything is written. `--yes` only skips the confirmation, never these checks.
 - **Verified result.** `SUCCESS` is printed only when every restored resource runs like on the source and its domains answer through the proxy; build dependencies on the host are checked too. A resource held back by a domain clash or failing any check makes the restore end with *NOT operational* and exit code 1.
@@ -246,6 +252,18 @@ coolify-mirror start-all                                # ask Coolify to start a
 
 > [!IMPORTANT]
 > Run it inside `tmux`/`screen` on big servers so an SSH disconnect doesn't interrupt a long copy.
+
+---
+
+## 🔄 Coolify updates
+
+Coolify ships often, and the tool relies on parts of it (database tables, PHP classes and methods). So:
+
+- **Before every backup and restore** it checks that this Coolify still has everything it needs — every class and method (probed inside Coolify) and every table and reference column. A missing essential part stops it **before anything changes**, naming exactly what is missing. A missing optional part makes that feature fall back to the safe path (e.g. Coolify deploys a compose app itself), and says so.
+- **Schema drift is reported at backup time:** a table Coolify added that holds data of the selected resources, or a reference column this version doesn't know, is listed instead of being lost silently. New plain columns travel automatically.
+- **Every new Coolify release is tested automatically.** A daily workflow ([`compat.yml`](.github/workflows/compat.yml)) installs it on two fresh servers, migrates real resources (a git compose app, Postgres with data, an image app with a volume and a domain) with a share code and compares everything ([`lab/e2e.sh`](lab/e2e.sh)). The result goes to `compat.json` on the `compat` branch; a failure opens an issue.
+- **The tool reads that result:** next to the Coolify version it shows *tested* or *not tested yet*; a version that failed is refused with a clear message, an untested one only warns — the trial import, rollback and result verification run regardless.
+- **`coolify-mirror update`** installs a new release; the menu says when one exists. Turn off Coolify's auto-update on both servers while you migrate.
 
 ---
 
@@ -263,7 +281,7 @@ coolify-mirror start-all                                # ask Coolify to start a
 
 ## 🧪 Tested
 
-On real Coolify 4.3.23 installs (lab in [`lab/`](lab)): **a real migration with zero manual fixes** — healthy source → new backup → freshly installed Coolify → selective and full restore with `--verify-redeploy` (a multi-service compose app whose build uses a host policy script and a named buildx builder, a Dockerfile app, an image app, WordPress + MariaDB, Postgres): `SUCCESS`, the same secrets, volume data and database rows as the source, every domain answering through Traefik, and a full rebuild on the target; merge into an existing Coolify without touching its other resources; an app that exits and one that turns unhealthy after the restore reported as *NOT operational*; rollback leaving the target exactly as before; backups made by 1.2.0. Also: native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals, restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
+Automatically, for every new Coolify release: [`lab/e2e.sh`](lab/e2e.sh) (two fresh servers, official installer, a git compose app + Postgres + an image app with a volume and domains, backup → share code → restore, data compared through the proxy) — passing on 4.3.23. By hand on real Coolify 4.3.23 installs (lab in [`lab/`](lab)): **a real migration with zero manual fixes** — healthy source → new backup → freshly installed Coolify → selective and full restore with `--verify-redeploy` (a multi-service compose app whose build uses a host policy script and a named buildx builder, a Dockerfile app, an image app, WordPress + MariaDB, Postgres): `SUCCESS`, the same secrets, volume data and database rows as the source, every domain answering through Traefik, and a full rebuild on the target; merge into an existing Coolify without touching its other resources; an app that exits and one that turns unhealthy after the restore reported as *NOT operational*; rollback leaving the target exactly as before; backups made by 1.2.0. Also: native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals, restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
 
 ---
 

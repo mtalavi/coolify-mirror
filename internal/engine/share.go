@@ -41,12 +41,19 @@ type ShareOptions struct {
 	Port         int
 	Host         string // public address to put in the link (default: detected)
 	OpenFirewall bool   // add a temporary ufw rule when ufw is active
-	Token        string // reuse a token (keeps the link the same); random when empty
+	Secret       string // reuse a share secret (keeps the code the same); random when empty
 }
+
+// SecretEnv carries the share secret to a background share (not argv).
+const SecretEnv = "COOLIFY_MIRROR_SECRET"
+
+// InstallCommand installs the latest release from GitHub and opens the menu.
+const InstallCommand = "curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh"
 
 // Share is an active share of a backup file.
 type Share struct {
-	Link      string
+	Code      string // HOST[:PORT]/secret - all the other server needs
+	Link      string // the same share as a full link (key and pin in it)
 	ToolSHA   string // sha256 of the served tool binary
 	Pin       string // certificate pin (also in the link)
 	hostPort  string
@@ -57,6 +64,7 @@ type Share struct {
 	container string
 	certDir   string
 	ufwPort   int
+	secret    string
 	cancel    context.CancelFunc
 }
 
@@ -109,17 +117,25 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 	if strings.Count(host, ":") > 1 && !strings.HasPrefix(host, "[") {
 		host = "[" + host + "]"
 	}
-	token := opt.Token
-	if token == "" {
-		token = transfer.NewToken()
+	secret := opt.Secret
+	if secret == "" {
+		secret = transfer.NewSecret()
+	}
+	token, err := transfer.CodeToken(secret)
+	if err != nil {
+		return nil, err
+	}
+	keyBlob, err := transfer.WrapKey(secret, key)
+	if err != nil {
+		return nil, err
 	}
 	self, _ := os.Executable()
 	sctx, cancel := context.WithCancel(context.Background())
-	s := &Share{Mode: opt.Mode, Token: token, Events: make(chan transfer.Event, 64), cancel: cancel}
+	s := &Share{Mode: opt.Mode, Token: token, secret: secret, Events: make(chan transfer.Event, 64), cancel: cancel}
 	if sum, err := fileSHA256(self); err == nil {
 		s.ToolSHA = sum
 	}
-	cert, err := transfer.NewCert(token)
+	cert, err := transfer.NewCodeCert(secret)
 	if err != nil {
 		cancel()
 		return nil, err
@@ -152,6 +168,10 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 			cancel()
 			return nil, err
 		}
+		if err := os.WriteFile(filepath.Join(s.certDir, "key.blob"), keyBlob, 0o600); err != nil {
+			cancel()
+			return nil, err
+		}
 		router := "coolify-mirror-" + token[:8]
 		args := []string{"run", "-d", "--name", name, "--network", "coolify", "--restart", "no", "--user", "0:0",
 			"--label", "coolify-mirror.share=true",
@@ -176,6 +196,7 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 		s.container = name
 		s.hostPort = net.JoinHostPort(strings.Trim(host, "[]"), "443")
 		s.Link = transfer.Link(strings.TrimSuffix(s.hostPort, ":443"), token, key, cert.Pin)
+		s.Code = transfer.FormatCode(s.hostPort, secret)
 		go followContainerEvents(sctx, name, s.Events)
 
 	default:
@@ -184,7 +205,7 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 		if port == 0 {
 			port = DefaultPort
 		}
-		srv := &transfer.Server{File: file, Token: token, Binary: self, Cert: cert, OnEvent: func(e transfer.Event) {
+		srv := &transfer.Server{File: file, Token: token, Binary: self, Cert: cert, KeyBlob: keyBlob, OnEvent: func(e transfer.Event) {
 			select {
 			case s.Events <- e:
 			default:
@@ -208,6 +229,7 @@ func StartShare(ctx context.Context, in *coolify.Instance, file, key string, opt
 		}
 		s.hostPort = net.JoinHostPort(strings.Trim(host, "[]"), strconv.Itoa(actual))
 		s.Link = transfer.Link(s.hostPort, token, key, cert.Pin)
+		s.Code = transfer.FormatCode(s.hostPort, secret)
 	}
 	return s, nil
 }
@@ -282,14 +304,14 @@ func Detach(file, key string, opt ShareOptions, ttl time.Duration) (int, string,
 	if opt.Host != "" {
 		args = append(args, "--host", opt.Host)
 	}
-	if opt.Token != "" {
-		args = append(args, "--token", opt.Token)
-	}
 	if opt.OpenFirewall {
 		args = append(args, "--open-firewall")
 	}
 	cmd := exec.Command(self, args...)
 	cmd.Env = append(os.Environ(), KeyEnv+"="+key)
+	if opt.Secret != "" {
+		cmd.Env = append(cmd.Env, SecretEnv+"="+opt.Secret)
+	}
 	cmd.Stdout, cmd.Stderr = lf, lf
 	cmd.SysProcAttr = detachAttr()
 	if err := cmd.Start(); err != nil {
@@ -300,11 +322,20 @@ func Detach(file, key string, opt ShareOptions, ttl time.Duration) (int, string,
 	return pid, logPath, nil
 }
 
-// ToolCommand is the one-liner that downloads this tool on the other server
-// over the pinned HTTPS connection, checks its SHA-256 and opens the menu. The
-// backup link is pasted into the menu, so its key stays out of shell history.
+// Secret is the share secret (to keep the same code in a background share).
+func (s *Share) Secret() string { return s.secret }
+
+// RestoreCommand is the one command for the other server: it installs the
+// tool from GitHub and restores this share.
+func (s *Share) RestoreCommand() string {
+	return InstallCommand + " -s restore " + s.Code
+}
+
+// ToolCommand is the fallback for a server that cannot reach GitHub: it
+// downloads this tool from this server over the pinned HTTPS connection and
+// restores this share.
 func (s *Share) ToolCommand() string {
-	return transfer.ToolCommand(s.hostPort, s.Token, s.Pin, s.ToolSHA)
+	return transfer.ToolCommand(s.hostPort, s.Token, s.Pin, s.Code)
 }
 
 func fileSHA256(path string) (string, error) {

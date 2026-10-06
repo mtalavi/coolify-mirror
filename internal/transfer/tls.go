@@ -143,9 +143,9 @@ func Link(hostPort, token, key, pin string) string {
 	return fmt.Sprintf("https://%s/cm/%s/%s#key=%s&pin=%s", hostPort, token, BackupName, key, url.QueryEscape(pin))
 }
 
-// ToolCommand returns a curl one-liner that downloads the tool binary over the
-// pinned TLS connection and checks its SHA-256.
-func ToolCommand(hostPort, token, pin, sha string) string {
+// ToolCommand returns a one-liner that downloads the tool binary from the
+// share over the pinned TLS connection and restores the share code with it.
+func ToolCommand(hostPort, token, pin, code string) string {
 	host, port, err := net.SplitHostPort(hostPort)
 	if err != nil {
 		host, port = strings.Trim(hostPort, "[]"), "443"
@@ -158,12 +158,8 @@ func ToolCommand(hostPort, token, pin, sha string) string {
 	if port != "443" {
 		u += ":" + port
 	}
-	cmd := fmt.Sprintf("curl -fsSL -k --pinnedpubkey 'sha256//%s' --resolve '%s:%s:%s' '%s/cm/%s/%s' -o coolify-mirror",
-		pin, sni, port, host, u, token, ToolName)
-	if sha != "" {
-		cmd += fmt.Sprintf(" && echo '%s  coolify-mirror' | sha256sum -c -", sha)
-	}
-	return cmd + " && chmod +x coolify-mirror && ./coolify-mirror"
+	return fmt.Sprintf("curl -fsSLk --pinnedpubkey 'sha256//%s' --resolve '%s:%s:%s' '%s/cm/%s/%s' -o coolify-mirror && chmod +x coolify-mirror && sudo ./coolify-mirror restore %s",
+		pin, sni, port, host, u, token, ToolName, code)
 }
 
 // tokenFromURL extracts the share token from a /cm/<token>/... URL.

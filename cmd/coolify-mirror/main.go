@@ -67,6 +67,8 @@ func realMain(args []string) int {
 		err = cmdServeInternal(ctx, args)
 	case "start-all":
 		err = cmdStartAll(ctx)
+	case "update":
+		err = cmdUpdate(ctx)
 	case "version", "--version", "-v":
 		fmt.Println("coolify-mirror", engine.Version)
 		return 0
@@ -114,7 +116,8 @@ Run it as root on a Coolify server:
   ./coolify-mirror serve FILE [flags]   share an existing backup file
         --mode direct|proxy             direct HTTPS port (default 8123) or through Coolify's proxy on port 443
         --port 8123  --host IP  --open-firewall  --detach  --ttl 24h
-  ./coolify-mirror restore LINK|FILE    download, verify and restore a backup
+  ./coolify-mirror restore CODE        download, verify and restore a shared backup
+                                        (CODE = HOST/xxxx-xxxx-… shown on the source; a link or a .cmb file also works)
         --key KEY                       if the link has no #key=... part
         --yes                           do not ask for confirmation
         --on-conflict copy|skip         selective restore: resource already exists here
@@ -125,6 +128,7 @@ Run it as root on a Coolify server:
         --keep-download                 keep the downloaded file after a successful restore
         --set-domain OLD=NEW            replace a restored domain (repeatable, e.g. a.com=b.com);
                                         without --yes every domain is asked for at the end
+  ./coolify-mirror update               install the latest release of coolify-mirror (checksum verified)
   ./coolify-mirror start-all            ask Coolify to start every resource on this server
                                         that has no running container (recovery helper)
 `)
@@ -173,6 +177,19 @@ func splitList(s string) []string {
 		}
 	}
 	return out
+}
+
+func cmdUpdate(ctx context.Context) error {
+	v, err := engine.SelfUpdate(ctx)
+	if err != nil {
+		return err
+	}
+	if v == "" {
+		fmt.Println("coolify-mirror", engine.Version, "is the latest release.")
+		return nil
+	}
+	fmt.Printf("Updated coolify-mirror %s -> %s\n", engine.Version, v)
+	return nil
 }
 
 // --- list ------------------------------------------------------------------------
@@ -412,7 +429,8 @@ func cmdServe(ctx context.Context, args []string) error {
 	if *key == "" {
 		return errors.New("no key: pass --key (it was printed when the backup was created)")
 	}
-	opt := engine.ShareOptions{Mode: *mode, Port: *port, Host: *host, OpenFirewall: *openFW, Token: *token}
+	_ = token // accepted for compatibility; the share code is kept with COOLIFY_MIRROR_SECRET
+	opt := engine.ShareOptions{Mode: *mode, Port: *port, Host: *host, OpenFirewall: *openFW, Secret: os.Getenv(engine.SecretEnv)}
 	if *detach {
 		pid, logf, err := engine.Detach(file, *key, opt, *ttl)
 		if err != nil {
@@ -446,8 +464,9 @@ func serveLoop(ctx context.Context, in *coolify.Instance, file, key string, opt 
 		return err
 	}
 	defer sh.Stop()
-	fmt.Printf("\nSharing %s (%s mode)\n\n  Restore link (paste it on the other server):\n    %s\n\n", filepath.Base(file), sh.Mode, sh.Link)
-	fmt.Printf("  On the other server, download this tool (checksum verified) and open its menu:\n    %s\n  then choose \"Restore a backup\" and paste the link.\n\n", sh.ToolCommand())
+	fmt.Printf("\nSharing %s (%s mode)\n\n  On the other Coolify server, run this one command (installs coolify-mirror and restores):\n\n    %s\n\n", filepath.Base(file), sh.Mode, sh.RestoreCommand())
+	fmt.Printf("  Share code: %s  (coolify-mirror already there? sudo coolify-mirror restore %s)\n", sh.Code, sh.Code)
+	fmt.Printf("  No GitHub access there? This gets the tool from this server instead:\n    %s\n\n", sh.ToolCommand())
 	fmt.Println("Waiting for downloads - press Ctrl+C to stop sharing.")
 	var expire <-chan time.Time
 	if ttl > 0 {
@@ -497,6 +516,9 @@ func cmdServeInternal(ctx context.Context, args []string) error {
 	}
 	enc := json.NewEncoder(os.Stdout)
 	srv := &transfer.Server{File: *file, Token: *token, Binary: *binary, Cert: cert, OnEvent: func(e transfer.Event) { _ = enc.Encode(e) }}
+	if b, err := os.ReadFile(filepath.Join(*tlsDir, "key.blob")); err == nil {
+		srv.KeyBlob = b
+	}
 	if _, err := srv.Listen(*listen); err != nil {
 		return err
 	}
@@ -526,7 +548,12 @@ func cmdRestore(ctx context.Context, args []string) error {
 		return err
 	}
 	if src == "" {
-		return errors.New("usage: coolify-mirror restore LINK|FILE")
+		return errors.New("usage: coolify-mirror restore CODE|LINK|FILE")
+	}
+	// In a terminal without options: the same interactive restore as the menu.
+	if !*yes && *key == "" && !*noStart && !*verifyRedeploy && len(setDomains) == 0 &&
+		term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
+		return ui.RunRestore(ctx, src)
 	}
 	if *key == "" {
 		*key = os.Getenv(engine.KeyEnv)

@@ -1,3 +1,4 @@
 dist/
 *.cmb
 *.cmb.key
+.session/

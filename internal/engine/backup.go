@@ -105,6 +105,15 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 	stMeasure := pr.Add("Measure data", 0)
 
 	stRead.Begin("database")
+	compat := CheckCompat(ctx, in)
+	if len(compat.Blockers) > 0 {
+		err = fmt.Errorf("backup not possible: %s", strings.Join(compat.Blockers, "; "))
+		stRead.Fail(err)
+		return nil, err
+	}
+	for _, w := range compat.Warnings {
+		pr.Warn("%s", w)
+	}
 	if req.Mode == ModeFull {
 		err = b.discoverFull(ctx)
 	} else {
@@ -342,7 +351,7 @@ func (b *backupper) discoverSelective(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	for _, w := range ex.Warnings {
+	for _, w := range append(ex.Warnings, ex.Drift...) {
 		b.pr.Warn("%s", w)
 	}
 	b.export, err = json.Marshal(ex)
