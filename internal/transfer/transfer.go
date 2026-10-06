@@ -38,15 +38,21 @@ func NewToken() string {
 	return hex.EncodeToString(b)
 }
 
-// ParseSource splits a pasted link (or file path) into location and key.
-// Accepted: https://…/backup.cmb#key=KEY&pin=PIN, /path/file.cmb#key=KEY,
-// /path/file.cmb. For links the returned location keeps "#pin=PIN" (the
+// ParseSource splits a pasted share code, link or file path into location
+// and key. Accepted: HOST[:PORT]/CODE (the key is then fetched with FetchKey),
+// https://…/backup.cmb#key=KEY&pin=PIN, /path/file.cmb#key=KEY, /path/file.cmb. For links the returned location keeps "#pin=PIN" (the
 // download needs it; it is never sent). Plain http links are refused.
 func ParseSource(s string) (location, key string, isURL bool, err error) {
 	s = strings.TrimSpace(s)
 	s = strings.Trim(s, `"'`)
 	if s == "" {
 		return "", "", false, errors.New("empty link")
+	}
+	if loc, secret, ok, err := parseCode(s); ok {
+		if err != nil {
+			return "", "", false, err
+		}
+		return loc, codeKeyPrefix + secret, true, nil
 	}
 	loc, frag, _ := strings.Cut(s, "#")
 	pin := ""
@@ -97,6 +103,7 @@ type Server struct {
 	Token   string
 	Binary  string // path of this executable, served as /cm/<token>/coolify-mirror
 	Cert    *Cert  // TLS certificate (required by Listen)
+	KeyBlob []byte // the backup key encrypted with a share code (WrapKey), served as /cm/<token>/key
 	OnEvent func(Event)
 
 	completed atomic.Int64
@@ -120,6 +127,15 @@ func (s *Server) Handler() http.Handler {
 			return
 		}
 		s.serveFile(w, r, s.Binary, false)
+	})
+	mux.HandleFunc(base+"key", func(w http.ResponseWriter, r *http.Request) {
+		if len(s.KeyBlob) == 0 || r.Method != http.MethodGet {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Content-Type", "text/plain")
+		w.Header().Set("Cache-Control", "no-store")
+		_, _ = w.Write(s.KeyBlob)
 	})
 	mux.HandleFunc(base+"info", func(w http.ResponseWriter, r *http.Request) {
 		st, err := os.Stat(s.File)

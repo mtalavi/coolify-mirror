@@ -28,6 +28,8 @@ type Export struct {
 	Roots          []coolify.Resource       `json:"roots"`
 	Tables         map[string][]coolify.Row `json:"tables"`
 	Warnings       []string                 `json:"warnings,omitempty"`
+	// Drift: what this version could not carry from this Coolify (see drift.go).
+	Drift []string `json:"drift,omitempty"`
 }
 
 type collector struct {
@@ -55,6 +57,9 @@ func Collect(ctx context.Context, in *coolify.Instance, roots []coolify.Resource
 	}
 	if err := c.sharedVariableRefs(); err != nil {
 		return nil, err
+	}
+	if d, err := c.ex.FindDrift(ctx, in); err == nil {
+		c.ex.Drift = d
 	}
 	return c.ex, nil
 }

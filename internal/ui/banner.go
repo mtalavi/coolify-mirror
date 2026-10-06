@@ -13,7 +13,7 @@ import (
 )
 
 // RepoURL is the project's home page.
-const RepoURL = "https://github.com/mtalavi/coolify-mirror"
+const RepoURL = engine.RepoURL
 
 var logo = []string{
 	"█▀▀ █▀█ █▀█ █   █ █▀▀ █▄█   █▀▄▀█ █ █▀█ █▀█ █▀█ █▀█",

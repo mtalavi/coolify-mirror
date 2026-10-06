@@ -45,6 +45,63 @@ try {
             $result['version'] = (string) config('constants.coolify.version');
             break;
 
+        case 'capabilities':
+            // Everything of Coolify this helper relies on, per feature: a
+            // Coolify update that renames or removes something is reported
+            // precisely instead of failing in the middle of a restore.
+            $has = function (array $need): array {
+                $missing = [];
+                foreach ($need as $item) {
+                    if (str_contains($item, '::')) {
+                        [$class, $method] = explode('::', $item, 2);
+                        if (! class_exists($class) || ! method_exists($class, $method)) {
+                            $missing[] = $item;
+                        }
+                    } elseif (str_ends_with($item, '()')) {
+                        if (! function_exists(substr($item, 0, -2))) {
+                            $missing[] = $item;
+                        }
+                    } elseif (! class_exists($item)) {
+                        $missing[] = $item;
+                    }
+                }
+
+                return $missing;
+            };
+            $features = [
+                'core' => array_merge([
+                    'App\Models\Application', 'App\Models\ApplicationDeploymentQueue', 'App\Models\Server',
+                    'App\Models\Service', 'App\Models\Project', 'App\Models\Environment',
+                    'App\Models\Server::isFunctional', 'App\Models\Server::proxyType',
+                    'App\Actions\Server\ValidateServer::run', 'App\Actions\Proxy\CheckProxy::run', 'App\Actions\Proxy\StartProxy::run',
+                    'App\Actions\Service\StartService::run', 'App\Actions\Database\StartDatabase::dispatch',
+                    'queue_application_deployment()', 'new_public_id()', 'data_get()',
+                ], array_values(cm_database_models())),
+                'no_rebuild' => ['App\Models\Application::markDeploymentConfigurationApplied'],
+                'compose_start' => [
+                    'App\Models\Application::parse', 'App\Models\Application::workdir', 'App\Models\Application::link',
+                    'App\Jobs\ApplicationDeploymentJob::generate_runtime_environment_variables',
+                    'App\Jobs\ApplicationDeploymentJob::resolveContainerName',
+                    'App\Models\ApplicationDeploymentQueue::addLogEntry', 'convertToArray()',
+                ],
+                'domains' => ['App\Models\ServiceApplication', 'App\Models\Service::parse', 'updateCompose()', 'generateLabelsApplication()'],
+                'transfer_bundle' => [
+                    'App\Services\ServerTransfer\ServerTransferBundle::wrap', 'App\Services\ServerTransfer\ServerTransferBundle::validate',
+                    'App\Services\ServerTransfer\ServerTransferExporter::collectProjectIds',
+                    'App\Services\ServerTransfer\ServerTransferExporter::destinationUuidMap',
+                    'App\Services\ServerTransfer\ServerTransferExporter::collectDependencies',
+                    'App\Services\ServerTransfer\ServerTransferExporter::buildWarnings',
+                    'App\Services\ServerTransfer\ServerTransferExporter::exportProject',
+                    'App\Services\ServerTransfer\ServerTransferExporter::exportServer',
+                ],
+            ];
+            $out = [];
+            foreach ($features as $name => $need) {
+                $out[$name] = $has($need);
+            }
+            $result['missing'] = $out;
+            break;
+
         case 'crypt_check':
             // Proves that this tool and Laravel agree on the APP_KEY and format.
             $result['decrypted'] = Crypt::decryptString($input['payload']);

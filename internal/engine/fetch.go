@@ -49,6 +49,12 @@ func Fetch(ctx context.Context, source, key string, pr *Progress) (f *Fetched, e
 	if key == "" {
 		key = linkKey
 	}
+	if isURL {
+		// A share code: the backup key comes from the share itself.
+		if key, err = transfer.FetchKey(ctx, loc, key); err != nil {
+			return nil, err
+		}
+	}
 	if key == "" && !isURL {
 		if b, err := os.ReadFile(loc + ".key"); err == nil {
 			key = strings.TrimSpace(string(b))

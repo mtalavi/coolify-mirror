@@ -1,0 +1,109 @@
+name: coolify-compat
+
+# Every day: when Coolify has released a version that the current coolify-mirror
+# has not been tested with, run the end-to-end test (lab/e2e.sh: two fresh
+# Coolify servers of that version, migrate real resources, compare) and publish
+# the result in compat.json on the "compat" branch. coolify-mirror reads that
+# file before a backup or restore: a failed version is refused with a clear
+# message, a passed one is shown as tested. A failure also opens an issue.
+
+on:
+  schedule:
+    - cron: "23 3 * * *"
+  workflow_dispatch:
+    inputs:
+      coolify:
+        description: "Coolify version to test (empty = latest release)"
+        required: false
+      force:
+        description: "Test even if this combination was tested already"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: coolify-compat
+  cancel-in-progress: false
+
+jobs:
+  compat:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build coolify-mirror
+        run: scripts/build.sh
+      - name: Pick the Coolify version
+        id: pick
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WANT: ${{ inputs.coolify }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          tool=$(grep -oE 'Version = "[^"]+"' internal/engine/manifest.go | cut -d'"' -f2)
+          v=${WANT:-$(gh api repos/coollabsio/coolify/releases/latest --jq .tag_name)}
+          v=${v#v}
+          echo "tool=$tool" >> "$GITHUB_OUTPUT"
+          echo "coolify=$v" >> "$GITHUB_OUTPUT"
+          git fetch origin compat:compat 2>/dev/null || true
+          tested=$(git show compat:compat.json 2>/dev/null | jq -r --arg v "$v" '.coolify[$v].tool // ""' || true)
+          if [ "$tested" = "$tool" ] && [ "$FORCE" != "true" ]; then
+            echo "coolify-mirror $tool was already tested with Coolify $v"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: End-to-end test
+        id: e2e
+        if: steps.pick.outputs.skip != 'true'
+        continue-on-error: true
+        env:
+          E2E_BRANCH: ${{ github.ref_name }}
+        run: |
+          set -o pipefail
+          bash lab/e2e.sh "${{ steps.pick.outputs.coolify }}" dist/coolify-mirror-linux-amd64 2>&1 | tee e2e.log
+      - name: Publish the result
+        if: steps.pick.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.pick.outputs.coolify }}
+          TOOL: ${{ steps.pick.outputs.tool }}
+          OUTCOME: ${{ steps.e2e.outcome }}
+        run: |
+          set -euo pipefail
+          status=ok; detail=""
+          if [ "$OUTCOME" != success ]; then
+            status=fail
+            detail=$(grep -E 'BAD|failed|no SUCCESS|not |ERROR' e2e.log | tail -3 | tr '\n' ' ' | cut -c1-300)
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git show-ref --quiet refs/heads/compat; then
+            git switch compat
+          else
+            git switch --orphan compat
+            git rm -rqf . || true
+            echo '{"coolify":{}}' > compat.json
+          fi
+          jq --arg v "$V" --arg s "$status" --arg t "$TOOL" --arg d "$(date -u +%F)" --arg x "$detail" \
+            '.coolify[$v] = ({status:$s, tool:$t, date:$d} + (if $x == "" then {} else {detail:$x} end))' compat.json > c.json
+          mv c.json compat.json
+          git add compat.json
+          git commit -qm "compat: Coolify $V with coolify-mirror $TOOL: $status"
+          git push -q origin compat
+          if [ "$status" = fail ]; then
+            title="Coolify $V: compatibility test failed (coolify-mirror $TOOL)"
+            if [ -z "$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')" ]; then
+              gh issue create --title "$title" --body "The daily end-to-end test failed: $detail
+
+          Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            fi
+            exit 1
+          fi
