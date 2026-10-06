@@ -255,6 +255,9 @@ func followContainerEvents(ctx context.Context, name string, out chan<- transfer
 	for sc.Scan() {
 		var e transfer.Event
 		if json.Unmarshal(sc.Bytes(), &e) == nil && e.Total > 0 {
+			// Behind Coolify's proxy every download comes from the proxy's
+			// own address, not from the other server's.
+			e.Remote = "The other server"
 			select {
 			case out <- e:
 			default:
