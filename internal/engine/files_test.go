@@ -90,6 +90,14 @@ func TestListStored(t *testing.T) {
 			t.Errorf("%s should be a leftover: %+v", n, got[n])
 		}
 	}
+	// "All backups": the complete ones made here and downloaded, no .part.
+	var ready []string
+	for _, f := range ReadyBackups(list) {
+		ready = append(ready, f.Name)
+	}
+	if strings.Join(ready, " ") != strings.Join(want[:3], " ") {
+		t.Errorf("ready backups: %v", ready)
+	}
 	b := got["coolify-src-selective-20261006-120000.cmb"]
 	if b.About != "Lift, Norino" || len(b.files) != 2 {
 		t.Errorf("backup: %+v", b)
@@ -129,6 +137,20 @@ func TestListStored(t *testing.T) {
 		if err := removeInside(home, []string{p}); err == nil {
 			t.Errorf("deleting %s was allowed", p)
 		}
+	}
+
+	// A backup in a subfolder (--output): the emptied subfolder goes, backups/ stays.
+	home2 := t.TempDir()
+	deep := filepath.Join(home2, "backups", "v1", "deep", "b.cmb")
+	writeFile(t, deep, 1)
+	if err := removeInside(home2, []string{deep}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(home2, "backups", "v1")); !os.IsNotExist(err) {
+		t.Error("the emptied subfolder was kept")
+	}
+	if _, err := os.Stat(filepath.Join(home2, "backups")); err != nil {
+		t.Error("backups/ itself was removed")
 	}
 }
 
