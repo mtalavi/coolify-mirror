@@ -103,15 +103,23 @@ func DeleteWarnings(f StoredFile) []string {
 	return w
 }
 
-// StoredOf returns the files of one kind.
-func StoredOf(all []StoredFile, kind string) []StoredFile {
+// StoredOf returns the files of the given kinds, in list order.
+func StoredOf(all []StoredFile, kinds ...string) []StoredFile {
 	var out []StoredFile
 	for _, f := range all {
-		if f.Kind == kind {
-			out = append(out, f)
+		for _, k := range kinds {
+			if f.Kind == k {
+				out = append(out, f)
+				break
+			}
 		}
 	}
 	return out
+}
+
+// ReadyBackups are the complete backups kept here: made here or downloaded.
+func ReadyBackups(all []StoredFile) []StoredFile {
+	return StoredOf(all, StoredBackup, StoredDownload)
 }
 
 // StoredTotal is the size of a list of saved files.
@@ -437,6 +445,13 @@ func removeInside(home string, paths []string) error {
 	for _, p := range paths {
 		if err := os.RemoveAll(p); err != nil {
 			return err
+		}
+		// A subfolder of backups/ (from --output) left empty goes too;
+		// backups/ itself and the other top folders stay.
+		for d := filepath.Dir(filepath.Clean(p)); filepath.Dir(d) != filepath.Clean(home) && d != filepath.Clean(home); d = filepath.Dir(d) {
+			if os.Remove(d) != nil {
+				break
+			}
 		}
 	}
 	return nil

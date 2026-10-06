@@ -55,7 +55,7 @@ func Run(ctx context.Context) error {
 					menuOption("Back up the whole server", "Coolify itself, its settings and every app", actBackupFull),
 					menuOption("Restore a backup", "type the share code from the other server", actRestore),
 					menuOption("Share a saved backup", "send a backup made earlier to another server", actShare),
-					menuOption(filesMenuName, "see and delete old backups, downloads, safety copies", actFiles),
+					menuOption(filesMenuName, "see and delete old backups (all or some), safety copies", actFiles),
 					menuOption("How it works", "step-by-step guide", actGuide),
 					menuOption("Quit", "", actQuit),
 				).
@@ -210,6 +210,8 @@ func printGuide() {
 		"",
 		step("4", "Free the disk space - on both servers"),
 		note("sudo coolify-mirror → " + filesMenuName),
+		note("→ All backups: delete all of them at once, or tick only some"),
+		note("→ Everything kept here: also the safety copies of restores and the logs"),
 		note("old server: the backup file · new server: safety copies, once everything works"),
 		"",
 		sMuted.Render("Keys: ↑/↓ move · enter choose · space tick · / search · esc back (in the menu: quit) · ctrl+c stop"),
