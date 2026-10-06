@@ -47,7 +47,7 @@ func restoreSource(ctx context.Context, in *coolify.Instance, link string) error
 			Description("It looks like 1.2.3.4/abcd-efgh-ijkl-mnop-qrst-uvwx-yz (a full https://… link or a local .cmb file path also works)").
 			Value(&link).
 			Validate(checkSource),
-	)).WithTheme(theme()).RunWithContext(ctx); err != nil {
+	)).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
 		return err
 	}
 	var err error
@@ -57,7 +57,7 @@ func restoreSource(ctx context.Context, in *coolify.Instance, link string) error
 		if _, err := os.Stat(loc + ".key"); err != nil {
 			if err := huh.NewForm(huh.NewGroup(huh.NewInput().Title("Key of this backup file").
 				Description("It was shown on the source server when the backup was created").Value(&key))).
-				WithTheme(theme()).RunWithContext(ctx); err != nil {
+				WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
 				return err
 			}
 		}
@@ -111,7 +111,7 @@ func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetch
 		}
 		team = teams[0].ID
 		if err := huh.NewForm(huh.NewGroup(huh.NewSelect[int64]().Title("Restore into which team?").
-			Options(opts...).Value(&team))).WithTheme(theme()).RunWithContext(ctx); err != nil {
+			Options(opts...).Value(&team))).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
 			return err
 		}
 	}
@@ -130,7 +130,7 @@ func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetch
 			Options(
 				huh.NewOption("Restore it again as a separate copy (new IDs, both keep running)", dbx.NewCopy),
 				huh.NewOption("Skip it (keep the existing one)", dbx.Skip),
-			).Value(&d))).WithTheme(theme()).RunWithContext(ctx)
+			).Value(&d))).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx)
 		if err != nil {
 			return err
 		}
@@ -231,7 +231,7 @@ func restoreFull(ctx context.Context, in *coolify.Instance, f *engine.Fetched) e
 				return errors.New("type yes to continue, or press esc to go back")
 			}
 			return nil
-		}))).WithTheme(theme()).RunWithContext(ctx)
+		}))).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx)
 	if errors.Is(err, huh.ErrUserAborted) {
 		return errNotRestored
 	}
@@ -277,7 +277,11 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 			return err
 		}
 		// The resources are restored; a clashing one simply stays stopped.
-		fmt.Println(sWarn.Render("  ! domains were not changed: " + err.Error() + " - change them in Coolify"))
+		if errors.Is(err, huh.ErrUserAborted) {
+			fmt.Println(sMuted.Render("  domains kept as in the backup (change them in Coolify if needed)"))
+		} else {
+			fmt.Println(sWarn.Render("  ! domains were not changed: " + err.Error() + " - change them in Coolify"))
+		}
 	}
 	pr := engine.NewProgress("Start")
 	var results []engine.StartResult
@@ -342,6 +346,9 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	}
 	ok, err := confirm(ctx, fmt.Sprintf("Rebuild %d application(s) once now?", builds),
 		"They run from the restored images. One rebuild here (same commit, no cache) proves that the next deploy works on this server without the old one.\nLike any first deploy it downloads base images and packages - on a slow connection answer No and redeploy later from Coolify.", true)
+	if errors.Is(err, huh.ErrUserAborted) {
+		return nil // the restore is complete; esc only skips the rebuild
+	}
 	if err != nil || !ok {
 		return err
 	}
@@ -408,7 +415,7 @@ func askDomains(ctx context.Context, in *coolify.Instance, rep *engine.RestoreRe
 				return err
 			}))
 	}
-	if err := huh.NewForm(huh.NewGroup(inputs...)).WithTheme(theme()).RunWithContext(ctx); err != nil {
+	if err := huh.NewForm(huh.NewGroup(inputs...)).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
 		return err
 	}
 	for i := range fields {

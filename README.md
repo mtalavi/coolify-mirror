@@ -34,7 +34,7 @@ Coolify's own backup covers its database. Moving **one app** to a new server —
 
 | | |
 |---|---|
-| 🎯 **Pick by domain** | Arrow keys + space. Databases and services an app depends on (via `DATABASE_URL`, etc.) are found and added for you. |
+| 🎯 **Pick by domain** | Arrow keys + enter (space to tick several). Databases and services an app depends on (via `DATABASE_URL`, etc.) are found and added for you. |
 | 🔒 **Encrypted at rest and in transit** | The whole backup — `APP_KEY`, env vars, SSH keys, tokens, S3 keys, database passwords — is one [age](https://age-encryption.org)-encrypted file (passphrase, scrypt). It travels over **HTTPS with a pinned certificate**; the key and the pin live only in the link's `#fragment`. |
 | 🔗 **One link transfer** | A temporary, random-token HTTPS link — through Coolify's own proxy on port 443 (TLS passthrough), or a direct port. Plain HTTP is never served. |
 | 🗄️ **Native database dumps** | PostgreSQL, MySQL and MariaDB are saved with `pg_dumpall` / `mysqldump` while they keep running, and loaded with the same image on the target. |
@@ -87,11 +87,17 @@ Real screenshots from two Coolify 4.3.23 servers (IP addresses replaced with doc
 
 ### On the source server
 
-**1 · Start** — the tool checks Docker, Coolify and its version.
+**1 · Start** — the tool checks Docker, Coolify and its version, and says how much disk space its saved files use. *How it works* shows the whole move step by step.
 
 <img src="docs/shots/01-menu.png" width="760" alt="main menu">
 
-**2 · Pick what to move** — every resource with its domain, type, project and state. `space` selects, `/` filters, `ctrl+a` selects all.
+<details>
+<summary>The built-in guide</summary>
+
+<img src="docs/shots/15-guide.png" width="760" alt="How it works">
+</details>
+
+**2 · Pick what to move** — every resource with its domain, type, project and state. Move to an app and press `enter` — that's it. Several apps: `space` on each, then `enter`. `/` filters, `ctrl+a` selects all.
 
 <img src="docs/shots/02-select.png" width="760" alt="select domains">
 
@@ -99,7 +105,7 @@ Real screenshots from two Coolify 4.3.23 servers (IP addresses replaced with doc
 
 <img src="docs/shots/03-deps.png" width="760" alt="dependencies">
 
-**4 · Options** — how to keep running databases consistent while their data is copied, and which Docker images to include.
+**4 · Options** — *Recommended* is one keypress (pause for a moment, include application images). *Choose them myself* asks how to keep running databases consistent while their data is copied, and which Docker images to include.
 
 <img src="docs/shots/04-options.png" width="760" alt="options">
 
@@ -146,6 +152,23 @@ Real screenshots from two Coolify 4.3.23 servers (IP addresses replaced with doc
 <img src="docs/shots/13-complete.png" width="760" alt="restore complete">
 
 Refresh Coolify — the project is there with all its environments, variables, storages, tags, scheduled tasks and backups.
+
+### Afterwards · free the disk space (both servers)
+
+Nothing is deleted behind your back, so the menu's **Saved files & disk space** (or `coolify-mirror files`) shows everything the tool keeps on a server, with size, date and contents — and deletes what you pick:
+
+<img src="docs/shots/14-files.png" width="760" alt="saved files">
+
+| Kind | Where | What | Delete it when |
+|---|---|---|---|
+| `backup` | source | backups made here (`.cmb` + key) — the apps inside are named | the target has restored it |
+| `download` | target | a downloaded backup whose restore did not finish (removed automatically after a successful one) | you won't restore it again |
+| `unfinished` | both | interrupted backups / downloads (`.part`) | any time |
+| `safety copy` | target | `pre-restore-*` (previous Coolify database + `.env`), `replaced-*` (folders a restore replaced) | everything works |
+| `old volume` | target | `<name>.cm-old-<time>` — previous data of a volume that already existed | everything works |
+| `logs`, `leftover` | both | logs of earlier runs, remains of interrupted runs | any time |
+
+`enter` deletes the highlighted line, `space` ticks several. Every deletion says what is lost and needs a *Yes* (default *No*). Anything in use is protected: while a backup/restore runs, a volume a container uses, a backup shared from another menu window. A backup shared in the background is unshared first. Only the tool's own folder and its own `*.cm-old-*` volumes are ever touched.
 
 ---
 
@@ -208,6 +231,8 @@ coolify-mirror restore FILE.cmb --key KEY --yes \
   --set-domain shop.com=shop.new.com --set-domain www.shop.com=-
 coolify-mirror start-all                                # start anything stopped (compose apps from their images)
 coolify-mirror update                                   # install the latest release (SHA-256 checked)
+coolify-mirror files                                    # what the tool keeps here, with sizes
+coolify-mirror files delete NAME… | --all [--yes]       # free the disk space
 ```
 
 <details>
@@ -232,6 +257,7 @@ coolify-mirror update                                   # install the latest rel
 | | `--no-start` | restore but don't start |
 | | `--verify-redeploy` | after starting, rebuild every app Coolify builds (same commit, no cache) and check it again |
 | | `--keep-download` | keep the downloaded file |
+| `files` | `delete NAME…` / `--all` / `--yes` | list, or delete, saved backups, downloads, safety copies, old volumes, logs |
 </details>
 
 ---
@@ -246,7 +272,7 @@ coolify-mirror update                                   # install the latest rel
 - **Mandatory preflight.** Version, disk space, Coolify's bundle validation, conflicts (same resources, volumes, host folders, domains) and a trial import in a rolled-back transaction run before anything is written. `--yes` only skips the confirmation, never these checks.
 - **Verified result.** `SUCCESS` is printed only when every restored resource runs like on the source and its domains answer through the proxy; build dependencies on the host are checked too. A resource held back by a domain clash or failing any check makes the restore end with *NOT operational* and exit code 1.
 - **Rollback.** Selective: everything created is removed if the import fails (including parent folders it created). Full: the previous Coolify database and `.env` are restored and its containers started again.
-- **Nothing is deleted.** Volumes that already exist on the target keep their old data in `<name>.cm-old-<time>`; replaced folders go to `/data/coolify-mirror/replaced-<time>`.
+- **Nothing is deleted.** Volumes that already exist on the target keep their old data in `<name>.cm-old-<time>`; replaced folders go to `/data/coolify-mirror/replaced-<time>`. They stay until you delete them in *Saved files & disk space*.
 - **One run at a time.** A lock prevents two backups/restores on a server. Paused containers are always resumed — even after `Ctrl+C` or a crash.
 - **Logs** of every run: `/data/coolify-mirror/logs/` (no secrets).
 
@@ -281,7 +307,7 @@ Coolify ships often, and the tool relies on parts of it (database tables, PHP cl
 
 ## 🧪 Tested
 
-Automatically, for every new Coolify release: [`lab/e2e.sh`](lab/e2e.sh) (two fresh servers, official installer, a git compose app + Postgres + an image app with a volume and domains, backup → share code → restore, data compared through the proxy) — passing on 4.3.23. By hand on real Coolify 4.3.23 installs (lab in [`lab/`](lab)): **a real migration with zero manual fixes** — healthy source → new backup → freshly installed Coolify → selective and full restore with `--verify-redeploy` (a multi-service compose app whose build uses a host policy script and a named buildx builder, a Dockerfile app, an image app, WordPress + MariaDB, Postgres): `SUCCESS`, the same secrets, volume data and database rows as the source, every domain answering through Traefik, and a full rebuild on the target; merge into an existing Coolify without touching its other resources; an app that exits and one that turns unhealthy after the restore reported as *NOT operational*; rollback leaving the target exactly as before; backups made by 1.2.0. Also: native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals, restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
+Automatically, for every new Coolify release: [`lab/e2e.sh`](lab/e2e.sh) (two fresh servers, official installer, a git compose app + Postgres + an image app with a volume and domains, backup → share code → restore, data compared through the proxy) — passing on 4.3.23. By hand on real Coolify 4.3.23 installs (lab in [`lab/`](lab)): **a real migration with zero manual fixes** — healthy source → new backup → freshly installed Coolify → selective and full restore with `--verify-redeploy` (a multi-service compose app whose build uses a host policy script and a named buildx builder, a Dockerfile app, an image app, WordPress + MariaDB, Postgres): `SUCCESS`, the same secrets, volume data and database rows as the source, every domain answering through Traefik, and a full rebuild on the target; merge into an existing Coolify without touching its other resources; an app that exits and one that turns unhealthy after the restore reported as *NOT operational*; rollback leaving the target exactly as before; backups made by 1.2.0. Also: native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals (a single-container app restored as a copy is checked under its new name), saved-file cleanup on both servers (a backup shared in the background is unshared first; one shared from another window and a volume in use are refused), restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
 
 ---
 
@@ -290,7 +316,7 @@ Automatically, for every new Coolify release: [`lab/e2e.sh`](lab/e2e.sh) (two fr
 ```
 cmd/coolify-mirror     CLI + entry point
 internal/ui            interactive menu (Bubble Tea, huh, lipgloss)
-internal/engine        backup, share, fetch, selective/full restore, start, domains
+internal/engine        backup, share, fetch, selective/full restore, start, domains, saved files
 internal/dbx           export + import planner for Coolify's database
 internal/coolify       Coolify detection, psql, PHP runner, Laravel encryption
 internal/archive       tar + zstd + age stream format

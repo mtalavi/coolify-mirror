@@ -392,9 +392,9 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 		stDeps.Finish(fmt.Sprintf("%d checked", len(man.HostDeps)))
 	}
 
-	notes := append([]string{"a safety copy of the previous Coolify database and .env is in " + safety}, builderNotes...)
+	notes := append([]string{"a safety copy of the previous Coolify database and .env is in " + safety + " (delete it from the menu, 'Saved files & disk space', once everything works)"}, builderNotes...)
 	if av := undo.asideVolumes(); len(av) > 0 {
-		notes = append(notes, "previous data of volumes that already existed is kept in: "+strings.Join(av, ", ")+" (docker volume rm them when no longer needed)")
+		notes = append(notes, "previous data of volumes that already existed is kept in: "+strings.Join(av, ", ")+" (delete them from the menu, 'Saved files & disk space', once everything works)")
 	}
 	return &RestoreReport{Resources: fullResources(man), Notes: notes, Problems: problems, AsideDir: safety, Duration: time.Since(start)}, nil
 }
