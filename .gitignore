@@ -2,3 +2,4 @@ dist/
 *.cmb
 *.cmb.key
 .session/
+.wrangler/
