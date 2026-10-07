@@ -103,8 +103,10 @@ Run it as root on a Coolify server:
 
   ./coolify-mirror                      interactive menu (arrow keys)
 
-  ./coolify-mirror list                 show resources and their domains
+  ./coolify-mirror list                 show the projects, their resources and domains
   ./coolify-mirror backup [flags]       create a backup
+        --project NAME,…                whole projects: everything in them (name as in Coolify,
+                                        name/environment, or a domain of the project)
         --full                          whole Coolify server (instead of selected resources)
         --domain a.com,b.com            back up the resources serving these domains
         --uuid x,y                      back up these resources (uuid)
@@ -139,6 +141,9 @@ Run it as root on a Coolify server:
   ./coolify-mirror update               install the latest release of coolify-mirror (checksum verified)
   ./coolify-mirror start-all            ask Coolify to start every resource on this server
                                         that has no running container (recovery helper)
+
+Guide with a screenshot of every screen: ` + engine.SiteURL + `
+Source, releases and issues:            ` + engine.RepoURL + `
 `)
 }
 
@@ -341,22 +346,37 @@ func cmdList(ctx context.Context, args []string) error {
 		fmt.Println(string(b))
 		return nil
 	}
-	fmt.Printf("Coolify %s on %s - %d resource(s)\n\n", in.Version, in.Hostname, len(rs))
-	for _, r := range rs {
-		doms := "-"
-		if len(r.Domains) > 0 {
-			hs := make([]string, len(r.Domains))
-			for i, d := range r.Domains {
-				hs[i] = coolify.Host(d)
+	projects := coolify.GroupProjects(rs)
+	fmt.Printf("Coolify %s on %s - %d project(s), %d resource(s)\n", in.Version, in.Hostname, len(projects), len(rs))
+	for _, p := range projects {
+		run := "stopped"
+		switch p.RunState() {
+		case "running":
+			run = "running"
+		case "partly":
+			run = "partly running"
+			if p.Degraded() == 0 {
+				run = fmt.Sprintf("%d of %d running", p.Running(), len(p.Resources))
 			}
-			doms = strings.Join(hs, ", ")
 		}
-		where := ""
-		if !r.Local() {
-			where = "  [remote: " + r.ServerName + "]"
+		fmt.Printf("\n%s  (%s · %s)\n", p.Title(), p.Kinds(), run)
+		for _, r := range p.Resources {
+			doms := "-"
+			if len(r.Domains) > 0 {
+				hs := make([]string, len(r.Domains))
+				for i, d := range r.Domains {
+					hs[i] = coolify.Host(d)
+				}
+				doms = strings.Join(hs, ", ")
+			}
+			where := ""
+			if !r.Local() {
+				where = "  [remote: " + r.ServerName + "]"
+			}
+			fmt.Printf("  %-38s %-11s %-28s %-16s %s%s\n", doms, r.Label(), r.Name, r.Status, r.UUID, where)
 		}
-		fmt.Printf("%-40s %-12s %-28s %s/%s  %s  %s%s\n", doms, r.Label(), r.Name, r.Project, r.Environment, r.Status, r.UUID, where)
 	}
+	fmt.Println("\nBack up a whole project: coolify-mirror backup --project NAME (or one of its domains)")
 	return nil
 }
 
@@ -365,6 +385,7 @@ func cmdList(ctx context.Context, args []string) error {
 func cmdBackup(ctx context.Context, args []string) error {
 	fs := flag.NewFlagSet("backup", flag.ContinueOnError)
 	full := fs.Bool("full", false, "")
+	projects := fs.String("project", "", "")
 	domains := fs.String("domain", "", "")
 	uuids := fs.String("uuid", "", "")
 	all := fs.Bool("all", false, "")
@@ -394,7 +415,7 @@ func cmdBackup(ctx context.Context, args []string) error {
 		if err != nil {
 			return err
 		}
-		sel, err := selectResources(rs, *all, splitList(*domains), splitList(*uuids))
+		sel, err := selectResources(rs, *all, splitList(*projects), splitList(*domains), splitList(*uuids))
 		if err != nil {
 			return err
 		}
@@ -426,7 +447,7 @@ func cmdBackup(ctx context.Context, args []string) error {
 	return serveLoop(ctx, in, res.Path, res.Key, engine.ShareOptions{Mode: *mode, Port: *port, Host: *host, OpenFirewall: *openFW, Dedicated: true}, 0)
 }
 
-func selectResources(rs []coolify.Resource, all bool, domains, uuids []string) ([]coolify.Resource, error) {
+func selectResources(rs []coolify.Resource, all bool, projects, domains, uuids []string) ([]coolify.Resource, error) {
 	var sel []coolify.Resource
 	seen := map[string]bool{}
 	add := func(r coolify.Resource) {
@@ -438,6 +459,28 @@ func selectResources(rs []coolify.Resource, all bool, domains, uuids []string) (
 	for _, r := range rs {
 		if all && r.Local() {
 			add(r)
+		}
+	}
+	// A project brings everything in it (all its environments, unless named
+	// as project/environment); resources on remote servers are left out.
+	grouped := coolify.GroupProjects(rs)
+	for _, name := range projects {
+		found := false
+		for _, p := range grouped {
+			if !coolify.MatchProject(p, name) {
+				continue
+			}
+			found = true
+			local, remote := p.Local()
+			for _, r := range local {
+				add(r)
+			}
+			if len(remote) > 0 {
+				fmt.Printf("! project %s: %d resource(s) on remote servers are not included\n", p.Title(), len(remote))
+			}
+		}
+		if !found {
+			return nil, fmt.Errorf("no project %q (use its name as in Coolify, name/environment, or one of its domains - see: coolify-mirror list)", name)
 		}
 	}
 	for _, d := range domains {
@@ -467,7 +510,7 @@ func selectResources(rs []coolify.Resource, all bool, domains, uuids []string) (
 		}
 	}
 	if len(sel) == 0 {
-		return nil, errors.New("nothing selected: use --domain, --uuid, --all or --full")
+		return nil, errors.New("nothing selected: use --project, --domain, --uuid, --all or --full")
 	}
 	return sel, nil
 }
@@ -951,11 +994,20 @@ func confirm(q string) bool {
 	if !term.IsTerminal(int(os.Stdin.Fd())) {
 		return false
 	}
+	flushInput(int(os.Stdin.Fd()))
 	fmt.Printf("%s [yes/No]: ", q)
-	var s string
-	fmt.Scanln(&s)
-	s = strings.ToLower(strings.TrimSpace(s))
-	return s == "y" || s == "yes"
+	asked := time.Now()
+	in := bufio.NewReader(os.Stdin)
+	for {
+		line, err := in.ReadString('\n')
+		s := strings.ToLower(strings.TrimSpace(line))
+		// An empty line faster than anyone can type is the tail of the
+		// Enter that started the command (CR LF terminals), not an answer.
+		if s == "" && err == nil && time.Since(asked) < 150*time.Millisecond {
+			continue
+		}
+		return s == "y" || s == "yes"
+	}
 }
 
 type multiFlag []string

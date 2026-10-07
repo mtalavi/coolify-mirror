@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -69,10 +70,56 @@ func listKeys() *huh.KeyMap {
 
 func theme() *huh.Theme {
 	t := huh.ThemeCharm()
-	t.Focused.Title = t.Focused.Title.Foreground(colAccent)
-	t.Focused.SelectSelector = t.Focused.SelectSelector.Foreground(colAccent)
-	t.Focused.MultiSelectSelector = t.Focused.MultiSelectSelector.Foreground(colAccent)
-	t.Focused.SelectedPrefix = t.Focused.SelectedPrefix.Foreground(colOK)
+	t.Focused.Base = t.Focused.Base.BorderForeground(colAccent)
+	t.Focused.Card = t.Focused.Base
+	t.Focused.Title = t.Focused.Title.Foreground(colAccent).Bold(true)
+	t.Focused.Description = t.Focused.Description.Foreground(colMuted)
+	t.Focused.SelectSelector = lipgloss.NewStyle().Foreground(colAccent).Bold(true).SetString("❯ ")
+	t.Focused.MultiSelectSelector = lipgloss.NewStyle().Foreground(colAccent).Bold(true).SetString("❯ ")
+	t.Focused.NextIndicator = t.Focused.NextIndicator.Foreground(colAccent)
+	t.Focused.PrevIndicator = t.Focused.PrevIndicator.Foreground(colAccent)
+	t.Focused.SelectedPrefix = lipgloss.NewStyle().Foreground(colOK).SetString("[✓] ")
+	t.Focused.UnselectedPrefix = lipgloss.NewStyle().Foreground(colMuted).SetString("[ ] ")
 	t.Focused.SelectedOption = t.Focused.SelectedOption.Foreground(colOK)
+	t.Focused.FocusedButton = t.Focused.FocusedButton.Foreground(lipgloss.Color("#0B1020")).Background(colAccent).Bold(true)
+	t.Focused.Next = t.Focused.FocusedButton
+	t.Focused.TextInput.Prompt = t.Focused.TextInput.Prompt.Foreground(colAccent)
+	t.Focused.TextInput.Cursor = t.Focused.TextInput.Cursor.Foreground(colAccent)
+	t.Help.ShortKey = t.Help.ShortKey.Foreground(colAccent)
+	t.Help.ShortDesc = t.Help.ShortDesc.Foreground(colMuted)
+	t.Help.ShortSeparator = t.Help.ShortSeparator.Foreground(colMuted)
+
+	t.Blurred = t.Focused
+	t.Blurred.Base = t.Focused.Base.BorderStyle(lipgloss.HiddenBorder())
+	t.Blurred.Card = t.Blurred.Base
+	t.Blurred.MultiSelectSelector = lipgloss.NewStyle().SetString("  ")
+	t.Blurred.NextIndicator = lipgloss.NewStyle()
+	t.Blurred.PrevIndicator = lipgloss.NewStyle()
+	t.Group.Title = t.Focused.Title
+	t.Group.Description = t.Focused.Description
 	return t
+}
+
+// state renders how much of a project or resource runs, coloured.
+func state(running, total int) string {
+	switch {
+	case total > 0 && running == total:
+		return sOK.Render("● running")
+	case running > 0:
+		return sWarn.Render(fmt.Sprintf("◐ %d of %d running", running, total))
+	}
+	return sMuted.Render("○ stopped")
+}
+
+// rule is a section line: "── Title ──────".
+func rule(title string) string {
+	w := termWidth() - 4
+	if w > 72 {
+		w = 72
+	}
+	line := "── " + title + " "
+	if n := w - lipgloss.Width(line); n > 0 {
+		line += strings.Repeat("─", n)
+	}
+	return "  " + sAccent.Render(line)
 }

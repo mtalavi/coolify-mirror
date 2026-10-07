@@ -35,6 +35,9 @@ var TestedCoolify = []string{"4.3.23"}
 // RepoURL is the project's home page.
 const RepoURL = "https://github.com/mtalavi/coolify-mirror"
 
+// SiteURL is the website: the guide with a screenshot of every screen.
+const SiteURL = "https://coolify-mirror.pages.dev"
+
 // CompatURL holds the results of the automatic compatibility test.
 var CompatURL = "https://raw.githubusercontent.com/mtalavi/coolify-mirror/compat/compat.json"
 

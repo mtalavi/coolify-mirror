@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mtalavi/coolify-mirror/internal/archive"
+	"github.com/mtalavi/coolify-mirror/internal/coolify"
 	"github.com/mtalavi/coolify-mirror/internal/docker"
 	"github.com/mtalavi/coolify-mirror/internal/run"
 
@@ -351,14 +352,30 @@ func describeBackup(p, name string) string {
 	if m.Mode == ModeFull {
 		return fmt.Sprintf("FULL server · %d resource(s)", len(m.Resources))
 	}
-	var names []string
-	for _, r := range m.Resources {
-		names = append(names, r.Name)
+	return describeProjects(m.Resources)
+}
+
+// describeProjects names what a selective backup holds, by project:
+// "Shop (4 resources), Blog: blog".
+func describeProjects(rs []coolify.Resource) string {
+	var parts []string
+	for _, p := range coolify.GroupProjects(rs) {
+		if p.Name == "" {
+			for _, r := range p.Resources {
+				parts = append(parts, r.Name)
+			}
+			continue
+		}
+		if len(p.Resources) == 1 {
+			parts = append(parts, p.Title()+": "+p.Resources[0].Name)
+		} else {
+			parts = append(parts, fmt.Sprintf("%s (%d resources)", p.Title(), len(p.Resources)))
+		}
 	}
-	if len(names) > 4 {
-		names = append(names[:4], fmt.Sprintf("+%d", len(names)-4))
+	if len(parts) > 3 {
+		parts = append(parts[:3], fmt.Sprintf("+%d", len(parts)-3))
 	}
-	return strings.Join(names, ", ")
+	return strings.Join(parts, ", ")
 }
 
 // manifestOf reads only the manifest at the start of a backup.

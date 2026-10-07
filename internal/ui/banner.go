@@ -103,5 +103,6 @@ func Banner() {
 		fs = append(fs, lipgloss.NewStyle().Foreground(gradientAt(float64(i)/float64(len(feats))*0.5)).Render("● ")+sMuted.Render(f))
 	}
 	fmt.Println("  " + strings.Join(fs, "  "))
-	fmt.Println("  " + sMuted.Render("★ ") + sAccent.Render(link(RepoURL, strings.TrimPrefix(RepoURL, "https://"))) + sMuted.Render("  ·  MIT"))
+	fmt.Println("  " + sMuted.Render("◆ guide ") + sAccent.Render(link(engine.SiteURL, strings.TrimPrefix(engine.SiteURL, "https://"))) +
+		sMuted.Render("  ·  ★ ") + sAccent.Render(link(RepoURL, strings.TrimPrefix(RepoURL, "https://"))) + sMuted.Render("  ·  MIT"))
 }

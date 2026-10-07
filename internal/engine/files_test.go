@@ -172,3 +172,13 @@ func TestStoredHelpers(t *testing.T) {
 		t.Error("labels")
 	}
 }
+
+func TestDescribeProjects(t *testing.T) {
+	r := func(project, name string) coolify.Resource {
+		return coolify.Resource{Name: name, Project: project, ProjectUUID: project, Environment: "production", EnvironmentUUID: project + "-prod"}
+	}
+	got := describeProjects([]coolify.Resource{r("Shop", "shop-web"), r("Shop", "shop-db"), r("Blog", "blog")})
+	if got != "Blog: blog, Shop (2 resources)" {
+		t.Errorf("got %q", got)
+	}
+}

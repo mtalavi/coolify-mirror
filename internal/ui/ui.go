@@ -32,7 +32,12 @@ const (
 
 // menuOption is one line of the main menu: a short name and what it does.
 func menuOption(name, what, value string) huh.Option[string] {
-	return huh.NewOption(fmt.Sprintf("%-26s %s", name, what), value)
+	return huh.NewOption(pad(name, 26)+" "+sMuted.Render(what), value)
+}
+
+// mainOption is a line of the main menu with its symbol in front.
+func mainOption(icon, name, what, value string) huh.Option[string] {
+	return huh.NewOption(pad(icon+"  "+name, 29)+" "+sMuted.Render(what), value)
 }
 
 // Run starts the interactive menu.
@@ -51,13 +56,13 @@ func Run(ctx context.Context) error {
 				Title("What do you want to do?").
 				Description("Old server: back up and share · new server: restore with the code").
 				Options(
-					menuOption("Back up apps", "pick the domains / resources to move", actBackupSelected),
-					menuOption("Back up the whole server", "Coolify itself, its settings and every app", actBackupFull),
-					menuOption("Restore a backup", "type the share code from the other server", actRestore),
-					menuOption("Share a saved backup", "send a backup made earlier to another server", actShare),
-					menuOption(filesMenuName, "see and delete old backups (all or some), safety copies", actFiles),
-					menuOption("How it works", "step-by-step guide", actGuide),
-					menuOption("Quit", "", actQuit),
+					mainOption("↑", "Back up apps", "pick projects: everything in them moves together", actBackupSelected),
+					mainOption("⇑", "Back up the whole server", "Coolify itself, its settings and every project", actBackupFull),
+					mainOption("↓", "Restore a backup", "type the share code from the other server", actRestore),
+					mainOption("↔", "Share a saved backup", "send a backup made earlier to another server", actShare),
+					mainOption("≡", filesMenuName, "see and delete old backups (all or some), safety copies", actFiles),
+					mainOption("?", "How it works", "step-by-step guide · "+strings.TrimPrefix(engine.SiteURL, "https://"), actGuide),
+					mainOption("×", "Quit", "", actQuit),
 				).
 				Value(&action),
 		)).WithTheme(theme()).WithKeyMap(keys()).WithShowHelp(true).RunWithContext(ctx)
@@ -161,7 +166,8 @@ func checkServer(ctx context.Context) (*coolify.Instance, error) {
 	case compat.Status != "tested":
 		state = sWarn.Render("not tested with this version yet")
 	}
-	fmt.Println(sMuted.Render(fmt.Sprintf("  Coolify %s on %s (%s) · ", in.Version, in.Hostname, v4)) + state)
+	fmt.Println(rule("This server"))
+	fmt.Println("  " + sBold.Render("Coolify "+in.Version) + sMuted.Render(fmt.Sprintf(" on %s (%s) · ", in.Hostname, v4)) + state)
 	for _, b := range compat.Blockers {
 		fmt.Println("  " + sErr.Render("✗ "+b))
 	}
@@ -192,9 +198,11 @@ func printGuide() {
 		"",
 		step("1", "On the OLD server - make the backup"),
 		cmd("sudo coolify-mirror"),
-		note("→ Back up apps (or the whole server) → ↑/↓ to the app, enter"),
-		note("  several apps: tick each with space, then enter"),
-		note("→ settings: Recommended → share through port 443"),
+		note("→ Back up apps → ↑/↓ to the project, enter"),
+		note("  everything in the project moves together (apps, databases, domains)"),
+		note("  several projects: tick each with space, then enter"),
+		note("  one app only: the last line, Pick single apps instead"),
+		note("→ Ready to back up: check the list → Start the backup → share through port 443"),
 		note("→ a share code and one command for the new server are shown"),
 		"",
 		step("2", "On the NEW server - restore"),
@@ -216,6 +224,7 @@ func printGuide() {
 		"",
 		sMuted.Render("Keys: ↑/↓ move · enter choose · space tick · / search · esc back (in the menu: quit) · ctrl+c stop"),
 		sMuted.Render("Without the menu: coolify-mirror help"),
+		sMuted.Render("Guide with a screenshot of every screen: ") + sAccent.Render(engine.SiteURL),
 	}
 	fmt.Println(boxed(sBox, strings.Join(lines, "\n")))
 }
