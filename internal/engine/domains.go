@@ -46,20 +46,32 @@ func DomainFields(ctx context.Context, in *coolify.Instance, res []dbx.PlannedRe
 			if deref(row.BuildPack) == "dockercompose" {
 				var m map[string]any
 				_ = json.Unmarshal([]byte(deref(row.Compose)), &m)
-				keys := make([]string, 0, len(m))
-				for k := range m {
-					keys = append(keys, k)
-				}
-				sort.Strings(keys)
-				for _, k := range keys {
+				type entry struct{ service, domain string }
+				entries := make([]entry, 0, len(m))
+				for k, raw := range m {
 					v := ""
-					switch x := m[k].(type) {
+					switch x := raw.(type) {
 					case string:
 						v = x
 					case map[string]any:
 						v, _ = x["domain"].(string)
 					}
-					out = append(out, DomainField{Resource: r.UUID, Label: r.Name + " · " + k, Kind: "compose", Service: k, Value: v, Original: v})
+					entries = append(entries, entry{k, strings.TrimSpace(v)})
+				}
+				// Services with a domain first; the ones without are marked,
+				// so a web domain is not typed into a worker or a job by mistake.
+				sort.Slice(entries, func(i, j int) bool {
+					if a, b := entries[i].domain != "", entries[j].domain != ""; a != b {
+						return a
+					}
+					return entries[i].service < entries[j].service
+				})
+				for _, e := range entries {
+					label := r.Name + " · " + e.service
+					if e.domain == "" {
+						label += "  (had no domain)"
+					}
+					out = append(out, DomainField{Resource: r.UUID, Label: label, Kind: "compose", Service: e.service, Value: e.domain, Original: e.domain})
 				}
 				continue
 			}
@@ -93,6 +105,46 @@ func deref(p *string) string {
 
 // NormalizeDomains cleans a user typed domain list: "a.com, http://b.com"
 // becomes "https://a.com,http://b.com". It returns an error for a bad entry.
+// RiskyComposeDomainMoves finds the likely slip in the domain step of a
+// Docker Compose app: a domain taken off a service that had one while a
+// service that had none (a worker, a migration or a backup job) gets one.
+// Giving a domain to a service that had none is fine on its own.
+func RiskyComposeDomainMoves(fields []DomainField) []string {
+	type change struct{ removed, added []string }
+	byResource := map[string]*change{}
+	var order []string
+	for _, f := range fields {
+		if f.Kind != "compose" || f.Value == f.Original {
+			continue
+		}
+		c := byResource[f.Resource]
+		if c == nil {
+			c = &change{}
+			byResource[f.Resource] = c
+			order = append(order, f.Resource)
+		}
+		was, now := strings.TrimSpace(f.Original) != "", strings.TrimSpace(f.Value) != ""
+		switch {
+		case was && !now:
+			c.removed = append(c.removed, f.Service)
+		case !was && now:
+			c.added = append(c.added, f.Service)
+		}
+	}
+	var out []string
+	for _, res := range order {
+		c := byResource[res]
+		if len(c.removed) == 0 || len(c.added) == 0 {
+			continue
+		}
+		sort.Strings(c.removed)
+		sort.Strings(c.added)
+		out = append(out, fmt.Sprintf("the domain was taken off %s and given to %s, which had none",
+			strings.Join(c.removed, ", "), strings.Join(c.added, ", ")))
+	}
+	return out
+}
+
 func NormalizeDomains(s string) (string, error) {
 	var out []string
 	for _, d := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ' ' || r == '\t' }) {

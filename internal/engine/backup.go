@@ -172,7 +172,7 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 		case "volume":
 			it.step = pr.Add("Volume "+it.vol.Name, it.vol.Size)
 		case "image":
-			it.step = pr.Add("Image  "+strings.Join(it.img.Refs, ", "), it.img.Size)
+			it.step = pr.Add(imageTitle(it.img.Refs), it.img.Size)
 		case "dump":
 			it.step = pr.Add("Database dump "+it.dump.Container, 0)
 		}

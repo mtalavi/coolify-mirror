@@ -26,6 +26,22 @@ const (
 )
 
 // HumanBytes formats a byte count (1.5 GB).
+// imageTitle names an image in a progress step: its first name, a long tag
+// (a commit) shortened to 12 characters, and how many other names it has.
+func imageTitle(refs []string) string {
+	if len(refs) == 0 {
+		return "Image"
+	}
+	r := refs[0]
+	if i := strings.LastIndex(r, ":"); i > 0 && !strings.Contains(r[i:], "/") && len(r)-i-1 > 12 {
+		r = r[:i+13]
+	}
+	if len(refs) > 1 {
+		return fmt.Sprintf("Images %s  +%d more", r, len(refs)-1)
+	}
+	return "Image  " + r
+}
+
 func HumanBytes(n int64) string {
 	const unit = 1000
 	if n < unit {
