@@ -30,7 +30,9 @@ concurrency:
 
 jobs:
   compat:
-    runs-on: ubuntu-24.04
+    # This public repository keeps pull-request CI on GitHub-hosted runners.
+    # Only the trusted scheduled/manual compatibility job uses the Hestia host.
+    runs-on: [self-hosted, Linux, X64, hestia, coolify-mirror, docker, trusted]
     timeout-minutes: 100
     steps:
       - uses: actions/checkout@v4
