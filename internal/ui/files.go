@@ -262,7 +262,7 @@ func storedLabel(f engine.StoredFile) string {
 	l := fmt.Sprintf("%-11s %9s  %s  %s", engine.KindLabel(f.Kind), engine.HumanBytes(f.Size), date, f.About)
 	// The marks go before the file name, which is the part cut on a narrow screen.
 	if len(f.Shares) > 0 {
-		l += "  ⇄ shared now"
+		l += "  ↔ shared now"
 	}
 	if f.Busy != "" {
 		l += "  [in use]"
