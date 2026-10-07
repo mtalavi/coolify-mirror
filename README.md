@@ -48,9 +48,8 @@ The menu opens. Answer the screens like this:
 | Screen | What to do |
 |---|---|
 | *What do you want to do?* | **Back up apps** → `enter` &nbsp;(everything at once: *Back up the whole server*) |
-| *Which app should be backed up?* | `↑` `↓` to the app → `enter` &nbsp;·&nbsp; several apps: `space` on each, then `enter` |
-| *Also back up what they depend on?* | **Yes** — its database comes along |
-| *Backup settings* | **Recommended** |
+| *Which project should be backed up?* | `↑` `↓` to the project → `enter` — everything in it comes along &nbsp;·&nbsp; several: `space` on each, then `enter` |
+| *Ready to back up* | check the list → **Start the backup** |
 | *How should the other server get this backup?* | **Share a link through Coolify's proxy on port 443** |
 
 A green line starting with `curl` appears — **copy it**. It ends with the **share code** (`203.0.113.10/hi4i-2dzx-…`). Keep this window open while the new server downloads (it shows the progress), or press `b` to keep sharing in the background for 24 h.
@@ -119,7 +118,7 @@ Coolify's own backup covers its database. Moving **one app** to a new server —
 
 | | |
 |---|---|
-| 🎯 **Pick by domain** | Arrow keys + enter (space to tick several). Databases and services an app depends on (via `DATABASE_URL`, etc.) are found and added for you. |
+| 🎯 **Pick by project** | A list like Coolify's dashboard: pick a project and everything in it — apps, databases, services, domains — moves together (space to tick several). One app only: the last line. A database in another project that an app uses (via `DATABASE_URL`, etc.) is found and added for you. |
 | 🔒 **Encrypted at rest and in transit** | The whole backup — `APP_KEY`, env vars, SSH keys, tokens, S3 keys, database passwords — is one [age](https://age-encryption.org)-encrypted file (passphrase, scrypt). It travels over **HTTPS with a pinned certificate**; the key and the pin live only in the link's `#fragment`. |
 | 🔗 **One share code** | The old server shares the backup over HTTPS for as long as you need, through Coolify's own proxy on port 443 (TLS passthrough) or a direct port, and prints one command with a short share code for the new server. Plain HTTP is never served. |
 | 🗄️ **Native database dumps** | PostgreSQL, MySQL and MariaDB are saved with `pg_dumpall` / `mysqldump` while they keep running, and loaded with the same image on the target. |
@@ -176,45 +175,50 @@ A real move of `shop.cmlab.test` (an app and the Postgres it uses) from an old s
 
 <img src="docs/shots/01-menu.png" width="760" alt="install and main menu">
 
-**2 · Pick the app.** Every resource with its domain, type, project and state. Move to the app and press `enter` — that's it. Several apps: `space` on each, then `enter`. `/` searches.
+**2 · Pick the project.** The projects as Coolify's dashboard shows them: main domain, what is inside and whether it runs. Move to the project and press `enter` — its apps, databases, services and domains all come along. Several projects: `space` on each, then `enter`. `/` searches.
 
-<img src="docs/shots/02-select.png" width="760" alt="pick the app">
+<img src="docs/shots/02-select.png" width="760" alt="pick the project">
 
-**3 · Its database comes along.** The Postgres that `shop-web` uses through `DATABASE_URL` is found by itself — answer **Yes**.
+**3 · Ready to back up.** Before anything starts you see exactly what goes into the backup, project by project, and the settings. **Start the backup** — or *Change the settings* first. **Recommended** pauses containers for the few seconds their data is copied and puts the app's image in the backup, so the new server doesn't build anything ([other modes below](#backup-settings)).
+
+<img src="docs/shots/04-options.png" width="760" alt="ready to back up">
+
+<details>
+<summary><b>One app only</b> (the last line: <i>Pick single apps instead</i>)</summary>
+
+<br>The list then shows every resource on its own. A database the picked app uses through `DATABASE_URL` (also from another project) is found by itself — answer **Yes** and it comes along.
 
 <img src="docs/shots/03-deps.png" width="760" alt="dependencies">
 
-**4 · Settings.** **Recommended** pauses containers for the few seconds their data is copied and puts the app's image in the backup, so the new server doesn't build anything. *Choose them myself* offers the other modes ([tables below](#backup-settings)).
+</details>
 
-<img src="docs/shots/04-options.png" width="760" alt="backup settings">
-
-**5 · Live progress** — every step with ✓, sizes, speed and time left. Databases are dumped with their own tools while they keep running.
+**4 · Live progress** — every step with ✓, sizes, speed and time left. Databases are dumped with their own tools while they keep running.
 
 <img src="docs/shots/05-progress.png" width="760" alt="backup progress">
 
-**6 · Done — now share it.** The backup is one encrypted file. Choose **Share a link through Coolify's proxy on port 443** — that port is already open.
+**5 · Done — now share it.** The backup is one encrypted file. Choose **Share a link through Coolify's proxy on port 443** — that port is already open.
 
 <img src="docs/shots/06-done.png" width="760" alt="backup complete">
 
-**7 · The command for the new server.** The green line is all the new server needs: it installs the tool and restores the **share code** at its end. Below it: the bare code, and a fallback that fetches the tool from this server when the new one can't reach GitHub. This screen shows the download live; `b` keeps sharing in the background for 24 h.
+**6 · The command for the new server.** The green line is all the new server needs: it installs the tool and restores the **share code** at its end. Below it: the bare code, and a fallback that fetches the tool from this server when the new one can't reach GitHub. This screen shows the download live; `b` keeps sharing in the background for 24 h.
 
 <img src="docs/shots/07-share.png" width="760" alt="share code">
 
 ### On the new server
 
-**8 · Paste the command.** The tool installs, connects to the old server (it accepts only that server's certificate), downloads — resumable — and verifies every checksum **before** anything changes.
+**7 · Paste the command.** The tool installs, connects to the old server (it accepts only that server's certificate), downloads — resumable — and verifies every checksum **before** anything changes.
 
 <img src="docs/shots/08-paste.png" width="760" alt="paste the command">
 
-**9 · Check, then confirm.** It tries the encryption with this Coolify and runs the whole import once in a transaction that is rolled back. Then it lists what will be added, with anything to know — and waits for your **Yes**.
+**8 · Check, then confirm.** It tries the encryption with this Coolify and runs the whole import once in a transaction that is rolled back. Then it lists what will be added, with anything to know — and waits for your **Yes**.
 
 <img src="docs/shots/10-confirm.png" width="760" alt="confirm the restore">
 
-**10 · Restore, then domains — last.** Files, volumes, images and database dumps are restored and the resources are added to Coolify in one transaction. Then each domain: `enter` keeps it, or type a new one (several: comma-separated; empty: none).
+**9 · Restore, then domains — last.** Files, volumes, images and database dumps are restored and the resources are added to Coolify in one transaction. Then each domain: `enter` keeps it, or type a new one (several: comma-separated; empty: none).
 
 <img src="docs/shots/12-domains.png" width="760" alt="restore and domains">
 
-**11 · Running — and proven.** Coolify itself starts everything. The tool then checks the real state: the same services as on the old server, every container stable for 30 s, every domain answering through the proxy. Anything else would end as *Restored, but NOT operational* with the reason.
+**10 · Running — and proven.** Coolify itself starts everything. The tool then checks the real state: the same services as on the old server, every container stable for 30 s, every domain answering through the proxy. Anything else would end as *Restored, but NOT operational* with the reason.
 
 <img src="docs/shots/13-complete.png" width="760" alt="restore complete">
 
@@ -255,7 +259,7 @@ Every deletion lists what goes and needs a **Yes** (the default is *No*):
 
 <a id="backup-settings"></a>
 <details>
-<summary><b>Backup settings</b> (<i>Choose them myself</i>)</summary>
+<summary><b>Backup settings</b> (<i>Change the settings</i>)</summary>
 
 | Consistency | What happens |
 |---|---|
@@ -319,8 +323,9 @@ flowchart LR
 Everything in the menu also works headless, for scripts:
 
 ```bash
-coolify-mirror list                                     # resources and domains
-coolify-mirror backup --domain shop.com,blog.com        # selective (+ dependencies)
+coolify-mirror list                                     # projects, resources and domains
+coolify-mirror backup --project Shop,Blog               # whole projects (a name, name/env or a domain)
+coolify-mirror backup --domain shop.com,blog.com        # single resources (+ dependencies)
 coolify-mirror backup --all                             # every resource
 coolify-mirror backup --full                            # the whole Coolify
 coolify-mirror backup --domain shop.com --serve --mode proxy
@@ -340,7 +345,7 @@ coolify-mirror files delete NAME… | --backups | --all [--yes]   # free the dis
 
 | Command | Flag | Meaning |
 |---|---|---|
-| `backup` | `--domain a,b` / `--uuid u` / `--all` / `--full` | what to back up |
+| `backup` | `--project p,q` / `--domain a,b` / `--uuid u` / `--all` / `--full` | what to back up (`--project`: everything in the project; its name, `name/environment` or one of its domains) |
 | | `--no-deps` | don't add databases/services the apps depend on |
 | | `--consistency pause\|stop\|live` | see the table above |
 | | `--images apps\|all\|none` | see the table above |

@@ -88,10 +88,7 @@ func pickAndDelete(ctx context.Context, title, noun string, items []engine.Store
 	for _, f := range items {
 		opts = append(opts, huh.NewOption(storedLabel(f), f.Name))
 	}
-	height := len(opts) + 2
-	if height > 16 {
-		height = 16
-	}
+	height := listHeight(len(opts), desc)
 
 	var chosen []string
 	ms := huh.NewMultiSelect[string]()
@@ -262,7 +259,7 @@ func storedLabel(f engine.StoredFile) string {
 	l := fmt.Sprintf("%-11s %9s  %s  %s", engine.KindLabel(f.Kind), engine.HumanBytes(f.Size), date, f.About)
 	// The marks go before the file name, which is the part cut on a narrow screen.
 	if len(f.Shares) > 0 {
-		l += "  ⇄ shared now"
+		l += "  ↔ shared now"
 	}
 	if f.Busy != "" {
 		l += "  [in use]"

@@ -82,8 +82,8 @@ func restoreSource(ctx context.Context, in *coolify.Instance, link string) error
 		kind = sWarn.Render("FULL server backup")
 	}
 	b.WriteString(fmt.Sprintf("%s %s · %d resource(s) · %s of data", sMuted.Render("Type  "), kind, len(m.Resources), engine.HumanBytes(m.TotalBytes)))
-	for _, r := range m.Resources {
-		b.WriteString("\n  • " + resourceLabel(r))
+	if len(m.Resources) > 0 {
+		b.WriteString("\n" + resourceTree(m.Resources, nil))
 	}
 	fmt.Println(boxed(sBox, b.String()))
 
