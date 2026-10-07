@@ -423,6 +423,7 @@ internal/archive       tar + zstd + age stream format
 internal/transfer      share server + resumable download
 lab/                   Docker lab with real Coolify servers
 site/                  the website (static, Cloudflare Pages): coolify-mirror.pages.dev
+site-fa/               the Persian website, separate: coolify-mirror-fa.pages.dev
 ```
 
 Contributions and issues are welcome. **Not affiliated with Coolify / coolLabs** — “Coolify” is their trademark.

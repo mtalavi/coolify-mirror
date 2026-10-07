@@ -13,6 +13,13 @@
   font-weight: 100 800;
   font-display: swap;
 }
+@font-face {
+  font-family: "Vazirmatn";
+  src: url("fonts/vazirmatn-arabic-wght-normal.woff2") format("woff2-variations");
+  font-weight: 100 900;
+  font-display: swap;
+  unicode-range: U+0600-06FF, U+0750-077F, U+200C-200F, U+FB50-FDFF, U+FE70-FEFF;
+}
 
 :root {
   color-scheme: light dark;
@@ -30,7 +37,7 @@
   --shot-shadow: 0 24px 60px -28px rgb(40 22 90 / 0.45);
   --r-media: 14px;
   --r-ctl: 10px;
-  --sans: "Geist", ui-sans-serif, system-ui, sans-serif;
+  --sans: "Geist", "Vazirmatn", ui-sans-serif, system-ui, sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
 }
 @media (prefers-color-scheme: dark) {
@@ -83,6 +90,8 @@ code, kbd, pre { font-family: var(--mono); font-variant-ligatures: none; font-fe
 .nav-links { display: flex; gap: 22px; margin-inline-start: auto; font-size: 15px; color: var(--muted); }
 .nav-links a:hover { color: var(--text); }
 .nav-side { display: flex; align-items: center; gap: 10px; }
+.lang { font-size: 15px; color: var(--muted); padding: 6px 4px; }
+.lang:hover { color: var(--text); }
 .icon-btn.menu-btn { display: none; }
 @media (max-width: 960px) {
   .nav-links { display: none; }
@@ -357,3 +366,13 @@ footer a:hover { color: var(--text); }
   .btn, .copy, .gallery .main { transition: none; }
 }
 .no-js .reveal { opacity: 1; transform: none; }
+
+/* ---------- right-to-left (Persian) ---------- */
+[dir="rtl"] body { font-family: "Vazirmatn", var(--sans); }
+[dir="rtl"] h1, [dir="rtl"] h2, [dir="rtl"] h3 { letter-spacing: 0; line-height: 1.35; }
+[dir="rtl"] .lead { font-size: 1.15rem; }
+[dir="rtl"] h1 { font-size: clamp(2.1rem, 3.5vw, 2.85rem); }
+[dir="rtl"] .cmd, [dir="rtl"] .cmd code, [dir="rtl"] .flow-side li, [dir="rtl"] .rel .v, [dir="rtl"] .rel .d { direction: ltr; text-align: left; }
+[dir="rtl"] .flow-mid .pipe { background: linear-gradient(270deg, var(--accent), var(--ok)); }
+[dir="rtl"] .screens .q { direction: ltr; text-align: right; }
+[dir="rtl"] .cmd-label, [dir="rtl"] .facts { direction: rtl; }

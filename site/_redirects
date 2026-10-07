@@ -1,0 +1,3 @@
+# The Persian page has its own site now.
+/fa   https://coolify-mirror-fa.pages.dev/  301
+/fa/* https://coolify-mirror-fa.pages.dev/  301

@@ -14,7 +14,7 @@
 
 بعد از ریستور، در داشبورد Coolify پروژه‌ها، environmentها، env variableها، volumeها، فایل‌ها، تگ‌ها، تسک‌های زمان‌بندی‌شده و بک‌آپ‌های زمان‌بندی‌شده را **دقیقاً مثل سرور قدیم** می‌بینید.
 
-**سایت معرفی و آموزش تصویری (فارسی و انگلیسی): [coolify-mirror.pages.dev/fa](https://coolify-mirror.pages.dev/fa/)**
+**سایت فارسی معرفی و آموزش تصویری: [coolify-mirror-fa.pages.dev](https://coolify-mirror-fa.pages.dev/)** · سایت انگلیسی: [coolify-mirror.pages.dev](https://coolify-mirror.pages.dev/)
 
 [English README با تصویر همه‌ی صفحه‌ها](README.md) · لایسنس [MIT](LICENSE) · این پروژه رسمی Coolify نیست.
 
@@ -373,14 +373,23 @@ internal/engine         بک‌آپ، دانلود/بررسی، ریستور ا�
 internal/transfer       سرور HTTP با توکن و دانلودر قابل ادامه
 internal/ui             صفحه‌های تعاملی
 lab/                    محیط تست: دو سرور Ubuntu+systemd داخل Docker با Coolify واقعی
-site/                   سایت معرفی (HTML/CSS ساده، بدون build) روی Cloudflare Pages: coolify-mirror.pages.dev
+site/                   سایت انگلیسی (HTML/CSS ساده، بدون build) روی Cloudflare Pages: coolify-mirror.pages.dev
+site-fa/                سایت فارسی، جدا و مستقل (با کپی خودش از assets/): coolify-mirror-fa.pages.dev
 ```
 
-انتشار دوباره‌ی سایت بعد از تغییر (با حساب Cloudflare وارد شده):
+انتشار دوباره‌ی سایت‌ها بعد از تغییر (با حساب Cloudflare وارد شده). سایت انگلیسی:
 
 ```bash
 npx wrangler pages deploy site --project-name coolify-mirror --branch main
 ```
+
+سایت فارسی:
+
+```bash
+npx wrangler pages deploy site-fa --project-name coolify-mirror-fa --branch main
+```
+
+فایل‌های `assets/` در هر دو پوشه جدا هستند؛ اگر CSS، JS یا اسکرین‌شات‌ها عوض شد، در هر دو پوشه عوض کنید. فونت فارسی (Vazirmatn) و قواعد راست‌به‌چپ فقط در `site-fa/` هست.
 
 تست‌ها (روی لینوکس/داخل Docker):
 
@@ -472,6 +481,7 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 - صفحه‌ی اشتراک (منو و `serve`) در حالت پورت 443: به‌جای IP داخلی پروکسی Traefik (مثلاً `10.0.1.9`) نوشته می‌شود `The other server`؛ پشت پروکسی IP واقعی سرور مقصد دیده نمی‌شود.
 - «شروع سریع» در هر دو README: کجا چه دستوری بزنید و در هر صفحه چه انتخاب کنید، به‌علاوه‌ی جدول عیب‌یابی.
 - همه‌ی تصاویر README با نسخه‌ی منتشرشده‌ی 1.7.0 از نو گرفته شدند: انتقال واقعی به یک Coolify 4.3.23 تازه‌نصب، از نصب تا آزاد کردن فضا.
+- بعد از انتشار (فقط سایت): نسخه‌ی فارسی از سایت انگلیسی جدا شد و آدرس خودش را دارد: [coolify-mirror-fa.pages.dev](https://coolify-mirror-fa.pages.dev/) (سورس در `site-fa/`). در سایت انگلیسی دیگر هیچ متن یا لینک فارسی نیست؛ آدرس قدیمی `/fa/` با redirect 301 به سایت فارسی می‌رود تا لینک‌های قبلی خراب نشوند.
 - بعد از انتشار (فقط مستندات): متن بنر از «یک لینک» به «یک دستور» تغییر کرد. `SECURITY.md` هم که هنوز از «HTTP ساده» حرف می‌زد، با رفتار واقعی هماهنگ شد: اشتراک فقط HTTPS، کد اشتراک ۱۲۸ بیتی که کلید بک‌آپ در آن نیست، فایل `.key` فقط برای root، و پایان خودکار اشتراک پس‌زمینه بعد از ۲۴ ساعت.
 
 ### 1.7.0 — ۲۰۲۶-۱۰-۰۶
