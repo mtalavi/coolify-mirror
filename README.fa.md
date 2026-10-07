@@ -443,6 +443,7 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 | 1.3.0: پاسخ واقعی Traefik وقتی پروکسی از شبکه‌ی اپ جدا است / دامنه route ندارد | ✓ 504 و 404 شناخته شدند؛ بعد از وصل دوباره 200 |
 | 1.3.1: merge روی Coolify موجود که همان فایل سیاست build را دارد / همان فایل با محتوای دیگر | ✓ فایل یکسان دست نخورد و `SUCCESS` + rebuild موفق؛ فایل متفاوت ← «restore not allowed» و هیچ تغییری روی مقصد |
 | 1.7.0 منتشرشده: **انتقال کامل با دستورهای همین راهنما** — نصب‌کننده‌ی رسمی روی سرور قدیم، `Back up apps` (shop-web، Postgres آن خودکار اضافه شد)، `Recommended`، اشتراک از پورت 443، Paste همان دستور روی یک Coolify 4.3.23 **تازه‌نصب** | ✓ دانلود و بررسی در ۱ ثانیه؛ ریستور تا «Restore complete · everything verified» در ۲ دقیقه و ۳۹ ثانیه؛ هر دو ریسورس پایدار و دامنه‌ها از Traefik جواب دادند؛ بعد `All backups` ← `ALL` سه بک‌آپ سرور قدیم را یک‌جا حذف کرد |
+| 1.8.0 منتشرشده: **انتقال کامل یک پروژه با دستورهای همین راهنما** — نصب‌کننده‌ی رسمی روی سرور قدیم، `Back up apps` ← پروژه‌ی Shop (دو اپ، Redis، Postgres)، `Start the backup`، اشتراک از پورت 443، Paste همان دستور روی یک Coolify 4.3.23 **تازه‌نصب** | ✓ نصب‌کننده نسخه‌ی 1.8.0 را از GitHub نصب کرد؛ دانلود و بررسی ۴۷٫۵ مگابایت در ۱ ثانیه؛ «Restore complete · everything verified» در ۲ دقیقه و ۴۸ ثانیه؛ هر ۴ ریسورس پایدار و دامنه‌ها از Traefik جواب دادند (HTTP 200)؛ بعد `All backups` ← `ALL` دو بک‌آپ سرور قدیم را حذف کرد. همه‌ی اسکرین‌شات‌های README و سایت از همین اجرا است |
 | 1.8.0: `Back up apps` روی مبدأ lab (۳ پروژه) ← پروژه‌ی Shop با Enter | ✓ هر ۴ ریسورس (shop-api، shop-web، shop-cache، shop-db) در `Ready to back up`؛ بک‌آپ ۴۷.۵ مگابایت در ۱۵ ثانیه |
 | 1.8.0: تیک یک پروژه همراه خط `Pick single apps instead` / فقط shop-web از لیست تکی / `Change the settings` / `Back to the menu` / `Back up the whole server` | ✓ پیام «untick the projects…»؛ Postgres با سؤال وابستگی و «added: used by shop-web (DATABASE_URL)» در خلاصه؛ تنظیمات جدید در خلاصه؛ برگشت بدون بک‌آپ؛ خلاصه‌ی کل سرور (۷ ریسورس در ۳ پروژه) |
 | 1.8.0: `backup --project shop.cmlab.test` / `--project Blog,"Compose Lab"` / اسم اشتباه | ✓ کل Shop (۴ ریسورس) / ۳ ریسورس / پیام «no project …» |
@@ -481,6 +482,8 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 - **رفع باگ سؤال `[yes/No]` در خط فرمان** (`files delete`، و `restore` با گزینه‌هایی مثل `--key` ولی بدون `--yes`): ترمینال‌هایی که با Enter یک line feed اضافه هم می‌فرستند، جواب را «خالی» و در نتیجه No می‌کردند (`aborted - nothing was deleted`) حتی وقتی `yes` تایپ شده بود. حالا ورودی مانده قبل از سؤال دور ریخته می‌شود.
 - **ظاهر:** منوی اصلی با علامت کنار هر گزینه و توضیح کم‌رنگ، خط «This server»، علامت‌های `❯` و `[✓]`، وضعیت رنگی `● running` / `◐ 2 of 3 running` / `○ stopped` در لیست‌ها، فهرست پروژه‌به‌پروژه در صفحه‌ی ریستور (`Backup verified`) و در `Saved files & disk space` (مثلاً `Shop (4 resources)`).
 - **سایت در خود برنامه:** لینک [coolify-mirror.pages.dev](https://coolify-mirror.pages.dev) در بالای منو، در `How it works` و در `coolify-mirror help`.
+- پروژه‌ای که سرویسش نیمه‌روشن است (degraded) «partly running» نشان داده می‌شود، نه stopped. در ترمینال باریک (مثلاً ۴۲ ستون) ستون‌ها کم می‌شوند تا هیچ خطی نشکند.
+- بعد از انتشار: همه‌ی اسکرین‌شات‌های README و سایت از یک انتقال واقعی با نسخه‌ی منتشرشده‌ی 1.8.0 (پروژه‌ی Shop) از نو گرفته شدند.
 
 ### 1.7.1 — ۲۰۲۶-۱۰-۰۷
 

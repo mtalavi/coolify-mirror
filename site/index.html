@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="assets/site.css">
 <link rel="stylesheet" href="assets/icons/phosphor.min.css">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Coolify Mirror","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (amd64, arm64)","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.7.1","url":"https://coolify-mirror.pages.dev/","downloadUrl":"https://github.com/mtalavi/coolify-mirror/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Coolify Mirror","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (amd64, arm64)","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.8.0","url":"https://coolify-mirror.pages.dev/","downloadUrl":"https://github.com/mtalavi/coolify-mirror/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
 </script>
 <script defer src="assets/site.js"></script>
 </head>
@@ -57,7 +57,7 @@
       </div>
     </div>
     <div class="hero-shot reveal" style="--d:.12s">
-      <img class="shot" src="assets/img/01-menu.webp" width="2024" height="1087" alt="Terminal: coolify-mirror installed with one command, showing its main menu on the old server" fetchpriority="high" decoding="async">
+      <img class="shot" src="assets/img/01-menu.webp" width="1964" height="1084" alt="Terminal: coolify-mirror installed with one command, showing its main menu on the old server" fetchpriority="high" decoding="async">
     </div>
   </div>
 </section>
@@ -96,14 +96,14 @@
   <div class="wrap">
     <div class="section-head reveal">
       <h2 id="moves-h">What travels with your app</h2>
-      <p>Pick a domain in a list. Everything that makes it run comes along, and the new server starts it through Coolify itself.</p>
+      <p>Pick a project in a list, the way Coolify shows it. Everything that makes it run comes along, and the new server starts it through Coolify itself.</p>
     </div>
     <div class="bento">
       <article class="cell span2 media">
         <i class="ph ph-hard-drives ph-icon" aria-hidden="true"></i>
         <h3>Data, copied while it runs</h3>
         <p>Volumes, bind folders and files. Containers pause for the seconds a copy takes. Databases never pause.</p>
-        <figure><img src="assets/img/05-progress.webp" width="1990" height="760" alt="Backup progress: files, volumes, a database dump and an image, with size, speed and time left" loading="lazy" decoding="async"></figure>
+        <figure><img src="assets/img/05-progress.webp" width="1930" height="830" alt="Backup progress: files, volumes, a database dump and an image, with size, speed and time left" loading="lazy" decoding="async"></figure>
       </article>
       <article class="cell">
         <i class="ph ph-database ph-icon" aria-hidden="true"></i>
@@ -117,9 +117,9 @@
       </article>
       <article class="cell span2 media">
         <i class="ph ph-graph ph-icon" aria-hidden="true"></i>
-        <h3>Dependencies found for you</h3>
-        <p>Pick the app. The Postgres behind its <code>DATABASE_URL</code> is found and offered.</p>
-        <figure><img src="assets/img/03-deps.webp" width="1390" height="469" alt="Question: also back up what they depend on, listing shop-db used by shop-web through DATABASE_URL" loading="lazy" decoding="async"></figure>
+        <h3>Projects, the way Coolify shows them</h3>
+        <p>Pick a project and everything in it moves together. Moving one app only? The Postgres behind its <code>DATABASE_URL</code> is found and offered.</p>
+        <figure><img src="assets/img/03-deps.webp" width="1297" height="429" alt="Question: also back up what they depend on, listing shop-db used by shop-web through DATABASE_URL" loading="lazy" decoding="async"></figure>
       </article>
       <article class="cell span2 tint">
         <i class="ph ph-lightning ph-icon" aria-hidden="true"></i>
@@ -161,9 +161,8 @@
         </div>
         <ol class="screens">
           <li><div><span class="q">What do you want to do?</span><span class="a">Back up apps</span></div></li>
-          <li><div><span class="q">Which app should be backed up?</span><span class="a">Arrow keys to the app, then enter. Several: space on each, then enter.</span></div></li>
-          <li><div><span class="q">Also back up what they depend on?</span><span class="a">Yes</span></div></li>
-          <li><div><span class="q">Backup settings</span><span class="a">Recommended</span></div></li>
+          <li><div><span class="q">Which project should be backed up?</span><span class="a">Arrow keys to the project, then enter: everything in it comes along. Several: space on each, then enter.</span></div></li>
+          <li><div><span class="q">Ready to back up</span><span class="a">Check the list, then Start the backup</span></div></li>
           <li><div><span class="q">How should the other server get this backup?</span><span class="a">Share a link through Coolify's proxy on port 443</span></div></li>
           <li><div><span class="q">On the other Coolify server, run this one command</span><span class="a">Copy the green <code>curl</code> line.</span></div></li>
         </ol>
@@ -171,17 +170,17 @@
       </div>
       <div class="gallery">
         <figure>
-          <img class="shot main" src="assets/img/01-menu.webp" width="2024" height="1087" alt="Install and main menu" loading="lazy" decoding="async">
+          <img class="shot main" src="assets/img/01-menu.webp" width="1964" height="1084" alt="Install and main menu" loading="lazy" decoding="async">
           <figcaption>Install and start: one command, then the menu.</figcaption>
         </figure>
         <div class="thumbs" aria-label="Screens of this step">
-          <button class="thumb" type="button" aria-pressed="true" data-src="assets/img/01-menu.webp" data-w="2024" data-h="1087" data-alt="Install and main menu" data-cap="Install and start: one command, then the menu.">Start</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/02-select.webp" data-w="1807" data-h="614" data-alt="List of apps with domain, type, project and state" data-cap="Pick the app: move to it and press enter.">Pick the app</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/03-deps.webp" data-w="1390" data-h="469" data-alt="Dependency question for shop-db" data-cap="Its database is found by itself. Answer Yes.">Its database</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/04-options.webp" data-w="1824" data-h="469" data-alt="Backup settings with Recommended" data-cap="Recommended: short pause, app images included.">Settings</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/05-progress.webp" data-w="1990" data-h="760" data-alt="Backup progress" data-cap="Every step with size, speed and time left.">Progress</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/06-done.webp" data-w="1924" data-h="1197" data-alt="Backup complete and the share question" data-cap="Backup complete. Share through port 443.">Share</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/07-share.webp" data-w="2024" data-h="833" data-alt="The command and share code for the new server" data-cap="Copy the green line for the new server.">The command</button>
+          <button class="thumb" type="button" aria-pressed="true" data-src="assets/img/01-menu.webp" data-w="1964" data-h="1084" data-alt="Install and main menu" data-cap="Install and start: one command, then the menu.">Start</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/02-select.webp" data-w="1897" data-h="538" data-alt="List of projects with main domain, contents and state" data-cap="Pick the project: everything in it moves together.">Pick the project</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/03-deps.webp" data-w="1297" data-h="429" data-alt="Dependency question for shop-db" data-cap="One app only (last line of the list): its database is found by itself.">One app only</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/04-options.webp" data-w="1647" data-h="865" data-alt="Ready to back up: the Shop project with its four resources and the settings" data-cap="Ready to back up: what goes in, project by project, and the settings.">Review</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/05-progress.webp" data-w="1930" data-h="830" data-alt="Backup progress" data-cap="Every step with size, speed and time left.">Progress</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/06-done.webp" data-w="1864" data-h="1266" data-alt="Backup complete and the share question" data-cap="Backup complete. Share through port 443.">Share</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/07-share.webp" data-w="1964" data-h="793" data-alt="The command and share code for the new server" data-cap="Copy the green line for the new server.">The command</button>
         </div>
       </div>
     </div>
@@ -206,14 +205,14 @@
       </div>
       <div class="gallery">
         <figure>
-          <img class="shot main" src="assets/img/08-paste.webp" width="2024" height="1197" alt="The pasted command installing the tool and verifying the backup" loading="lazy" decoding="async">
+          <img class="shot main" src="assets/img/08-paste.webp" width="1964" height="1302" alt="The pasted command installing the tool and verifying the backup" loading="lazy" decoding="async">
           <figcaption>Paste: install, download and verify before any change.</figcaption>
         </figure>
         <div class="thumbs" aria-label="Screens of this step">
-          <button class="thumb" type="button" aria-pressed="true" data-src="assets/img/08-paste.webp" data-w="2024" data-h="1197" data-alt="The pasted command installing the tool and verifying the backup" data-cap="Paste: install, download and verify before any change.">Paste</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/10-confirm.webp" data-w="1924" data-h="614" data-alt="Restore these resources into this Coolify question" data-cap="A trial import runs first, then it asks.">Confirm</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/12-domains.webp" data-w="1990" data-h="1087" data-alt="Restore progress and the domains step" data-cap="Files, volumes, images, dumps, then your domains.">Domains</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/13-complete.webp" data-w="2007" data-h="905" data-alt="Restore complete, everything verified" data-cap="Started by Coolify, checked for real.">Verified</button>
+          <button class="thumb" type="button" aria-pressed="true" data-src="assets/img/08-paste.webp" data-w="1964" data-h="1302" data-alt="The pasted command installing the tool and verifying the backup" data-cap="Paste: install, download and verify before any change.">Paste</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/10-confirm.webp" data-w="1947" data-h="865" data-alt="Restore these resources into this Coolify question" data-cap="A trial import runs first, then it asks.">Confirm</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/12-domains.webp" data-w="1930" data-h="1266" data-alt="Restore progress and the domains step" data-cap="Files, volumes, images, dumps, then your domains.">Domains</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/13-complete.webp" data-w="1947" data-h="1047" data-alt="Restore complete, everything verified" data-cap="Started by Coolify, checked for real.">Verified</button>
         </div>
       </div>
     </div>
@@ -231,7 +230,7 @@
       </div>
       <div class="gallery">
         <figure>
-          <img class="shot main" src="assets/img/15-guide.webp" width="1857" height="1269" alt="The built-in guide How a move works" loading="lazy" decoding="async">
+          <img class="shot main" src="assets/img/15-guide.webp" width="1797" height="1339" alt="The built-in guide How a move works" loading="lazy" decoding="async">
           <figcaption>The built-in guide, from backup to free space.</figcaption>
         </figure>
       </div>
@@ -255,14 +254,14 @@
       </div>
       <div class="gallery">
         <figure>
-          <img class="shot main" src="assets/img/14-files.webp" width="1640" height="651" alt="Summary of saved files and the clean up question" loading="lazy" decoding="async">
+          <img class="shot main" src="assets/img/14-files.webp" width="1580" height="611" alt="Summary of saved files and the clean up question" loading="lazy" decoding="async">
           <figcaption>What the tool keeps here, and the free disk space.</figcaption>
         </figure>
         <div class="thumbs" aria-label="Screens of this step">
-          <button class="thumb" type="button" aria-pressed="true" data-src="assets/img/14-files.webp" data-w="1640" data-h="651" data-alt="Summary of saved files and the clean up question" data-cap="What the tool keeps here, and the free disk space.">Summary</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/16-all-backups.webp" data-w="1957" data-h="469" data-alt="All backups list with the ALL line" data-cap="ALL takes every backup at once.">All backups</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/17-delete.webp" data-w="1190" data-h="506" data-alt="Delete 3 backups confirmation" data-cap="It lists what goes. The default is No.">Confirm</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/18-freed.webp" data-w="1174" data-h="396" data-alt="Freed 81.3 MB" data-cap="Space freed, with the new free total.">Freed</button>
+          <button class="thumb" type="button" aria-pressed="true" data-src="assets/img/14-files.webp" data-w="1580" data-h="611" data-alt="Summary of saved files and the clean up question" data-cap="What the tool keeps here, and the free disk space.">Summary</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/16-all-backups.webp" data-w="1930" data-h="429" data-alt="All backups list with the ALL line" data-cap="ALL takes every backup at once.">All backups</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/17-delete.webp" data-w="1147" data-h="429" data-alt="Delete 2 backups confirmation" data-cap="It lists what goes. The default is No.">Confirm</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/18-freed.webp" data-w="1114" data-h="284" data-alt="Freed 94.9 MB" data-cap="Space freed, with the new free total.">Freed</button>
         </div>
       </div>
     </div>
@@ -285,7 +284,7 @@
       <p>Coolify starts everything. Then the tool checks what actually happened, and says so plainly when something does not work.</p>
     </div>
     <figure class="proof-shot" style="margin-inline:auto">
-      <img class="shot" src="assets/img/13-complete.webp" width="2007" height="905" alt="Restore complete, everything verified: shop-db and shop-web running, domains answering through the proxy" decoding="async">
+      <img class="shot" src="assets/img/13-complete.webp" width="1947" height="1047" alt="Restore complete, everything verified: shop-api, shop-web, shop-cache and shop-db running, domains answering through the proxy" decoding="async">
     </figure>
     <div class="checks">
       <div><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Same services</h3><p>Every service that ran on the old server is up on the new one.</p></div>
@@ -324,8 +323,8 @@
       </article>
       <article class="case">
         <h3>From paste to verified</h3>
-        <div class="metric">2m 39s<small>restore to verified</small></div>
-        <p>The tutorial above: an app and its Postgres moved through port 443 to a brand-new Coolify. The 47.5 MB download and its checks took a second on the lab network.</p>
+        <div class="metric">2m 48s<small>restore to verified</small></div>
+        <p>The tutorial above: a whole project (two apps, Redis and Postgres) moved through port 443 to a brand-new Coolify with the released 1.8.0. The 47.5 MB download and its checks took a second on the lab network.</p>
       </article>
     </div>
   </div>
@@ -357,7 +356,7 @@
       <div class="flow-side">
         <h3><i class="ph ph-upload-simple" aria-hidden="true"></i>Old server</h3>
         <ol>
-          <li>Coolify rows of the picked apps</li>
+          <li>Coolify rows of the picked projects</li>
           <li>volumes, files, images, dumps</li>
           <li>Coolify's own transfer bundle</li>
           <li>tar, zstd, age: backup.cmb</li>
@@ -414,6 +413,7 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
+      <div class="rel"><div><span class="v">1.8.0</span><span class="d">2026-10-08</span></div><div><h3>Pick projects</h3><p>A list like Coolify's dashboard: pick a project and its apps, databases, services and domains move together. A review before every backup, <code>backup --project</code>, and a sharper look.</p></div></div>
       <div class="rel"><div><span class="v">1.7.1</span><span class="d">2026-10-07</span></div><div><h3>A step-by-step guide</h3><p>A 4-step quick start and every screenshot retaken from a real move. Behind Coolify's proxy, the share screen names the other server instead of the proxy's address.</p></div></div>
       <div class="rel"><div><span class="v">1.7.0</span><span class="d">2026-10-06</span></div><div><h3>All backups at once</h3><p>The ALL line deletes every backup in one go, or pick some. On the command line: <code>files delete --backups</code>.</p></div></div>
       <div class="rel"><div><span class="v">1.6.0</span><span class="d">2026-10-06</span></div><div><h3>Saved files and disk space</h3><p>See and delete what the tool keeps on both servers. Enter picks the highlighted app, Recommended settings, and a built-in guide.</p></div></div>
