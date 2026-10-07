@@ -350,11 +350,14 @@ func cmdList(ctx context.Context, args []string) error {
 	fmt.Printf("Coolify %s on %s - %d project(s), %d resource(s)\n", in.Version, in.Hostname, len(projects), len(rs))
 	for _, p := range projects {
 		run := "stopped"
-		switch n := p.Running(); {
-		case n == len(p.Resources):
+		switch p.RunState() {
+		case "running":
 			run = "running"
-		case n > 0:
-			run = fmt.Sprintf("%d of %d running", n, len(p.Resources))
+		case "partly":
+			run = "partly running"
+			if p.Degraded() == 0 {
+				run = fmt.Sprintf("%d of %d running", p.Running(), len(p.Resources))
+			}
 		}
 		fmt.Printf("\n%s  (%s · %s)\n", p.Title(), p.Kinds(), run)
 		for _, r := range p.Resources {

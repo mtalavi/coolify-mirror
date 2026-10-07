@@ -69,35 +69,79 @@ func resourceState(r coolify.Resource) string {
 // It is shortened to fit the terminal so options never wrap.
 func resourceLabel(r coolify.Resource) string {
 	w := termWidth()
-	domW := clamp(w/3, 16, 34)
 	st := resourceState(r)
 	if !r.Local() {
 		st = sWarn.Render("remote server " + r.ServerName + " - not supported")
 	}
-	room := w - 14 - domW - 2 - 2 - lipgloss.Width(st)
-	if room < 8 {
-		room = 8
+	avail := w - listMargin - 2 - lipgloss.Width(st)
+	if avail < 16+2+12 {
+		// Narrow terminal: the name and its state only.
+		n := clamp(avail, 6, avail)
+		return pad(truncate(r.Name, n), n) + "  " + st
 	}
+	domW := clamp(w/3, 16, 34)
+	room := clamp(avail-domW-2, 8, avail)
 	name := truncate(r.Name, room)
 	rest := room - lipgloss.Width(name)
 	meta := truncate(" · "+r.Label()+" · "+r.Project+"/"+r.Environment, rest)
 	return pad(truncate(domainText(r.Domains), domW), domW) + "  " + name + sMuted.Render(pad(meta, rest)) + "  " + st
 }
 
-// projectLabel renders one project line: name, domain(s), what is in it, state.
+// listHeight is the height a list needs to show its options under a title
+// and a description that may wrap on a narrow terminal.
+func listHeight(options int, desc string) int {
+	w := termWidth() - 4
+	lines := 1
+	for _, l := range strings.Split(desc, "\n") {
+		lines += clamp((lipgloss.Width(l)+w-1)/w, 1, 10)
+	}
+	return clamp(options+lines+1, 6, 24)
+}
+
+// listMargin is what a list adds in front of each option: border, cursor,
+// tick box, and a little room.
+const listMargin = 12
+
+// projectState renders whether a project runs: everything, partly, nothing.
+func projectState(p coolify.Project) string {
+	switch p.RunState() {
+	case "running":
+		return state(1, 1)
+	case "partly":
+		if p.Degraded() > 0 {
+			return sWarn.Render("◐ partly running")
+		}
+		return state(p.Running(), len(p.Resources))
+	}
+	return state(0, 1)
+}
+
+// projectLabel renders one project line: name, domain(s), what is in it,
+// state. Columns are left out as the terminal gets narrower.
 func projectLabel(p coolify.Project) string {
 	w := termWidth()
-	nameW := clamp(w/5, 14, 26)
-	domW := clamp(w/4, 16, 32)
-	st := state(p.Running(), len(p.Resources))
+	st := projectState(p)
 	if local, _ := p.Local(); len(local) == 0 {
 		st = sWarn.Render("remote server - not supported")
 	}
-	line := pad(truncate(p.Title(), nameW), nameW) + "  " + pad(truncate(domainText(p.Domains()), domW), domW) + "  "
-	if kindsW := w - 14 - nameW - 2 - domW - 2 - 2 - lipgloss.Width(st); kindsW >= 6 {
-		line += sMuted.Render(pad(truncate(p.Kinds(), kindsW), kindsW)) + "  "
+	avail := w - listMargin - 2 - lipgloss.Width(st)
+	title, dom := p.Title(), domainText(p.Domains())
+	switch {
+	case avail >= 14+2+16+2+6:
+		nameW := clamp(w/5, 14, 26)
+		domW := clamp(w/4, 16, 32)
+		line := pad(truncate(title, nameW), nameW) + "  " + pad(truncate(dom, domW), domW) + "  "
+		if kindsW := avail - nameW - 2 - domW - 2; kindsW >= 6 {
+			line += sMuted.Render(pad(truncate(p.Kinds(), kindsW), kindsW)) + "  "
+		}
+		return line + st
+	case avail >= 10+2+10:
+		nameW := clamp(avail/2, 10, 26)
+		domW := avail - nameW - 2
+		return pad(truncate(title, nameW), nameW) + "  " + pad(truncate(dom, domW), domW) + "  " + st
 	}
-	return line + st
+	n := clamp(avail, 6, avail)
+	return pad(truncate(title, n), n) + "  " + st
 }
 
 // errSingle: the user wants to pick single resources instead of projects.
@@ -115,7 +159,11 @@ func pickProjects(ctx context.Context, projects []coolify.Project) ([]coolify.Pr
 		byKey[k] = p
 		opts = append(opts, huh.NewOption(projectLabel(p), k))
 	}
-	opts = append(opts, huh.NewOption(sMuted.Render("Pick single apps instead (advanced) →"), pickSingleLine))
+	single := "Pick single apps instead (advanced) →"
+	if lipgloss.Width(single) > termWidth()-listMargin {
+		single = "Single apps instead →"
+	}
+	opts = append(opts, huh.NewOption(sMuted.Render(single), pickSingleLine))
 	var chosen []string
 	ms := huh.NewMultiSelect[string]()
 	// Enter alone takes the highlighted line; space ticks several first.
@@ -127,12 +175,13 @@ func pickProjects(ctx context.Context, projects []coolify.Project) ([]coolify.Pr
 		}
 		return v
 	}
+	desc := "Everything in a project moves together: its apps, databases, services and domains.\n" +
+		"↑/↓ move · enter = the highlighted one · several: space on each, then enter · / search · esc back"
 	ms.Title("Which project should be backed up?").
-		Description("Everything in a project moves together: its apps, databases, services and domains.\n" +
-			"↑/↓ move · enter = the highlighted one · several: space on each, then enter · / search · esc back").
+		Description(desc).
 		Options(opts...).
 		Filterable(true).
-		Height(clamp(len(opts)+4, 7, 20)).
+		Height(listHeight(len(opts), desc)).
 		Value(&chosen).
 		Validate(func(v []string) error {
 			v = pick(v)
@@ -177,11 +226,12 @@ func pickResources(ctx context.Context, all []coolify.Resource) ([]coolify.Resou
 	var chosen []string
 	// Enter alone takes the highlighted line; space ticks several first.
 	ms := huh.NewMultiSelect[string]()
+	desc := "↑/↓ move · enter = the highlighted one · several: space on each, then enter · / search · esc back"
 	ms.Title("Which app should be backed up?").
-		Description("↑/↓ move · enter = the highlighted one · several: space on each, then enter · / search · esc back").
+		Description(desc).
 		Options(opts...).
 		Filterable(true).
-		Height(clamp(len(opts)+3, 6, 20)).
+		Height(listHeight(len(opts), desc)).
 		Value(&chosen).
 		Validate(func(v []string) error {
 			if len(v) == 0 {

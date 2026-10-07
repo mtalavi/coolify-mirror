@@ -54,6 +54,28 @@ func TestProjectMainDomainFirst(t *testing.T) {
 	}
 }
 
+func TestProjectRunState(t *testing.T) {
+	p := func(statuses ...string) Project {
+		var q Project
+		for i, s := range statuses {
+			q.Resources = append(q.Resources, res("x", "production", string(rune('a'+i)), "service", s))
+		}
+		return q
+	}
+	for want, q := range map[string]Project{
+		"running": p("running", "running:healthy"),
+		"partly":  p("degraded"),
+		"stopped": p("exited", "exited:unhealthy"),
+	} {
+		if got := q.RunState(); got != want {
+			t.Errorf("%v: %s, want %s", q.Resources, got, want)
+		}
+	}
+	if q := p("running", "exited"); q.RunState() != "partly" || q.Running() != 1 {
+		t.Errorf("one of two running: %s", q.RunState())
+	}
+}
+
 func TestProjectKindsCounts(t *testing.T) {
 	p := Project{Resources: []Resource{
 		res("x", "production", "db", "postgresql", ""),

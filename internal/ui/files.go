@@ -88,10 +88,7 @@ func pickAndDelete(ctx context.Context, title, noun string, items []engine.Store
 	for _, f := range items {
 		opts = append(opts, huh.NewOption(storedLabel(f), f.Name))
 	}
-	height := len(opts) + 2
-	if height > 16 {
-		height = 16
-	}
+	height := listHeight(len(opts), desc)
 
 	var chosen []string
 	ms := huh.NewMultiSelect[string]()

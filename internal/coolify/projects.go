@@ -124,11 +124,34 @@ func (p Project) Running() int {
 	return n
 }
 
-func (p Project) runRank() int {
+// Degraded counts services with some of their containers running.
+func (p Project) Degraded() int {
+	n := 0
+	for _, r := range p.Resources {
+		if r.Status == "degraded" {
+			n++
+		}
+	}
+	return n
+}
+
+// RunState is "running" (everything runs), "partly" (something runs) or
+// "stopped" (nothing runs).
+func (p Project) RunState() string {
 	switch n := p.Running(); {
 	case n == len(p.Resources):
+		return "running"
+	case n > 0 || p.Degraded() > 0:
+		return "partly"
+	}
+	return "stopped"
+}
+
+func (p Project) runRank() int {
+	switch p.RunState() {
+	case "running":
 		return 0
-	case n > 0:
+	case "partly":
 		return 1
 	}
 	return 2
