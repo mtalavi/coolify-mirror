@@ -97,10 +97,12 @@
     items.forEach(function (el) { el.classList.add("in"); });
     return;
   }
+  // Start a little before an item scrolls in, so fast scrolling never shows
+  // empty space; anything already above the screen is shown at once.
   var io = new IntersectionObserver(function (entries) {
     entries.forEach(function (e) {
-      if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+      if (e.isIntersecting || e.boundingClientRect.bottom < 0) { e.target.classList.add("in"); io.unobserve(e.target); }
     });
-  }, { rootMargin: "0px 0px -8% 0px", threshold: 0.08 });
+  }, { rootMargin: "0px 0px 15% 0px", threshold: 0 });
   items.forEach(function (el) { io.observe(el); });
 })();

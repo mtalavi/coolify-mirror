@@ -57,18 +57,18 @@
       </div>
     </div>
     <div class="hero-shot reveal" style="--d:.12s">
-      <img class="shot" src="assets/img/01-menu.webp" width="2024" height="1087" alt="Terminal: coolify-mirror installed with one command, showing its main menu on the old server" fetchpriority="high">
+      <img class="shot" src="assets/img/01-menu.webp" width="2024" height="1087" alt="Terminal: coolify-mirror installed with one command, showing its main menu on the old server" fetchpriority="high" decoding="async">
     </div>
   </div>
 </section>
 
 <section class="band" id="install" aria-labelledby="install-h">
   <div class="wrap band-grid">
-    <div class="reveal">
+    <div>
       <h2 id="install-h">Two commands. One on each server.</h2>
       <p>The first installs the tool and opens its menu. The old server prints the second one after the backup.</p>
     </div>
-    <div class="cmds reveal">
+    <div class="cmds">
       <div>
         <div class="cmd-label"><i class="ph ph-hard-drives" aria-hidden="true"></i>Old server</div>
         <div class="cmd">
@@ -99,35 +99,35 @@
       <p>Pick a domain in a list. Everything that makes it run comes along, and the new server starts it through Coolify itself.</p>
     </div>
     <div class="bento">
-      <article class="cell span2 media reveal">
+      <article class="cell span2 media">
         <i class="ph ph-hard-drives ph-icon" aria-hidden="true"></i>
         <h3>Data, copied while it runs</h3>
         <p>Volumes, bind folders and files. Containers pause for the seconds a copy takes. Databases never pause.</p>
-        <figure><img src="assets/img/05-progress.webp" width="1990" height="760" alt="Backup progress: files, volumes, a database dump and an image, with size, speed and time left" loading="lazy"></figure>
+        <figure><img src="assets/img/05-progress.webp" width="1990" height="760" alt="Backup progress: files, volumes, a database dump and an image, with size, speed and time left" loading="lazy" decoding="async"></figure>
       </article>
-      <article class="cell reveal">
+      <article class="cell">
         <i class="ph ph-database ph-icon" aria-hidden="true"></i>
         <h3>Native database dumps</h3>
         <p>PostgreSQL, MySQL and MariaDB are saved with <code>pg_dumpall</code> and <code>mysqldump</code>, then loaded with the same image on the new server.</p>
       </article>
-      <article class="cell reveal">
+      <article class="cell">
         <i class="ph ph-sliders-horizontal ph-icon" aria-hidden="true"></i>
         <h3>Every Coolify setting</h3>
         <p>Projects, environments, variables, storages, tags, scheduled tasks and backup schedules. Secrets are re-encrypted for the new server's key.</p>
       </article>
-      <article class="cell span2 media reveal">
+      <article class="cell span2 media">
         <i class="ph ph-graph ph-icon" aria-hidden="true"></i>
         <h3>Dependencies found for you</h3>
         <p>Pick the app. The Postgres behind its <code>DATABASE_URL</code> is found and offered.</p>
-        <figure><img src="assets/img/03-deps.webp" width="1390" height="469" alt="Question: also back up what they depend on, listing shop-db used by shop-web through DATABASE_URL" loading="lazy"></figure>
+        <figure><img src="assets/img/03-deps.webp" width="1390" height="469" alt="Question: also back up what they depend on, listing shop-db used by shop-web through DATABASE_URL" loading="lazy" decoding="async"></figure>
       </article>
-      <article class="cell span2 tint reveal">
+      <article class="cell span2 tint">
         <i class="ph ph-lightning ph-icon" aria-hidden="true"></i>
         <h3>No rebuild on the new server</h3>
         <p>The exact images your apps run are shipped. Docker Compose apps start from them without cloning or building, which matters most on a slow connection.</p>
         <div class="big">0 builds</div>
       </article>
-      <article class="cell reveal">
+      <article class="cell">
         <i class="ph ph-globe ph-icon" aria-hidden="true"></i>
         <h3>Domains, last</h3>
         <p>Right before anything starts, keep each domain or type a new one. Coolify updates its proxy labels.</p>
@@ -143,7 +143,7 @@
       <p>Real screens from a move to a freshly installed Coolify 4.3.23 with the released tool. Pick a step, then a screen.</p>
     </div>
 
-    <div class="tabs reveal" role="tablist" aria-label="Steps of a move">
+    <div class="tabs" role="tablist" aria-label="Steps of a move">
       <button class="tab" role="tab" id="step-backup" aria-controls="panel-backup" aria-selected="true"><span class="n">1</span>Back up</button>
       <button class="tab" role="tab" id="step-restore" aria-controls="panel-restore" aria-selected="false" tabindex="-1"><span class="n">2</span>Restore</button>
       <button class="tab" role="tab" id="step-switch" aria-controls="panel-switch" aria-selected="false" tabindex="-1"><span class="n">3</span>Switch DNS</button>
@@ -171,7 +171,7 @@
       </div>
       <div class="gallery">
         <figure>
-          <img class="shot main" src="assets/img/01-menu.webp" width="2024" height="1087" alt="Install and main menu" loading="lazy">
+          <img class="shot main" src="assets/img/01-menu.webp" width="2024" height="1087" alt="Install and main menu" loading="lazy" decoding="async">
           <figcaption>Install and start: one command, then the menu.</figcaption>
         </figure>
         <div class="thumbs" aria-label="Screens of this step">
@@ -206,7 +206,7 @@
       </div>
       <div class="gallery">
         <figure>
-          <img class="shot main" src="assets/img/08-paste.webp" width="2024" height="1197" alt="The pasted command installing the tool and verifying the backup" loading="lazy">
+          <img class="shot main" src="assets/img/08-paste.webp" width="2024" height="1197" alt="The pasted command installing the tool and verifying the backup" loading="lazy" decoding="async">
           <figcaption>Paste: install, download and verify before any change.</figcaption>
         </figure>
         <div class="thumbs" aria-label="Screens of this step">
@@ -231,7 +231,7 @@
       </div>
       <div class="gallery">
         <figure>
-          <img class="shot main" src="assets/img/15-guide.webp" width="1857" height="1269" alt="The built-in guide How a move works" loading="lazy">
+          <img class="shot main" src="assets/img/15-guide.webp" width="1857" height="1269" alt="The built-in guide How a move works" loading="lazy" decoding="async">
           <figcaption>The built-in guide, from backup to free space.</figcaption>
         </figure>
       </div>
@@ -255,7 +255,7 @@
       </div>
       <div class="gallery">
         <figure>
-          <img class="shot main" src="assets/img/14-files.webp" width="1640" height="651" alt="Summary of saved files and the clean up question" loading="lazy">
+          <img class="shot main" src="assets/img/14-files.webp" width="1640" height="651" alt="Summary of saved files and the clean up question" loading="lazy" decoding="async">
           <figcaption>What the tool keeps here, and the free disk space.</figcaption>
         </figure>
         <div class="thumbs" aria-label="Screens of this step">
@@ -267,7 +267,7 @@
       </div>
     </div>
 
-    <div class="keys reveal" aria-label="Keys">
+    <div class="keys" aria-label="Keys">
       <span><kbd>↑</kbd><kbd>↓</kbd>move</span>
       <span><kbd>enter</kbd>choose</span>
       <span><kbd>space</kbd>tick several</span>
@@ -284,14 +284,14 @@
       <h2 id="ver-h">Restore complete means it really runs</h2>
       <p>Coolify starts everything. Then the tool checks what actually happened, and says so plainly when something does not work.</p>
     </div>
-    <figure class="proof-shot reveal" style="margin-inline:auto">
-      <img class="shot" src="assets/img/13-complete.webp" width="2007" height="905" alt="Restore complete, everything verified: shop-db and shop-web running, domains answering through the proxy" loading="lazy">
+    <figure class="proof-shot" style="margin-inline:auto">
+      <img class="shot" src="assets/img/13-complete.webp" width="2007" height="905" alt="Restore complete, everything verified: shop-db and shop-web running, domains answering through the proxy" decoding="async">
     </figure>
     <div class="checks">
-      <div class="reveal"><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Same services</h3><p>Every service that ran on the old server is up on the new one.</p></div>
-      <div class="reveal"><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Stable for 30 seconds</h3><p>All containers healthy, without a single restart.</p></div>
-      <div class="reveal"><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Domains answer</h3><p>Each domain is reached through the local Traefik, not just configured.</p></div>
-      <div class="reveal"><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Next deploy works</h3><p>Optional rebuild from the same commit, without cache.</p></div>
+      <div><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Same services</h3><p>Every service that ran on the old server is up on the new one.</p></div>
+      <div><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Stable for 30 seconds</h3><p>All containers healthy, without a single restart.</p></div>
+      <div><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Domains answer</h3><p>Each domain is reached through the local Traefik, not just configured.</p></div>
+      <div><h3><i class="ph ph-check-circle" aria-hidden="true"></i>Next deploy works</h3><p>Optional rebuild from the same commit, without cache.</p></div>
     </div>
   </div>
 </section>
@@ -303,7 +303,7 @@
       <p>Three runs on real Coolify 4.3.23 installs, with what was measured.</p>
     </div>
     <div class="cases">
-      <article class="case lead-case reveal">
+      <article class="case lead-case">
         <h3>A 7-service Compose app over a slow link</h3>
         <p>A production Docker Compose app with 7 services, Postgres, 6 volumes and a build script on the host, moved to a server with a slow internet connection.</p>
         <div class="metric">~1 min<small>to running, no clone, no build</small></div>
@@ -317,12 +317,12 @@
           <li>One deployment recorded, with the new server's IDs</li>
         </ul>
       </article>
-      <article class="case reveal">
+      <article class="case">
         <h3>Five kinds of apps, zero manual fixes</h3>
         <div class="metric">0<small>manual fixes</small></div>
         <p>A Compose app with a host build script and a named buildx builder, a Dockerfile app, an image app, WordPress with MariaDB, and Postgres. Same secrets, volume data and database rows (md5) as the source, every domain answering, and a full rebuild on the new server.</p>
       </article>
-      <article class="case reveal">
+      <article class="case">
         <h3>From paste to verified</h3>
         <div class="metric">2m 39s<small>restore to verified</small></div>
         <p>The tutorial above: an app and its Postgres moved through port 443 to a brand-new Coolify. The 47.5 MB download and its checks took a second on the lab network.</p>
@@ -337,12 +337,12 @@
       <h2 id="safe-h">Built so nothing gets lost</h2>
     </div>
     <div class="safety">
-      <div class="reveal"><i class="ph ph-lock-key" aria-hidden="true"></i><h3>Encrypted end to end</h3><p>The backup is one age-encrypted file. It travels over HTTPS with a certificate pinned by the share code. Plain HTTP is never served.</p></div>
-      <div class="reveal"><i class="ph ph-shield-check" aria-hidden="true"></i><h3>Checked before anything changes</h3><p>Same Coolify version, disk space, Coolify's own bundle validation, conflicts, and a trial import in a transaction that is rolled back.</p></div>
-      <div class="reveal"><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><h3>Rollback</h3><p>If the import fails, everything it created is removed. A full restore puts back the previous Coolify database and <code>.env</code>.</p></div>
-      <div class="reveal"><i class="ph ph-archive" aria-hidden="true"></i><h3>Nothing deleted behind your back</h3><p>An existing volume keeps its data as <code>&lt;name&gt;.cm-old-&lt;time&gt;</code>. Replaced folders stay as safety copies until you delete them.</p></div>
-      <div class="reveal"><i class="ph ph-traffic-signal" aria-hidden="true"></i><h3>One run at a time</h3><p>A lock stops two backups or restores at once. Paused containers always resume, even after ctrl+c.</p></div>
-      <div class="reveal"><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><h3>Ready for Coolify updates</h3><p>Every run checks the Coolify parts it relies on. A daily job moves real apps between two fresh installs of each new Coolify release.</p></div>
+      <div><i class="ph ph-lock-key" aria-hidden="true"></i><h3>Encrypted end to end</h3><p>The backup is one age-encrypted file. It travels over HTTPS with a certificate pinned by the share code. Plain HTTP is never served.</p></div>
+      <div><i class="ph ph-shield-check" aria-hidden="true"></i><h3>Checked before anything changes</h3><p>Same Coolify version, disk space, Coolify's own bundle validation, conflicts, and a trial import in a transaction that is rolled back.</p></div>
+      <div><i class="ph ph-arrow-counter-clockwise" aria-hidden="true"></i><h3>Rollback</h3><p>If the import fails, everything it created is removed. A full restore puts back the previous Coolify database and <code>.env</code>.</p></div>
+      <div><i class="ph ph-archive" aria-hidden="true"></i><h3>Nothing deleted behind your back</h3><p>An existing volume keeps its data as <code>&lt;name&gt;.cm-old-&lt;time&gt;</code>. Replaced folders stay as safety copies until you delete them.</p></div>
+      <div><i class="ph ph-traffic-signal" aria-hidden="true"></i><h3>One run at a time</h3><p>A lock stops two backups or restores at once. Paused containers always resume, even after ctrl+c.</p></div>
+      <div><i class="ph ph-arrows-clockwise" aria-hidden="true"></i><h3>Ready for Coolify updates</h3><p>Every run checks the Coolify parts it relies on. A daily job moves real apps between two fresh installs of each new Coolify release.</p></div>
     </div>
   </div>
 </section>
@@ -353,7 +353,7 @@
       <h2 id="stack-h">Under the hood</h2>
       <p>One file goes from one server to the other. This is what happens on each side.</p>
     </div>
-    <div class="flow reveal">
+    <div class="flow">
       <div class="flow-side">
         <h3><i class="ph ph-upload-simple" aria-hidden="true"></i>Old server</h3>
         <ol>
@@ -379,7 +379,7 @@
       </div>
     </div>
     <div class="stack">
-      <div class="reveal">
+      <div>
         <h3>The tool</h3>
         <ul>
           <li><b>Go 1.26</b>, one static binary for Linux amd64 and arm64</li>
@@ -387,7 +387,7 @@
           <li><b>age</b> encryption (scrypt passphrase) and <b>zstd</b> compression</li>
         </ul>
       </div>
-      <div class="reveal">
+      <div>
         <h3>Inside Coolify</h3>
         <ul>
           <li><b>Server Transfer bundle</b> (schema_version 1), made and validated by Coolify's own code</li>
@@ -395,7 +395,7 @@
           <li><b>Traefik TLS passthrough</b> carries the share on port 443</li>
         </ul>
       </div>
-      <div class="reveal">
+      <div>
         <h3>Releases</h3>
         <ul>
           <li><b>GitHub Actions</b> builds every release and its SHA-256 sums</li>
@@ -414,15 +414,15 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
-      <div class="rel reveal"><div><span class="v">1.7.1</span><span class="d">2026-10-07</span></div><div><h3>A step-by-step guide</h3><p>A 4-step quick start and every screenshot retaken from a real move. Behind Coolify's proxy, the share screen names the other server instead of the proxy's address.</p></div></div>
-      <div class="rel reveal"><div><span class="v">1.7.0</span><span class="d">2026-10-06</span></div><div><h3>All backups at once</h3><p>The ALL line deletes every backup in one go, or pick some. On the command line: <code>files delete --backups</code>.</p></div></div>
-      <div class="rel reveal"><div><span class="v">1.6.0</span><span class="d">2026-10-06</span></div><div><h3>Saved files and disk space</h3><p>See and delete what the tool keeps on both servers. Enter picks the highlighted app, Recommended settings, and a built-in guide.</p></div></div>
-      <div class="rel reveal"><div><span class="v">1.5.0</span><span class="d">2026-10-06</span></div><div><h3>Share codes and one command</h3><p>One short command per server. Checks against every Coolify update, and <code>coolify-mirror update</code>.</p></div></div>
-      <div class="rel reveal"><div><span class="v">1.4.0</span><span class="d">2026-10-06</span></div><div><h3>Compose apps without a build</h3><p>Docker Compose apps start from the restored images, without cloning or building.</p></div></div>
-      <div class="rel reveal"><div><span class="v">1.3.1</span><span class="d">2026-10-06</span></div><div><h3>Verified restores</h3><p>Success only when the new server really runs the apps. Build dependencies on the host travel too, and <code>--verify-redeploy</code> proves the next deploy.</p></div></div>
-      <div class="rel reveal"><div><span class="v">1.2.0</span><span class="d">2026-10-05</span></div><div><h3>Pinned HTTPS and native dumps</h3><p>HTTPS-only transfer with a pinned certificate, native database dumps, a mandatory preflight, and Coolify's official transfer bundle inside.</p></div></div>
-      <div class="rel reveal"><div><span class="v">1.1.0</span><span class="d">2026-10-04</span></div><div><h3>Domains last, open source</h3><p>A domains step at the end of every restore. Released under MIT with a one-line installer.</p></div></div>
-      <div class="rel reveal"><div><span class="v">1.0.0</span><span class="d">2026-10-01</span></div><div><h3>First release</h3><p>Selective and full backups, sharing, restores with rollback, and the interactive menu.</p></div></div>
+      <div class="rel"><div><span class="v">1.7.1</span><span class="d">2026-10-07</span></div><div><h3>A step-by-step guide</h3><p>A 4-step quick start and every screenshot retaken from a real move. Behind Coolify's proxy, the share screen names the other server instead of the proxy's address.</p></div></div>
+      <div class="rel"><div><span class="v">1.7.0</span><span class="d">2026-10-06</span></div><div><h3>All backups at once</h3><p>The ALL line deletes every backup in one go, or pick some. On the command line: <code>files delete --backups</code>.</p></div></div>
+      <div class="rel"><div><span class="v">1.6.0</span><span class="d">2026-10-06</span></div><div><h3>Saved files and disk space</h3><p>See and delete what the tool keeps on both servers. Enter picks the highlighted app, Recommended settings, and a built-in guide.</p></div></div>
+      <div class="rel"><div><span class="v">1.5.0</span><span class="d">2026-10-06</span></div><div><h3>Share codes and one command</h3><p>One short command per server. Checks against every Coolify update, and <code>coolify-mirror update</code>.</p></div></div>
+      <div class="rel"><div><span class="v">1.4.0</span><span class="d">2026-10-06</span></div><div><h3>Compose apps without a build</h3><p>Docker Compose apps start from the restored images, without cloning or building.</p></div></div>
+      <div class="rel"><div><span class="v">1.3.1</span><span class="d">2026-10-06</span></div><div><h3>Verified restores</h3><p>Success only when the new server really runs the apps. Build dependencies on the host travel too, and <code>--verify-redeploy</code> proves the next deploy.</p></div></div>
+      <div class="rel"><div><span class="v">1.2.0</span><span class="d">2026-10-05</span></div><div><h3>Pinned HTTPS and native dumps</h3><p>HTTPS-only transfer with a pinned certificate, native database dumps, a mandatory preflight, and Coolify's official transfer bundle inside.</p></div></div>
+      <div class="rel"><div><span class="v">1.1.0</span><span class="d">2026-10-04</span></div><div><h3>Domains last, open source</h3><p>A domains step at the end of every restore. Released under MIT with a one-line installer.</p></div></div>
+      <div class="rel"><div><span class="v">1.0.0</span><span class="d">2026-10-01</span></div><div><h3>First release</h3><p>Selective and full backups, sharing, restores with rollback, and the interactive menu.</p></div></div>
     </div>
   </div>
 </section>
@@ -432,7 +432,7 @@
     <div class="section-head reveal">
       <h2 id="faq-h">Questions</h2>
     </div>
-    <div class="faq reveal">
+    <div class="faq">
       <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3.x, with exactly the same version on both servers. At start the tool says whether this version is tested. If the versions differ, it tells you which server to upgrade.</p></details>
       <details><summary>Does the old server go down during the backup?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>No. With Recommended settings, containers pause only for the seconds their volume copy takes, and databases are dumped while they run. Nothing is deleted on the old server.</p></details>
       <details><summary>Can the new server already have other projects?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Backing up apps merges them into the new Coolify and keeps everything that is there. An app that already exists can be restored as a copy or skipped. A whole-server backup only goes onto a fresh, empty Coolify.</p></details>
@@ -447,12 +447,12 @@
 
 <section class="final" aria-labelledby="final-h">
   <div class="wrap">
-    <h2 id="final-h" class="reveal">Your next move takes two commands.</h2>
-    <div class="cmd reveal">
+    <h2 id="final-h" >Your next move takes two commands.</h2>
+    <div class="cmd">
       <code><span class="p">$ </span>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh</code>
       <button class="copy" type="button" aria-label="Copy" data-label="Copy" data-copied="Copied" data-copy="curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh"><i class="ph ph-copy" aria-hidden="true"></i></button>
     </div>
-    <div class="hero-cta reveal">
+    <div class="hero-cta">
       <a class="btn btn-primary" href="#tutorial">Start the move<i class="ph ph-arrow-right" aria-hidden="true"></i></a>
       <a class="btn btn-ghost" href="https://github.com/mtalavi/coolify-mirror"><i class="ph ph-github-logo" aria-hidden="true"></i>View on GitHub</a>
     </div>
