@@ -106,42 +106,71 @@ func deref(p *string) string {
 // NormalizeDomains cleans a user typed domain list: "a.com, http://b.com"
 // becomes "https://a.com,http://b.com". It returns an error for a bad entry.
 // RiskyComposeDomainMoves finds the likely slip in the domain step of a
-// Docker Compose app: a domain taken off a service that had one while a
-// service that had none (a worker, a migration or a backup job) gets one.
+// Docker Compose app: a service that had domains loses one while a service
+// that had none (a worker, a migration or a backup job) gets one. Domains
+// are compared one by one, so moving one of several domains counts too.
 // Giving a domain to a service that had none is fine on its own.
 func RiskyComposeDomainMoves(fields []DomainField) []string {
-	type change struct{ removed, added []string }
+	type change struct{ lost, gained []string }
 	byResource := map[string]*change{}
 	var order []string
 	for _, f := range fields {
-		if f.Kind != "compose" || f.Value == f.Original {
+		if f.Kind != "compose" {
 			continue
 		}
+		before, after := hostSet(f.Original), hostSet(f.Value)
 		c := byResource[f.Resource]
 		if c == nil {
 			c = &change{}
 			byResource[f.Resource] = c
 			order = append(order, f.Resource)
 		}
-		was, now := strings.TrimSpace(f.Original) != "", strings.TrimSpace(f.Value) != ""
-		switch {
-		case was && !now:
-			c.removed = append(c.removed, f.Service)
-		case !was && now:
-			c.added = append(c.added, f.Service)
+		if len(before) == 0 {
+			if len(after) > 0 {
+				c.gained = append(c.gained, f.Service+" ("+strings.Join(sortedKeys(after), ", ")+")")
+			}
+			continue
+		}
+		var lost []string
+		for h := range before {
+			if !after[h] {
+				lost = append(lost, h)
+			}
+		}
+		if len(lost) > 0 {
+			sort.Strings(lost)
+			c.lost = append(c.lost, f.Service+" ("+strings.Join(lost, ", ")+")")
 		}
 	}
 	var out []string
 	for _, res := range order {
 		c := byResource[res]
-		if len(c.removed) == 0 || len(c.added) == 0 {
+		if len(c.lost) == 0 || len(c.gained) == 0 {
 			continue
 		}
-		sort.Strings(c.removed)
-		sort.Strings(c.added)
-		out = append(out, fmt.Sprintf("the domain was taken off %s and given to %s, which had none",
-			strings.Join(c.removed, ", "), strings.Join(c.added, ", ")))
+		sort.Strings(c.lost)
+		sort.Strings(c.gained)
+		out = append(out, fmt.Sprintf("taken off %s; given to %s, which had none",
+			strings.Join(c.lost, ", "), strings.Join(c.gained, ", ")))
 	}
+	return out
+}
+
+// hostSet is the set of host names (lower case, no scheme) in a domain value.
+func hostSet(v string) map[string]bool {
+	out := map[string]bool{}
+	for _, d := range coolify.SplitDomains(v) {
+		out[strings.ToLower(strings.TrimSuffix(coolify.Host(d), "/"))] = true
+	}
+	return out
+}
+
+func sortedKeys(m map[string]bool) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
 	return out
 }
 

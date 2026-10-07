@@ -404,15 +404,25 @@ func hangWrap(s string, first, rest int) []string {
 	w := first
 	for lipgloss.Width(s) > w && w > 8 {
 		r := []rune(s)
-		cut := -1
-		for i := min(w, len(r)-1); i > w/3; i-- {
+		// fit: how many runes fill at most w cells (wide runes take two).
+		fit, cells := 0, 0
+		for fit < len(r) {
+			cw := lipgloss.Width(string(r[fit]))
+			if cells+cw > w {
+				break
+			}
+			cells += cw
+			fit++
+		}
+		if fit == 0 {
+			fit = 1
+		}
+		cut := fit
+		for i := min(fit, len(r)-1); i > fit/3; i-- {
 			if r[i] == ' ' {
 				cut = i
 				break
 			}
-		}
-		if cut < 0 {
-			cut = w
 		}
 		out = append(out, strings.TrimRight(string(r[:cut]), " "))
 		s = strings.TrimLeft(string(r[cut:]), " ")
@@ -490,7 +500,7 @@ func askDomains(ctx context.Context, in *coolify.Instance, rep *engine.RestoreRe
 			break
 		}
 		ok, err := confirm(ctx, "Move the domain to a service that had none?",
-			strings.Join(risky, "\n")+"\nPublic traffic would then go to that service (often a worker, a migration or a backup job).\nNo = edit the domains again.", false)
+			"Domain "+strings.Join(risky, "\nDomain ")+"\nPublic traffic would then go to that service (often a worker, a migration or a backup job).\nNo = edit the domains again.", false)
 		if err != nil {
 			return err
 		}
