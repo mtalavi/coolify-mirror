@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mtalavi/coolify-mirror/internal/coolify"
+	"github.com/mtalavi/coolify-mirror/internal/dbx"
 )
 
 func TestVersionBlocker(t *testing.T) {
@@ -55,5 +56,16 @@ func TestHostRequirementBlockers(t *testing.T) {
 	}
 	if b := hostRequirementBlockers(man); len(b) != 1 || !strings.Contains(b[0], "missing or unreadable") {
 		t.Fatalf("missing host prerequisite not blocked clearly: %v", b)
+	}
+}
+
+func TestRelevantWarnings(t *testing.T) {
+	w := []string{"Team-scoped GitHub Apps were exported with credentials. Update each GitHub App webhook URL.", "S3 storage credentials were exported."}
+	if got := relevantWarnings(w, &dbx.Export{Tables: map[string][]coolify.Row{}}); len(got) != 1 || !strings.HasPrefix(got[0], "S3") {
+		t.Errorf("without a GitHub App: %v", got)
+	}
+	ex := &dbx.Export{Tables: map[string][]coolify.Row{"github_apps": {{"id": 3}}}}
+	if got := relevantWarnings(w, ex); len(got) != 2 {
+		t.Errorf("with a GitHub App: %v", got)
 	}
 }

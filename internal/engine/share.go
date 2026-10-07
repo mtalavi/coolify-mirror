@@ -345,6 +345,12 @@ func (s *Share) RestoreCommand() string {
 	return InstallCommand + " -s restore " + s.Code
 }
 
+// RestoreLocalCommand restores this share with a coolify-mirror that is
+// already installed on the other server.
+func (s *Share) RestoreLocalCommand() string {
+	return "sudo coolify-mirror restore " + s.Code
+}
+
 // ToolCommand is the fallback for a server that cannot reach GitHub: it
 // downloads this tool from this server over the pinned HTTPS connection and
 // restores this share.

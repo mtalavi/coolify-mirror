@@ -200,7 +200,7 @@ A real move of the `Shop` project (two apps, Redis and Postgres) from an old ser
 
 <img src="docs/shots/06-done.png" width="760" alt="backup complete">
 
-**6 · The command for the new server.** The green line is all the new server needs: it installs the tool and restores the **share code** at its end. Below it: the bare code, and a fallback that fetches the tool from this server when the new one can't reach GitHub. This screen shows the download live; `b` keeps sharing in the background for 24 h.
+**6 · The command for the new server.** The green line is all the new server needs: it installs the tool and restores the **share code** at its end. Below it: the bare code with the short command for a server that already has the tool, and a fallback that fetches the tool from this server when the new one can't reach GitHub. This screen shows the download live; `b` keeps sharing in the background for 24 h.
 
 <img src="docs/shots/07-share.png" width="760" alt="share code">
 
@@ -214,7 +214,7 @@ A real move of the `Shop` project (two apps, Redis and Postgres) from an old ser
 
 <img src="docs/shots/10-confirm.png" width="760" alt="confirm the restore">
 
-**9 · Restore, then domains — last.** Files, volumes, images and database dumps are restored and the resources are added to Coolify in one transaction. Then each domain: `enter` keeps it, or type a new one (several: comma-separated; empty: none).
+**9 · Restore, then domains — last.** Files, volumes, images and database dumps are restored and the resources are added to Coolify in one transaction. Then each domain: `enter` keeps it, or type a new one (several: comma-separated; empty: none). A Docker Compose service that had no domain is marked *(had no domain)*; taking a domain off one service and giving it to such a service (often a worker or a backup job) asks first.
 
 <img src="docs/shots/12-domains.png" width="760" alt="restore and domains">
 

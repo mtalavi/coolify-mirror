@@ -47,6 +47,7 @@ type HostPath struct {
 	Exists bool // current content is moved aside first
 	Shared bool // not restored: a copy keeps using the original's directory
 	Same   bool // not restored: this server already has the identical file
+	File   bool // a single file (a build policy script, ...), not a folder
 }
 
 // isResourceDir reports Coolify's per-resource folders (always restored).
@@ -120,7 +121,7 @@ func (s *SelectiveRestore) Build(ctx context.Context, decisions map[string]dbx.D
 		if s.skipOwner(p.Owner) || isResourceDir(p.Path) {
 			continue
 		}
-		hp := HostPath{Path: plan.Rename(p.Path)}
+		hp := HostPath{Path: plan.Rename(p.Path), File: isHostFile(s.F.Manifest, p.Path)}
 		if sameHostFile(s.F.Manifest, p.Path) {
 			hp.Same = true
 			s.shared[p.Path] = true
@@ -226,7 +227,7 @@ func (s *SelectiveRestore) Apply(ctx context.Context, pr *Progress) (rep *Restor
 	}
 	imgSteps := map[int]*Step{}
 	for i, im := range man.Images {
-		imgSteps[i] = pr.Add("Image  "+strings.Join(im.Refs, ", "), im.Size)
+		imgSteps[i] = pr.Add(imageTitle(im.Refs), im.Size)
 	}
 	dumpSteps := map[string]*Step{}
 	for _, d := range man.Dumps {

@@ -346,6 +346,16 @@ func sameHostFile(man *Manifest, path string) bool {
 	return false
 }
 
+// isHostFile reports a host path saved as a single file (it has a checksum).
+func isHostFile(man *Manifest, path string) bool {
+	for _, d := range man.HostDeps {
+		if d.Saved && d.Kind == depPath && d.Ref == path && d.SHA256 != "" {
+			return true
+		}
+	}
+	return false
+}
+
 func builderNames(man *Manifest) string {
 	var n []string
 	for _, b := range man.Builders {

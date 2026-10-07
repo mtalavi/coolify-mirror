@@ -157,7 +157,15 @@ func (m *progressModel) View() string {
 	if hiddenDone > 0 {
 		b.WriteString(sOK.Render("  ✓ ") + sMuted.Render(fmt.Sprintf("%d earlier steps done", hiddenDone)) + "\n")
 	}
-	titleW := w - 34
+	// The title column is as wide as the longest title shown (at most w-34),
+	// so the notes on the right get the rest instead of being cut short.
+	longest := 0
+	for i, s := range steps {
+		if show[i] {
+			longest = max(longest, lipgloss.Width(s.Title))
+		}
+	}
+	titleW := min(longest, w-34)
 	if titleW < 24 {
 		titleW = 24
 	}

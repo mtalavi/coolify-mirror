@@ -28,3 +28,19 @@ func TestCompareHelpers(t *testing.T) {
 		t.Fatal("anonymous volume detection")
 	}
 }
+
+func TestImageTitle(t *testing.T) {
+	for _, c := range []struct {
+		refs []string
+		want string
+	}{
+		{[]string{"o60obsi6npnbrtpsseqthzav:4c57d5980fc9268546530080cce45aaf4a7471d2", "o60obsi6npnbrtpsseqthzav:latest"}, "Images o60obsi6npnbrtpsseqthzav:4c57d5980fc9  +1 more"},
+		{[]string{"postgres:16-alpine"}, "Image  postgres:16-alpine"},
+		{[]string{"localhost:5000/app"}, "Image  localhost:5000/app"},
+		{nil, "Image"},
+	} {
+		if got := imageTitle(c.refs); got != c.want {
+			t.Errorf("%v: %q, want %q", c.refs, got, c.want)
+		}
+	}
+}
