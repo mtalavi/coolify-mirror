@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/mtalavi/coolify-mirror/internal/coolify"
+	"github.com/mtalavi/coolify-mirror/internal/dbx"
 )
 
 // Preflight problems block a restore; they are checked when the restore is
@@ -172,6 +173,9 @@ func PreflightSelective(ctx context.Context, in *coolify.Instance, f *Fetched) [
 // bundle (what to update after the move).
 func BundleWarnings(ctx context.Context, in *coolify.Instance, f *Fetched) []string {
 	_, w := checkBundle(ctx, in, f)
+	if f.Export != nil {
+		w = relevantWarnings(w, f.Export)
+	}
 	w = append(w, CheckCompat(ctx, in).Warnings...)
 	if f.Export != nil {
 		for _, d := range f.Export.Drift {
@@ -179,6 +183,22 @@ func BundleWarnings(ctx context.Context, in *coolify.Instance, f *Fetched) []str
 		}
 	}
 	return w
+}
+
+// relevantWarnings drops Coolify's GitHub App advice when a selective backup
+// carries no GitHub App: Coolify's built-in "Public GitHub" source has no
+// credentials or webhooks to update.
+func relevantWarnings(w []string, ex *dbx.Export) []string {
+	if len(ex.Tables["github_apps"]) > 0 {
+		return w
+	}
+	var out []string
+	for _, s := range w {
+		if !strings.Contains(s, "GitHub App") {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func blockersErr(b []string) error {

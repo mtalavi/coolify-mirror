@@ -14,6 +14,7 @@ import (
 	"github.com/mtalavi/coolify-mirror/internal/transfer"
 
 	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 )
 
 func restoreFlow(ctx context.Context, in *coolify.Instance) error {
@@ -156,15 +157,19 @@ func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetch
 		lines = append(lines, sWarn.Render("! volume "+v+" exists: it gets the backup's data, its current data is kept in an aside volume"))
 	}
 	for _, h := range sr.HostPaths {
+		kind := "folder"
+		if h.File {
+			kind = "file"
+		}
 		switch {
 		case h.Same:
 			lines = append(lines, sMuted.Render("host file "+h.Path+" is already identical here - kept"))
 		case h.Shared:
-			lines = append(lines, sWarn.Render("! host folder "+h.Path+" is shared with the original resource - the copy uses it as it is (not overwritten)"))
+			lines = append(lines, sWarn.Render("! host "+kind+" "+h.Path+" is shared with the original resource - the copy uses it as it is (not overwritten)"))
 		case h.Exists:
-			lines = append(lines, sWarn.Render("! host folder "+h.Path+" exists: its current content is moved aside, then the backup is restored there"))
+			lines = append(lines, sWarn.Render("! host "+kind+" "+h.Path+" exists: its current content is moved aside, then the backup is restored there"))
 		default:
-			lines = append(lines, sMuted.Render("host folder "+h.Path+" will be created"))
+			lines = append(lines, sMuted.Render("host "+kind+" "+h.Path+" will be created"))
 		}
 	}
 	for _, d := range sr.DomainClashes {
@@ -296,28 +301,35 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	dash := dashboardBase(ctx, in)
 	var b strings.Builder
 	failed, held := 0, 0
+	inner := boxInner()
 	for _, r := range results {
-		if r.OK && r.Stopped {
+		switch {
+		case r.OK && r.Stopped:
 			if r.Resource.Hold != "" {
 				held++
 			}
-			b.WriteString(sWarn.Render("! ") + r.Resource.Name + sWarn.Render(" · "+r.Message))
-		} else if r.OK {
-			b.WriteString(sOK.Render("✓ ") + r.Resource.Name + sMuted.Render(" · "+r.Message))
-		} else {
+			b.WriteString(resultLine(sWarn.Render("!"), r.Resource.Name, r.Message, sWarn, inner))
+		case r.OK:
+			b.WriteString(resultLine(sOK.Render("✓"), r.Resource.Name, r.Message, sMuted, inner))
+		default:
 			failed++
-			b.WriteString(sErr.Render("✗ ") + r.Resource.Name + " · " + sErr.Render(r.Message))
+			b.WriteString(resultLine(sErr.Render("✗"), r.Resource.Name, r.Message, sErr, inner))
 		}
+		var hosts []string
 		for _, d := range r.Resource.Domains {
-			b.WriteString(sMuted.Render("  " + coolify.Host(d)))
+			hosts = append(hosts, coolify.Host(d))
 		}
-		b.WriteString("\n")
+		if len(hosts) > 0 {
+			for _, l := range hangWrap(strings.Join(hosts, " · "), inner-4, inner-4) {
+				b.WriteString("    " + sAccent.Render(l) + "\n")
+			}
+		}
 	}
 	for _, p := range rep.Problems {
-		b.WriteString(sErr.Render("✗ "+p) + "\n")
+		b.WriteString(noteLines(sErr.Render("✗ "), p, sErr, inner, 2))
 	}
 	for _, n := range rep.Notes {
-		b.WriteString(sMuted.Render("note: "+n) + "\n")
+		b.WriteString(noteLines(sMuted.Render("note: "), n, sMuted, inner, 6))
 	}
 	head := sOK.Render("Restore complete · everything verified") + sMuted.Render(" · "+engine.HumanDuration(time.Since(restoreStarted)))
 	verdict := engine.Verdict(failed, held, rep.Problems)
@@ -366,10 +378,10 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	bad := 0
 	for _, r := range checks {
 		if r.OK {
-			c.WriteString(sOK.Render("✓ ") + r.Resource.Name + sMuted.Render(" · "+r.Message) + "\n")
+			c.WriteString(resultLine(sOK.Render("✓"), r.Resource.Name, r.Message, sMuted, boxInner()))
 		} else {
 			bad++
-			c.WriteString(sErr.Render("✗ ") + r.Resource.Name + " · " + sErr.Render(r.Message) + "\n")
+			c.WriteString(resultLine(sErr.Render("✗"), r.Resource.Name, r.Message, sErr, boxInner()))
 		}
 	}
 	h := sOK.Render("Redeploy check passed · later deploys work on this server")
@@ -378,6 +390,67 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	}
 	fmt.Println(boxed(sBox, h+"\n"+c.String()))
 	return nil
+}
+
+// boxInner is the text width inside a box on this terminal.
+func boxInner() int {
+	return clamp(termWidth()-6, 30, 150)
+}
+
+// hangWrap wraps s at spaces: the first line at most first cells, the
+// others at most rest cells (the caller indents them).
+func hangWrap(s string, first, rest int) []string {
+	var out []string
+	w := first
+	for lipgloss.Width(s) > w && w > 8 {
+		r := []rune(s)
+		// fit: how many runes fill at most w cells (wide runes take two).
+		fit, cells := 0, 0
+		for fit < len(r) {
+			cw := lipgloss.Width(string(r[fit]))
+			if cells+cw > w {
+				break
+			}
+			cells += cw
+			fit++
+		}
+		if fit == 0 {
+			fit = 1
+		}
+		cut := fit
+		for i := min(fit, len(r)-1); i > fit/3; i-- {
+			if r[i] == ' ' {
+				cut = i
+				break
+			}
+		}
+		out = append(out, strings.TrimRight(string(r[:cut]), " "))
+		s = strings.TrimLeft(string(r[cut:]), " ")
+		w = rest
+	}
+	return append(out, s)
+}
+
+// resultLine renders "✓ name · message" for a box; a long message goes on
+// over indented lines instead of running past the edge.
+func resultLine(mark, name, msg string, st lipgloss.Style, inner int) string {
+	lead := 2 + lipgloss.Width(name) + 3
+	lines := hangWrap(msg, inner-lead, inner-4)
+	out := mark + " " + name + st.Render(" · "+lines[0]) + "\n"
+	for _, l := range lines[1:] {
+		out += "    " + st.Render(l) + "\n"
+	}
+	return out
+}
+
+// noteLines renders a labelled note for a box, continued under its text.
+func noteLines(label, text string, st lipgloss.Style, inner, indent int) string {
+	lines := hangWrap(text, inner-lipgloss.Width(label), inner-indent)
+	out := label + st.Render(lines[0]) + "\n"
+	for _, l := range lines[1:] {
+		out += strings.Repeat(" ", indent) + st.Render(l) + "\n"
+	}
+	return out
 }
 
 func dashboardBase(ctx context.Context, in *coolify.Instance) string {
@@ -402,28 +475,49 @@ func askDomains(ctx context.Context, in *coolify.Instance, rep *engine.RestoreRe
 	if len(fields) == 0 {
 		return nil
 	}
-	inputs := make([]huh.Field, 0, len(fields)+1)
-	inputs = append(inputs, huh.NewNote().Title("Domains").
-		Description("Last step before starting: keep or change each domain.\nSeveral domains: separate with commas. Empty = no domain. https:// is added when missing."))
-	for i := range fields {
-		f := &fields[i]
-		inputs = append(inputs, huh.NewInput().
-			Title(f.Label).
-			Value(&f.Value).
-			Validate(func(s string) error {
-				_, err := engine.NormalizeDomains(s)
-				return err
-			}))
+	for {
+		inputs := make([]huh.Field, 0, len(fields)+1)
+		inputs = append(inputs, huh.NewNote().Title("Domains").
+			Description("Last step before starting: keep or change each domain.\nSeveral domains: separate with commas. Empty = no domain. https:// is added when missing."))
+		for i := range fields {
+			f := &fields[i]
+			inputs = append(inputs, huh.NewInput().
+				Title(f.Label).
+				Value(&f.Value).
+				Validate(func(s string) error {
+					_, err := engine.NormalizeDomains(s)
+					return err
+				}))
+		}
+		if err := huh.NewForm(huh.NewGroup(inputs...)).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
+			return err
+		}
+		for i := range fields {
+			fields[i].Value, _ = engine.NormalizeDomains(fields[i].Value)
+		}
+		risky := engine.RiskyComposeDomainMoves(fields)
+		if len(risky) == 0 {
+			break
+		}
+		ok, err := confirm(ctx, "Move the domain to a service that had none?",
+			"Domain "+strings.Join(risky, "\nDomain ")+"\nPublic traffic would then go to that service (often a worker, a migration or a backup job).\nNo = edit the domains again.", false)
+		if err != nil {
+			return err
+		}
+		if ok {
+			break
+		}
 	}
-	if err := huh.NewForm(huh.NewGroup(inputs...)).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
-		return err
-	}
 	for i := range fields {
-		fields[i].Value, _ = engine.NormalizeDomains(fields[i].Value)
 		if fields[i].Original == fields[i].Value {
 			continue
 		}
-		fmt.Println(sMuted.Render("  "+fields[i].Label+": ") + strings.Join(hostList(fields[i].Original), ", ") + " → " + sOK.Render(strings.Join(hostList(fields[i].Value), ", ")))
+		was, now := strings.Join(hostList(fields[i].Original), ", "), strings.Join(hostList(fields[i].Value), ", ")
+		if was == now {
+			// Only the scheme changed (http → https): show it.
+			was, now = fields[i].Original, fields[i].Value
+		}
+		fmt.Println(sMuted.Render("  "+fields[i].Label+": ") + was + " → " + sOK.Render(now))
 	}
 	_, err = withSpinner(ctx, "Saving the domains", func(ctx context.Context) (struct{}, error) {
 		return struct{}{}, engine.ApplyDomains(ctx, in, rep.Resources, fields)
