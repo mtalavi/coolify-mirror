@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="assets/site.css">
 <link rel="stylesheet" href="assets/icons/phosphor.min.css">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Coolify Mirror","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (amd64, arm64)","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.8.1","url":"https://coolify-mirror.pages.dev/","downloadUrl":"https://github.com/mtalavi/coolify-mirror/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Coolify Mirror","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (amd64, arm64)","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.9.1","url":"https://coolify-mirror.pages.dev/","downloadUrl":"https://github.com/mtalavi/coolify-mirror/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
 </script>
 <script defer src="assets/site.js"></script>
 </head>
@@ -86,7 +86,7 @@
       <div class="facts">
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>SHA-256 checked on install</span>
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>Linux amd64 and arm64</span>
-        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Coolify 4.3.x, same version on both</span>
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Coolify 4.3 or 4.4, same version on both</span>
       </div>
     </div>
   </div>
@@ -140,7 +140,7 @@
   <div class="wrap">
     <div class="section-head reveal">
       <h2 id="tut-h">The whole move, screen by screen</h2>
-      <p>Real screens from a move to a freshly installed Coolify 4.3.23 with the released tool. Pick a step, then a screen.</p>
+      <p>Real screens from a move to a freshly installed Coolify 4.4.2 with the released tool. Pick a step, then a screen.</p>
     </div>
 
     <div class="tabs" role="tablist" aria-label="Steps of a move">
@@ -261,7 +261,7 @@
           <button class="thumb" type="button" aria-pressed="true" data-src="assets/img/14-files.webp" data-w="1580" data-h="611" data-alt="Summary of saved files and the clean up question" data-cap="What the tool keeps here, and the free disk space.">Summary</button>
           <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/16-all-backups.webp" data-w="1930" data-h="429" data-alt="All backups list with the ALL line" data-cap="ALL takes every backup at once.">All backups</button>
           <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/17-delete.webp" data-w="1147" data-h="429" data-alt="Delete 2 backups confirmation" data-cap="It lists what goes. The default is No.">Confirm</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/18-freed.webp" data-w="1114" data-h="284" data-alt="Freed 94.9 MB" data-cap="Space freed, with the new free total.">Freed</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/18-freed.webp" data-w="1114" data-h="284" data-alt="Freed 95.0 MB" data-cap="Space freed, with the new free total.">Freed</button>
         </div>
       </div>
     </div>
@@ -299,7 +299,7 @@
   <div class="wrap">
     <div class="section-head reveal">
       <h2 id="cases-h">Real moves</h2>
-      <p>Three runs on real Coolify 4.3.23 installs, with what was measured.</p>
+      <p>Three runs on real Coolify installs (4.3.23 and 4.4.2), with what was measured.</p>
     </div>
     <div class="cases">
       <article class="case lead-case">
@@ -323,8 +323,8 @@
       </article>
       <article class="case">
         <h3>From paste to verified</h3>
-        <div class="metric">2m 59s<small>restore to verified</small></div>
-        <p>The tutorial above: a whole project (two apps, Redis and Postgres) moved through port 443 to a brand-new Coolify with the released 1.8.1. The 47.5 MB download and its checks took a second on the lab network.</p>
+        <div class="metric">2m 30s<small>restore to verified</small></div>
+        <p>The tutorial above: a whole project (two apps, Redis and Postgres) moved through port 443 to a brand-new Coolify 4.4.2 with the released 1.9.1. The 47.5 MB download and its checks took a second on the lab network.</p>
       </article>
     </div>
   </div>
@@ -413,6 +413,8 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
+      <div class="rel"><div><span class="v">1.9.1</span><span class="d">2026-10-08</span></div><div><h3>A clear compatibility line</h3><p>No more "did not work" warning from an older version under "✓ tested" when this release was tested with that Coolify.</p></div></div>
+      <div class="rel"><div><span class="v">1.9.0</span><span class="d">2026-10-08</span></div><div><h3>Coolify 4.4</h3><p>Works with Coolify 4.4 (tested on 4.4.2 and 4.3.23): Compose apps start from the restored images again, SQLite databases and secret-manager links (Vault, Doppler, Infisical) move with their apps, and a whole-server move no longer rebuilds Compose apps.</p></div></div>
       <div class="rel"><div><span class="v">1.8.1</span><span class="d">2026-10-08</span></div><div><h3>Tidier screens, safer domains</h3><p>Domains on their own line in the final box, a cleaner share screen, full progress notes, and a question before a Compose domain moves to a service that had none.</p></div></div>
       <div class="rel"><div><span class="v">1.8.0</span><span class="d">2026-10-08</span></div><div><h3>Pick projects</h3><p>A list like Coolify's dashboard: pick a project and its apps, databases, services and domains move together. A review before every backup, <code>backup --project</code>, and a sharper look.</p></div></div>
       <div class="rel"><div><span class="v">1.7.1</span><span class="d">2026-10-07</span></div><div><h3>A step-by-step guide</h3><p>A 4-step quick start and every screenshot retaken from a real move. Behind Coolify's proxy, the share screen names the other server instead of the proxy's address.</p></div></div>
@@ -434,7 +436,7 @@
       <h2 id="faq-h">Questions</h2>
     </div>
     <div class="faq">
-      <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3.x, with exactly the same version on both servers. At start the tool says whether this version is tested. If the versions differ, it tells you which server to upgrade.</p></details>
+      <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3 and v4.4 (tested with 4.3.23 and 4.4.2), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
       <details><summary>Does the old server go down during the backup?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>No. With Recommended settings, containers pause only for the seconds their volume copy takes, and databases are dumped while they run. Nothing is deleted on the old server.</p></details>
       <details><summary>Can the new server already have other projects?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Backing up apps merges them into the new Coolify and keeps everything that is there. An app that already exists can be restored as a copy or skipped. A whole-server backup only goes onto a fresh, empty Coolify.</p></details>
       <details><summary>The new server cannot connect to the old one.<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Port 443 of the old server is blocked. On the old server press q, choose Share a saved backup, the same backup, then Share a link on port 8123. Allow 8123 in your provider's firewall too, and run the new command it shows.</p></details>

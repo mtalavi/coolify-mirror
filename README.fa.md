@@ -415,6 +415,7 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 
 | سناریو | نتیجه |
 |---|---|
+| 1.9.1 منتشرشده: **انتقال کامل پروژه‌ی Shop با دستورهای همین راهنما** — نصب‌کننده‌ی رسمی روی هر دو سرور، اشتراک از پورت 443، ریستور روی یک Coolify 4.4.2 **تازه‌نصب** | ✓ نصب‌کننده 1.9.1 را نصب کرد و «✓ tested with this version» بدون هشدار؛ «Restore complete · everything verified» در ۲ دقیقه و ۳۰ ثانیه؛ هر ۳ دامنه HTTP 200؛ بعد `ALL` دو بک‌آپ را حذف کرد. همه‌ی اسکرین‌شات‌های README و سایت از همین اجرا هستند |
 | 1.9.0: **تست خودکار کامل روی Coolify 4.4.2** (`lab/e2e.sh`؛ دو سرور تازه با نصب‌کننده‌ی رسمی، اپ Compose از git + Postgres + اپ nginx با volume و دامنه، کد اشتراک) | ✓ «COMPATIBLE»؛ اپ Compose «started from the restored images, without a build»؛ اپ nginx با اسم جدید کانتینر 4.4 شناخته شد (قبلاً با 4.4.1: «service(s) not created» و build دوباره) |
 | 1.9.0 روی Coolify 4.3.23 (بدون پسرفت): بک‌آپ همه‌ی ریسورس‌های یک سرور lab (۳ پروژه، ۵ ریسورس) و ریستور روی سرور 4.3.23 دیگر. نصب‌کننده‌ی فعلی Coolify دیگر 4.3.23 را روی سرور تازه درست نصب نمی‌کند (فایل‌های 4.4 را می‌گیرد)، پس تست خودکار فقط آخرین نسخه را تست می‌کند | ✓ `SUCCESS`؛ اپ Compose «started from the restored images, without a build»، اپ‌های تک‌کانتینری با اسم قدیمی کانتینر شناخته شدند، همه‌ی دامنه‌ها از Traefik جواب دادند |
 | 1.9.0 روی 4.4.2: پروژه‌ی Lab44 — اپ nginx که `GREETING` را از **HashiCorp Vault** می‌خواند + **دیتابیس SQLite** وصل‌شده به همان اپ (۳۲۱ ردیف) — بک‌آپ و اشتراک از پورت 443، ریستور روی مقصدی که آدرس Vault را مجاز نکرده | ✓ قبل از سؤال ریستور: «! secret manager "Lab Vault" connects to 172.23.0.2, which the old server allows …»؛ بدون مجاز کردن، Coolify خودش deploy را متوقف کرد (همان‌طور که گفته شده بود) |
@@ -485,6 +486,8 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 ### 1.9.1 — ۲۰۲۶-۱۰-۰۸
 
 - پیام سازگاری ضد و نقیض حذف شد: 1.9.0 روی Coolify 4.4.2 هم «✓ tested with this version» نشان می‌داد و هم زیرش «coolify-mirror 1.8.1 did not work with Coolify 4.4.2» (نتیجه‌ی تست خودکار شبانه با نسخه‌ی قبلی). حالا اگر خود این نسخه با همان Coolify تست شده باشد، شکست یک نسخه‌ی قدیمی‌تر دیگر هشدار نمی‌دهد. شکست خود همین نسخه یا نسخه‌ی جدیدتر همچنان ریستور را متوقف می‌کند.
+- تست سازگاری رسمی (`compat.yml`) برای Coolify 4.4.2 با 1.9.0 قبول شد و در `compat.json` ثبت شد؛ issueهای #18 و #25 بسته شدند.
+- بعد از انتشار: همه‌ی اسکرین‌شات‌های README و سایت با نسخه‌ی منتشرشده‌ی 1.9.1 روی Coolify 4.4.2 از نو گرفته شدند.
 
 ### 1.9.0 — ۲۰۲۶-۱۰-۰۸
 
