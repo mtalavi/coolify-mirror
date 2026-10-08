@@ -73,14 +73,20 @@ func (p Project) Title() string {
 // applications before services.
 func (p Project) Domains() []string {
 	out := p.allDomains()
-	sort.SliceStable(out, func(i, j int) bool {
-		a, b := hostOf(out[i]), hostOf(out[j])
+	SortMainFirst(out)
+	return out
+}
+
+// SortMainFirst orders domains main domain first: fewest dots, then shortest
+// (vemela.app before api.vemela.app).
+func SortMainFirst(ds []string) {
+	sort.SliceStable(ds, func(i, j int) bool {
+		a, b := hostOf(ds[i]), hostOf(ds[j])
 		if da, db := strings.Count(a, "."), strings.Count(b, "."); da != db {
 			return da < db
 		}
 		return len(a) < len(b)
 	})
-	return out
 }
 
 // hostOf is the host name of a domain, without path or port.
