@@ -416,7 +416,7 @@ docker volume rm cmlab-src-docker cmlab-src-containerd cmlab-src-data cmlab-dst-
 | سناریو | نتیجه |
 |---|---|
 | 1.9.0: **تست خودکار کامل روی Coolify 4.4.2** (`lab/e2e.sh`؛ دو سرور تازه با نصب‌کننده‌ی رسمی، اپ Compose از git + Postgres + اپ nginx با volume و دامنه، کد اشتراک) | ✓ «COMPATIBLE»؛ اپ Compose «started from the restored images, without a build»؛ اپ nginx با اسم جدید کانتینر 4.4 شناخته شد (قبلاً با 4.4.1: «service(s) not created» و build دوباره) |
-| 1.9.0: همان تست خودکار روی Coolify 4.3.23 (بدون پسرفت) | ✓ «COMPATIBLE» |
+| 1.9.0 روی Coolify 4.3.23 (بدون پسرفت): بک‌آپ همه‌ی ریسورس‌های یک سرور lab (۳ پروژه، ۵ ریسورس) و ریستور روی سرور 4.3.23 دیگر. نصب‌کننده‌ی فعلی Coolify دیگر 4.3.23 را روی سرور تازه درست نصب نمی‌کند (فایل‌های 4.4 را می‌گیرد)، پس تست خودکار فقط آخرین نسخه را تست می‌کند | ✓ `SUCCESS`؛ اپ Compose «started from the restored images, without a build»، اپ‌های تک‌کانتینری با اسم قدیمی کانتینر شناخته شدند، همه‌ی دامنه‌ها از Traefik جواب دادند |
 | 1.9.0 روی 4.4.2: پروژه‌ی Lab44 — اپ nginx که `GREETING` را از **HashiCorp Vault** می‌خواند + **دیتابیس SQLite** وصل‌شده به همان اپ (۳۲۱ ردیف) — بک‌آپ و اشتراک از پورت 443، ریستور روی مقصدی که آدرس Vault را مجاز نکرده | ✓ قبل از سؤال ریستور: «! secret manager "Lab Vault" connects to 172.23.0.2, which the old server allows …»؛ بدون مجاز کردن، Coolify خودش deploy را متوقف کرد (همان‌طور که گفته شده بود) |
 | همان، بعد از مجاز کردن آدرس روی مقصد | ✓ `SUCCESS`؛ روی مقصد `GREETING=hello-from-vault`، ۳۲۱ ردیف SQLite، فایل اپ داخل volume مشترک، دامنه HTTP 200؛ volume مشترک فقط یک بار در بک‌آپ |
 | 1.9.0 روی 4.4.2: ریستور دوباره‌ی Lab44 روی همان مقصد به‌صورت کپی | ✓ «uses existing secret manager "Lab Vault"» (یک توکن، دو اتصال)؛ کپی اپ به‌خاطر دامنه‌ی تکراری روشن نشد، با پیام روشن |
