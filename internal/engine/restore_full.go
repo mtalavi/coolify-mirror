@@ -11,6 +11,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -396,7 +397,7 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 	if av := undo.asideVolumes(); len(av) > 0 {
 		notes = append(notes, "previous data of volumes that already existed is kept in: "+strings.Join(av, ", ")+" (delete them from the menu, 'Saved files & disk space', once everything works)")
 	}
-	return &RestoreReport{Resources: fullResources(man), Notes: notes, Problems: problems, AsideDir: safety, Duration: time.Since(start)}, nil
+	return &RestoreReport{Resources: fullResources(ctx, in, man), Notes: notes, Problems: problems, AsideDir: safety, Duration: time.Since(start)}, nil
 }
 
 func uniq(in []string) []string {
@@ -605,13 +606,37 @@ func restartProxy(ctx context.Context, in *coolify.Instance, pr *Progress) {
 	}
 }
 
-// fullResources lists the restored resources on this server.
-func fullResources(man *Manifest) []dbx.PlannedResource {
+// fullResources lists the restored resources on this server, each application
+// with its last successful deployment (restored with the database), so Docker
+// Compose applications start from the restored images instead of a rebuild.
+func fullResources(ctx context.Context, in *coolify.Instance, man *Manifest) []dbx.PlannedResource {
+	var deps []struct {
+		App    string  `json:"application_id"`
+		Commit *string `json:"commit"`
+		UUID   string  `json:"deployment_uuid"`
+	}
+	if err := in.Query(ctx, `SELECT DISTINCT ON (application_id) application_id, commit, deployment_uuid
+FROM application_deployment_queues WHERE status = 'finished' AND pull_request_id = 0
+ORDER BY application_id, created_at DESC, id DESC`, &deps); err != nil {
+		run.Logf("last deployments: %v", err)
+	}
+	last := map[string]int{}
+	for i, d := range deps {
+		last[d.App] = i
+	}
 	var out []dbx.PlannedResource
 	for _, r := range man.Resources {
-		if r.Local() {
-			out = append(out, dbx.PlannedResource{Resource: r, SourceUUID: r.UUID, WasRunning: r.Running() || len(man.Runtime[r.UUID]) > 0, Expect: man.Runtime[r.UUID]})
+		if !r.Local() {
+			continue
 		}
+		pl := dbx.PlannedResource{Resource: r, SourceUUID: r.UUID, WasRunning: r.Running() || len(man.Runtime[r.UUID]) > 0, Expect: man.Runtime[r.UUID]}
+		if i, ok := last[strconv.FormatInt(r.ID, 10)]; ok && r.Table == "applications" {
+			if c := deps[i].Commit; c != nil {
+				pl.Commit = *c
+			}
+			pl.DeploymentUUID = deps[i].UUID
+		}
+		out = append(out, pl)
 	}
 	return out
 }

@@ -25,6 +25,14 @@ func ctr(service, status string, exit int, health, restart string, restarts int)
 	return d
 }
 
+// single is a single-container application: Coolify names its service like
+// the container, <name>-<deploy time>.
+func single(name, status string, exit int, health, restart string, restarts int) docker.Details {
+	d := ctr(name, status, exit, health, restart, restarts)
+	d.Name = "/" + name
+	return d
+}
+
 func TestContainerState(t *testing.T) {
 	cases := []struct {
 		name string
@@ -75,7 +83,12 @@ func TestJudge(t *testing.T) {
 		{"compose service missing", compose[:3], []string{"db", "migrate", "web", "worker"}, false, "not created: worker"},
 		{"compose one service unhealthy", append(append([]docker.Details{}, compose[:3]...), ctr("worker", "running", 0, "unhealthy", "unless-stopped", 0)), nil, false, "worker unhealthy"},
 		// Single-container applications: the service label carries the deploy time.
-		{"application redeployed", []docker.Details{ctr("abc-213329158788", "running", 0, "healthy", "unless-stopped", 0)}, []string{"abc-194208935083"}, true, ""},
+		{"application redeployed", []docker.Details{single("abc-213329158788", "running", 0, "healthy", "unless-stopped", 0)}, []string{"abc-194208935083"}, true, ""},
+		// Coolify 4.4 names containers <name>-<YYYYMMDD>T<HHMMSS> (regression: "not created").
+		{"application redeployed (4.4 names)", []docker.Details{single("abc-20261008T010203", "running", 0, "healthy", "unless-stopped", 0)}, []string{"abc-20261007T102424"}, true, ""},
+		// A Compose service may itself end like a deploy time: it is not taken for "worker".
+		{"compose service named like a deploy time", compose, []string{"worker-20261008T010203"}, false, "not created"},
+		{"4.4 container name prefix", []docker.Details{single("shop-api-20261008T010203", "running", 0, "healthy", "unless-stopped", 0)}, []string{"shop-api-20260908T141530"}, true, ""},
 		{"still starting", []docker.Details{ctr("app", "running", 0, "starting", "unless-stopped", 0)}, nil, false, "starting"},
 	}
 	for _, c := range cases {

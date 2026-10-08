@@ -85,6 +85,29 @@ func referenceTexts(ctx context.Context, in *coolify.Instance, rs []coolify.Reso
 		}
 		out = append(out, refText{owner: names[e.Type+"#"+fmt.Sprint(e.ID)], where: e.Key, text: val})
 	}
+	// A SQLite database connected to an application (Coolify 4.4+) is mounted
+	// into it as a volume that points at the database.
+	if in.HasTable(ctx, "standalone_sqlites") {
+		var vwhere []string
+		for m, ids := range byMorph {
+			vwhere = append(vwhere, fmt.Sprintf("(v.resource_type = %s AND v.resource_id IN %s)", coolify.SQLString(m), coolify.SQLIntList(ids)))
+		}
+		var vols []struct {
+			Type string `json:"resource_type"`
+			ID   int64  `json:"resource_id"`
+			Name string `json:"name"`
+			UUID string `json:"uuid"`
+		}
+		if len(vwhere) > 0 {
+			if err := in.Query(ctx, "SELECT v.resource_type, v.resource_id, v.name, s.uuid FROM local_persistent_volumes v JOIN standalone_sqlites s ON s.id = v.standalone_sqlite_id WHERE "+
+				strings.Join(vwhere, " OR "), &vols); err != nil {
+				return nil, err
+			}
+		}
+		for _, v := range vols {
+			out = append(out, refText{owner: names[v.Type+"#"+fmt.Sprint(v.ID)], where: "connected SQLite volume " + v.Name, text: v.UUID})
+		}
+	}
 	for _, t := range []string{"applications", "services"} {
 		var ids []int64
 		for _, r := range rs {

@@ -364,15 +364,16 @@ func describeState(d docker.Details) string {
 
 func serviceName(d docker.Details) string {
 	s := d.Config.Labels["com.docker.compose.service"]
-	if s == "" {
-		s = strings.TrimPrefix(d.Name, "/")
+	if name := strings.TrimPrefix(d.Name, "/"); s == "" || s == name {
+		return stableService(name)
 	}
-	return stableService(s)
+	return s
 }
 
 // deploySuffix is the deployment time Coolify appends to container (and,
-// for single-container applications, service) names: <name>-<12 digits>.
-var deploySuffix = regexp.MustCompile(`-\d{12}$`)
+// for single-container applications, service) names: <name>-<12 digits>
+// before Coolify 4.4, <name>-<YYYYMMDD>T<HHMMSS> since.
+var deploySuffix = regexp.MustCompile(`-(\d{12}|\d{8}T\d{6})$`)
 
 // stableService removes the per-deployment suffix, so the same service has
 // the same name on the source and after a restore.
@@ -400,10 +401,19 @@ func judge(ds []docker.Details, expect []string) (ready bool, detail string) {
 	if len(ds) == 0 {
 		return false, "waiting for containers"
 	}
-	have := map[string]bool{}
+	// have: service names as they are. generated: single-container apps,
+	// whose service is named like the container (<name>-<deploy time>), by the
+	// name without the deploy time, which changes with every deployment.
+	have, generated := map[string]bool{}, map[string]bool{}
 	var bad, starting []string
 	for _, d := range ds {
-		have[serviceName(d)] = true
+		svc := d.Config.Labels["com.docker.compose.service"]
+		name := strings.TrimPrefix(d.Name, "/")
+		if svc == "" || svc == name {
+			generated[stableService(name)] = true
+			svc = name
+		}
+		have[svc] = true
 		switch containerState(d) {
 		case stateBad:
 			bad = append(bad, serviceName(d)+" "+describeState(d))
@@ -413,8 +423,10 @@ func judge(ds []docker.Details, expect []string) (ready bool, detail string) {
 	}
 	var missing []string
 	for _, s := range expect {
-		if s = stableService(s); !have[s] {
-			missing = append(missing, s)
+		// A Compose service may itself be called worker-20261008T010203: only
+		// generated names are compared without the deploy time.
+		if !have[s] && !(deploySuffix.MatchString(s) && generated[stableService(s)]) {
+			missing = append(missing, stableService(s))
 		}
 	}
 	sort.Strings(bad)
