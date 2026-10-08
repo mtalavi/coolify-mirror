@@ -12,10 +12,9 @@
       "detail": "  ✓ e2e-compose                  running (4 containers stable, domains answer through the proxy) - Coolify built it on this server: Coolify could not generate the compose files: coolify: Error: Call to undefined method App\\Jobs\\ApplicationDeploymentJob::resolveContainerName()   ✗ e2e-web        "
     },
     "4.4.2": {
-      "status": "fail",
-      "tool": "1.8.1",
-      "date": "2026-10-08",
-      "detail": "  ✗ e2e-web                      service(s) not created: erb6e2g0yote5z4py5v22f08-20261008T104742 - not running properly after 6m16s - check it in Coolify ERROR: Restored, but NOT operational: 1 resource(s) are not running properly - see above and the Coolify dashboard restore failed (exit 1) "
+      "status": "ok",
+      "tool": "1.9.0",
+      "date": "2026-10-08"
     }
   }
 }
