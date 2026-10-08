@@ -48,9 +48,9 @@ func domainText(ds []string) string {
 	case 0:
 		return "(no domain)"
 	case 1:
-		return coolify.Host(ds[0])
+		return coolify.ShowHost(ds[0])
 	}
-	return fmt.Sprintf("%s +%d", coolify.Host(ds[0]), len(ds)-1)
+	return fmt.Sprintf("%s +%d", coolify.ShowHost(ds[0]), len(ds)-1)
 }
 
 // resourceState is state() for one resource; a service with some of its

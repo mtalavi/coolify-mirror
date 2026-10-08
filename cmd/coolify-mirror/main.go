@@ -244,7 +244,12 @@ func cmdFiles(ctx context.Context, args []string) error {
 			fmt.Println("Nothing - no backups, downloads or safety copies are kept here.")
 			return nil
 		}
-		fmt.Printf("%-12s %-48s %10s  %-16s  %s\n", "KIND", "NAME", "SIZE", "DATE", "ABOUT")
+		// The NAME column fits the longest name: names are typed to delete, never cut.
+		nameW := 4
+		for _, f := range list {
+			nameW = max(nameW, len(f.Name))
+		}
+		fmt.Printf("%-12s %-*s %10s  %-16s  %s\n", "KIND", nameW, "NAME", "SIZE", "DATE", "ABOUT")
 		for _, f := range list {
 			about := f.About
 			if len(f.Shares) > 0 {
@@ -253,7 +258,7 @@ func cmdFiles(ctx context.Context, args []string) error {
 			if f.Busy != "" {
 				about += "  [in use: " + f.Busy + "]"
 			}
-			fmt.Printf("%-12s %-48s %10s  %-16s  %s\n", engine.KindLabel(f.Kind), f.Name, engine.HumanBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"), about)
+			fmt.Printf("%-12s %-*s %10s  %-16s  %s\n", engine.KindLabel(f.Kind), nameW, f.Name, engine.HumanBytes(f.Size), f.ModTime.Format("2006-01-02 15:04"), about)
 		}
 		fmt.Println("\nDelete with: coolify-mirror files delete NAME [NAME...]")
 		fmt.Println("        or: coolify-mirror files delete --backups   (every backup not in use)")
@@ -348,6 +353,38 @@ func cmdList(ctx context.Context, args []string) error {
 	}
 	projects := coolify.GroupProjects(rs)
 	fmt.Printf("Coolify %s on %s - %d project(s), %d resource(s)\n", in.Version, in.Hostname, len(projects), len(rs))
+	// Columns as wide as their longest value (capped); longer names are cut and
+	// several domains that do not fit show as "first +N" (all of them: --json).
+	domainsOf := func(r coolify.Resource) string {
+		if len(r.Domains) == 0 {
+			return "-"
+		}
+		hs := make([]string, len(r.Domains))
+		for i, d := range r.Domains {
+			hs[i] = coolify.ShowHost(d)
+		}
+		coolify.SortMainFirst(hs)
+		if all := strings.Join(hs, ", "); len([]rune(all)) <= 40 {
+			return all
+		}
+		return fmt.Sprintf("%s +%d", hs[0], len(hs)-1)
+	}
+	domW, kindW, nameW, statW := 6, 4, 4, 6
+	for _, r := range rs {
+		domW = max(domW, len([]rune(domainsOf(r))))
+		kindW = max(kindW, len(r.Label()))
+		nameW = max(nameW, len([]rune(r.Name)))
+		statW = max(statW, len(r.Status))
+	}
+	domW, nameW = min(domW, 44), min(nameW, 36)
+	// col cuts s to n characters or pads it to n (by characters, not bytes).
+	col := func(s string, n int) string {
+		r := []rune(s)
+		if len(r) > n {
+			return string(r[:n-1]) + "…"
+		}
+		return s + strings.Repeat(" ", n-len(r))
+	}
 	for _, p := range projects {
 		run := "stopped"
 		switch p.RunState() {
@@ -361,22 +398,16 @@ func cmdList(ctx context.Context, args []string) error {
 		}
 		fmt.Printf("\n%s  (%s · %s)\n", p.Title(), p.Kinds(), run)
 		for _, r := range p.Resources {
-			doms := "-"
-			if len(r.Domains) > 0 {
-				hs := make([]string, len(r.Domains))
-				for i, d := range r.Domains {
-					hs[i] = coolify.Host(d)
-				}
-				doms = strings.Join(hs, ", ")
-			}
 			where := ""
 			if !r.Local() {
 				where = "  [remote: " + r.ServerName + "]"
 			}
-			fmt.Printf("  %-38s %-11s %-28s %-16s %s%s\n", doms, r.Label(), r.Name, r.Status, r.UUID, where)
+			fmt.Printf("  %s  %s  %s  %s  %s%s\n", col(domainsOf(r), domW), col(r.Label(), kindW),
+				col(r.Name, nameW), col(r.Status, statW), r.UUID, where)
 		}
 	}
 	fmt.Println("\nBack up a whole project: coolify-mirror backup --project NAME (or one of its domains)")
+	fmt.Println("Every domain and field: coolify-mirror list --json")
 	return nil
 }
 
@@ -988,7 +1019,7 @@ func cmdStartAll(ctx context.Context) error {
 func hosts(ds []string) []string {
 	out := make([]string, len(ds))
 	for i, d := range ds {
-		out[i] = coolify.Host(d)
+		out[i] = coolify.ShowHost(d)
 	}
 	return out
 }
