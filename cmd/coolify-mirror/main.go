@@ -364,7 +364,7 @@ func cmdList(ctx context.Context, args []string) error {
 			hs[i] = coolify.ShowHost(d)
 		}
 		coolify.SortMainFirst(hs)
-		if all := strings.Join(hs, ", "); len([]rune(all)) <= 40 {
+		if all := strings.Join(hs, ", "); len(hs) == 1 || len([]rune(all)) <= 40 {
 			return all
 		}
 		return fmt.Sprintf("%s +%d", hs[0], len(hs)-1)
