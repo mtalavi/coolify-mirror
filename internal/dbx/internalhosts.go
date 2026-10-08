@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/mtalavi/coolify-mirror/internal/coolify"
 )
@@ -108,9 +109,46 @@ func endpointOf(table string, row coolify.Row) string {
 	return ""
 }
 
+// lookupHost resolves a host name on this server (replaced in tests).
+var lookupHost = func(host string) []netip.Addr {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	addrs, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
+	if err != nil {
+		return nil
+	}
+	return addrs
+}
+
+var cgnat = netip.MustParsePrefix("100.64.0.0/10")
+
+// internalAddr: an address Coolify only connects to when it is allowed
+// (private, local, link-local or carrier-grade NAT).
+func internalAddr(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	return ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsUnspecified() || cgnat.Contains(ip)
+}
+
+// refused reports whether a Coolify with these allowed hosts refuses host,
+// which resolves to addrs.
+func refused(host string, addrs []netip.Addr, allowed []string) bool {
+	if allowedBy(host, allowed) {
+		return false
+	}
+	for _, a := range addrs {
+		if internalAddr(a) && !allowedBy(a.Unmap().String(), allowed) {
+			return true
+		}
+	}
+	return false
+}
+
 // InternalHostWarnings lists the storages and secret managers of the backup
-// whose address the old server allowed as internal but this one does not
-// (the ones this server already has are its own and are not checked).
+// that this server's Coolify would refuse to connect to: their address (or
+// what their host name resolves to here) is private and not allowed under
+// Settings > Advanced. A name that does not resolve here but was allowed on
+// the old server is listed too. The ones this server already has are its own
+// and are not checked.
 func InternalHostWarnings(ex *Export, ts *TargetState) []string {
 	var out []string
 	for _, table := range []string{"s3_storages", "integration_tokens"} {
@@ -120,14 +158,36 @@ func InternalHostWarnings(ex *Export, ts *TargetState) []string {
 					continue
 				}
 			}
-			host := urlHost(endpointOf(table, row))
-			if host == "" || !allowedBy(host, ex.InternalHosts) || allowedBy(host, ts.InternalHosts) {
+			host := strings.Trim(urlHost(endpointOf(table, row)), "[]")
+			if host == "" {
 				continue
 			}
-			out = append(out, fmt.Sprintf("%s %q connects to %s, which the old server allows as an internal address - "+
-				"allow it here first (Coolify > Settings > Advanced, allowed internal hosts), or Coolify refuses to connect to it",
-				humanTable(table), row["name"], host))
+			var addrs []netip.Addr
+			if ip, err := netip.ParseAddr(host); err == nil {
+				addrs = []netip.Addr{ip}
+			} else {
+				addrs = lookupHost(host)
+			}
+			unknownHere := len(addrs) == 0 && allowedBy(host, ex.InternalHosts) && !allowedBy(host, ts.InternalHosts)
+			if !refused(host, addrs, ts.InternalHosts) && !unknownHere {
+				continue
+			}
+			why := "a private address"
+			if allowedBy(host, ex.InternalHosts) || anyAllowed(addrs, ex.InternalHosts) {
+				why = "a private address the old server allows"
+			}
+			out = append(out, fmt.Sprintf("%s %q connects to %s, %s - allow it here first (Coolify > Settings > Advanced, "+
+				"allowed internal hosts), or Coolify refuses to connect to it", humanTable(table), row["name"], host, why))
 		}
 	}
 	return out
+}
+
+func anyAllowed(addrs []netip.Addr, allowed []string) bool {
+	for _, a := range addrs {
+		if allowedBy(a.Unmap().String(), allowed) {
+			return true
+		}
+	}
+	return false
 }
