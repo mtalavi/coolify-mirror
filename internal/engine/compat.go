@@ -120,21 +120,29 @@ func CheckCompat(ctx context.Context, in *coolify.Instance) *Compat {
 	}
 
 	if e, ok := lookupCompat(ctx, in.Version); ok {
-		switch {
-		case e.Status == "ok":
-			c.Status = "tested"
-		case e.Status == "fail" && CompareVersions(Version, e.Tool) <= 0:
-			c.Status = "failed"
-			c.Blockers = append(c.Blockers, fmt.Sprintf("the automatic test of coolify-mirror %s with Coolify %s failed (%s) - %s", e.Tool, in.Version, e.Detail, update))
-		case e.Status == "fail":
-			c.Warnings = append(c.Warnings, fmt.Sprintf("coolify-mirror %s did not work with Coolify %s; this newer version is not tested with it yet", e.Tool, in.Version))
-		}
+		applyCompatEntry(c, e, update)
 	}
 	if c.Status == "untested" && len(c.Blockers) == 0 {
 		c.Warnings = append(c.Warnings, fmt.Sprintf("Coolify %s is not tested with coolify-mirror %s yet - every safety check still runs (trial import, rollback, verification of the result)", in.Version, Version))
 	}
 	compatCache[in.Version] = c
 	return c
+}
+
+// applyCompatEntry adds the published test result for this Coolify version.
+// A failure of this or a newer coolify-mirror blocks. A failure of an older
+// one only warns, and not at all when this release was tested with this
+// Coolify version itself (it fixed what failed).
+func applyCompatEntry(c *Compat, e CompatEntry, update string) {
+	switch {
+	case e.Status == "ok":
+		c.Status = "tested"
+	case e.Status == "fail" && CompareVersions(Version, e.Tool) <= 0:
+		c.Status = "failed"
+		c.Blockers = append(c.Blockers, fmt.Sprintf("the automatic test of coolify-mirror %s with Coolify %s failed (%s) - %s", e.Tool, c.CoolifyVersion, e.Detail, update))
+	case e.Status == "fail" && c.Status != "tested":
+		c.Warnings = append(c.Warnings, fmt.Sprintf("coolify-mirror %s did not work with Coolify %s; this newer version is not tested with it yet", e.Tool, c.CoolifyVersion))
+	}
 }
 
 func sortedFeatures(m map[string][]string) []string {
