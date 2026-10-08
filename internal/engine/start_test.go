@@ -76,6 +76,9 @@ func TestJudge(t *testing.T) {
 		{"compose one service unhealthy", append(append([]docker.Details{}, compose[:3]...), ctr("worker", "running", 0, "unhealthy", "unless-stopped", 0)), nil, false, "worker unhealthy"},
 		// Single-container applications: the service label carries the deploy time.
 		{"application redeployed", []docker.Details{ctr("abc-213329158788", "running", 0, "healthy", "unless-stopped", 0)}, []string{"abc-194208935083"}, true, ""},
+		// Coolify 4.4 names containers <name>-<YYYYMMDD>T<HHMMSS> (regression: "not created").
+		{"application redeployed (4.4 names)", []docker.Details{ctr("abc-20261008T010203", "running", 0, "healthy", "unless-stopped", 0)}, []string{"abc-20261007T102424"}, true, ""},
+		{"4.4 container name prefix", []docker.Details{ctr("shop-api-20261008T010203", "running", 0, "healthy", "unless-stopped", 0)}, []string{"shop-api-20260908T141530"}, true, ""},
 		{"still starting", []docker.Details{ctr("app", "running", 0, "starting", "unless-stopped", 0)}, nil, false, "starting"},
 	}
 	for _, c := range cases {

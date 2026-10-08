@@ -32,7 +32,14 @@ function cm_database_models(): array
         'standalone_keydbs' => App\Models\StandaloneKeydb::class,
         'standalone_dragonflies' => App\Models\StandaloneDragonfly::class,
         'standalone_clickhouses' => App\Models\StandaloneClickhouse::class,
+        'standalone_sqlites' => App\Models\StandaloneSqlite::class, // Coolify 4.4+
     ];
+}
+
+// Database types that only newer Coolify versions have.
+function cm_optional_database_tables(): array
+{
+    return ['standalone_sqlites'];
 }
 
 $action = getenv('CM_ACTION') ?: '';
@@ -76,12 +83,12 @@ try {
                     'App\Actions\Server\ValidateServer::run', 'App\Actions\Proxy\CheckProxy::run', 'App\Actions\Proxy\StartProxy::run',
                     'App\Actions\Service\StartService::run', 'App\Actions\Database\StartDatabase::dispatch',
                     'queue_application_deployment()', 'new_public_id()', 'data_get()',
-                ], array_values(cm_database_models())),
+                ], array_values(array_diff_key(cm_database_models(), array_flip(cm_optional_database_tables())))),
                 'no_rebuild' => ['App\Models\Application::markDeploymentConfigurationApplied'],
                 'compose_start' => [
                     'App\Models\Application::parse', 'App\Models\Application::workdir', 'App\Models\Application::link',
                     'App\Jobs\ApplicationDeploymentJob::generate_runtime_environment_variables',
-                    'App\Jobs\ApplicationDeploymentJob::resolveContainerName',
+                    'generateApplicationContainerName()',
                     'App\Models\ApplicationDeploymentQueue::addLogEntry', 'convertToArray()',
                 ],
                 'domains' => ['App\Models\ServiceApplication', 'App\Models\Service::parse', 'updateCompose()', 'generateLabelsApplication()'],
@@ -222,7 +229,10 @@ try {
                 $this->commit = $commit;
                 $this->branch = $application->git_branch;
                 $this->server = $this->mainServer = $server;
-                $this->container_name = $this->resolveContainerName();
+                // Coolify 4.3 resolves the name in a method; 4.4 calls the helper directly.
+                $this->container_name = method_exists($this, 'resolveContainerName')
+                    ? $this->resolveContainerName()
+                    : generateApplicationContainerName($application, 0);
 
                 return $this->generate_runtime_environment_variables();
             }, $job, $jobClass)();

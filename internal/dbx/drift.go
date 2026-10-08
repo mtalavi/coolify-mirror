@@ -23,14 +23,15 @@ import (
 var idColumnsNotReferences = map[string]bool{
 	"repository_project_id": true, "current_process_id": true, "horizon_job_id": true,
 	"pull_request_id": true, "app_id": true, "client_id": true, "installation_id": true,
-	"deploy_key_id": true, "oauth_id": true, "container_id": true,
+	"deploy_key_id": true, "oauth_id": true, "container_id": true, "runner_group_id": true,
 }
 
 // Tables that only log or track activity: they are not part of a resource.
 func driftIgnored(table string) bool {
 	switch table {
 	case "activity_log", "sessions", "personal_access_tokens", "jobs", "failed_jobs",
-		"notifications", "scheduled_job_deliveries", "migrations", "cache", "cache_locks":
+		"notifications", "scheduled_job_deliveries", "migrations", "cache", "cache_locks",
+		"audit_events", "notification_throttles", "oauth_identities":
 		return true
 	}
 	return strings.HasSuffix(table, "_executions") || strings.HasPrefix(table, "telescope_")
@@ -39,14 +40,23 @@ func driftIgnored(table string) bool {
 var driftReasons = map[string]string{
 	"application_previews":    "preview deployments (pull requests) are not carried",
 	"additional_destinations": "additional servers of an application are not carried",
+	"managed_dns_record_references": "Cloudflare DNS records that Coolify manages are not carried (they point at this server) - " +
+		"after the move, point the domains at the new server (Coolify can create the records again on the Domains page)",
 }
 
-// SchemaNeeds lists the tables and the reference columns the importer remaps.
+// SchemaNeeds lists the tables and the reference columns the importer remaps
+// (without the ones only newer Coolify versions have).
 func SchemaNeeds() map[string][]string {
 	out := map[string][]string{}
 	for t, fks := range foreignKeys {
+		if coolify.OptionalTables[t] {
+			continue
+		}
 		cols := map[string]bool{}
 		for _, f := range fks {
+			if f.Optional {
+				continue
+			}
 			cols[f.Col] = true
 			if f.MorphCol != "" {
 				cols[f.MorphCol] = true

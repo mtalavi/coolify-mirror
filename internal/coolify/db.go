@@ -36,6 +36,37 @@ func (in *Instance) Query(ctx context.Context, sql string, dst any) error {
 	return nil
 }
 
+// HasTable reports whether Coolify's database has this table (newer Coolify
+// versions add tables). The list is read once; a read error answers false.
+func (in *Instance) HasTable(ctx context.Context, table string) bool {
+	in.tablesMu.Lock()
+	defer in.tablesMu.Unlock()
+	if in.tables == nil {
+		var rows []struct {
+			T string `json:"table_name"`
+		}
+		if err := in.Query(ctx, "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'", &rows); err != nil {
+			return false
+		}
+		in.tables = map[string]bool{}
+		for _, r := range rows {
+			in.tables[r.T] = true
+		}
+	}
+	return in.tables[table]
+}
+
+// Kinds returns the standalone database types this Coolify has.
+func (in *Instance) Kinds(ctx context.Context) []DatabaseKind {
+	var out []DatabaseKind
+	for _, d := range DatabaseKinds {
+		if d.Since == "" || in.HasTable(ctx, d.Table) {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
 // Rows is Query into []Row.
 func (in *Instance) Rows(ctx context.Context, sql string) ([]Row, error) {
 	var rows []Row

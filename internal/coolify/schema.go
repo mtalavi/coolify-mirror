@@ -20,18 +20,28 @@ type DatabaseKind struct {
 	Table string
 	Kind  string
 	Morph string
+	// Since is the first Coolify version with this type ("" = every supported
+	// version). Older versions have no such table.
+	Since string
 }
 
 // DatabaseKinds lists every standalone database table Coolify has.
 var DatabaseKinds = []DatabaseKind{
-	{"standalone_postgresqls", "postgresql", `App\Models\StandalonePostgresql`},
-	{"standalone_mysqls", "mysql", `App\Models\StandaloneMysql`},
-	{"standalone_mariadbs", "mariadb", `App\Models\StandaloneMariadb`},
-	{"standalone_mongodbs", "mongodb", `App\Models\StandaloneMongodb`},
-	{"standalone_redis", "redis", `App\Models\StandaloneRedis`},
-	{"standalone_keydbs", "keydb", `App\Models\StandaloneKeydb`},
-	{"standalone_dragonflies", "dragonfly", `App\Models\StandaloneDragonfly`},
-	{"standalone_clickhouses", "clickhouse", `App\Models\StandaloneClickhouse`},
+	{"standalone_postgresqls", "postgresql", `App\Models\StandalonePostgresql`, ""},
+	{"standalone_mysqls", "mysql", `App\Models\StandaloneMysql`, ""},
+	{"standalone_mariadbs", "mariadb", `App\Models\StandaloneMariadb`, ""},
+	{"standalone_mongodbs", "mongodb", `App\Models\StandaloneMongodb`, ""},
+	{"standalone_redis", "redis", `App\Models\StandaloneRedis`, ""},
+	{"standalone_keydbs", "keydb", `App\Models\StandaloneKeydb`, ""},
+	{"standalone_dragonflies", "dragonfly", `App\Models\StandaloneDragonfly`, ""},
+	{"standalone_clickhouses", "clickhouse", `App\Models\StandaloneClickhouse`, ""},
+	{"standalone_sqlites", "sqlite", `App\Models\StandaloneSqlite`, "4.4.0"},
+}
+
+// OptionalTables are tables that only newer Coolify versions have (the tool
+// still supports versions without them).
+var OptionalTables = map[string]bool{
+	"standalone_sqlites": true, "integration_tokens": true, "secret_manager_links": true,
 }
 
 // MorphToTable maps a morph class to its table.

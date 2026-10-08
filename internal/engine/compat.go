@@ -30,7 +30,7 @@ import (
 //     (trial import, rollback, verification of the result) still runs.
 
 // TestedCoolify lists the Coolify versions this release was tested with.
-var TestedCoolify = []string{"4.3.23"}
+var TestedCoolify = []string{"4.3.23", "4.4.2"}
 
 // RepoURL is the project's home page.
 const RepoURL = "https://github.com/mtalavi/coolify-mirror"

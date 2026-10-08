@@ -35,6 +35,9 @@ type SelectiveRestore struct {
 	Blockers []string
 	// CoolifyWarnings come from Coolify's own transfer bundle validation.
 	CoolifyWarnings []string
+	// Warnings: what to set up on this server first so everything works
+	// (private addresses that Coolify must be allowed to connect to).
+	Warnings []string
 
 	sql       string
 	decisions map[string]dbx.Decision
@@ -75,7 +78,8 @@ func PrepareSelective(ctx context.Context, in *coolify.Instance, f *Fetched, tea
 	if err != nil {
 		return nil, err
 	}
-	s := &SelectiveRestore{In: in, F: f, Target: ts, Blockers: PreflightSelective(ctx, in, f), CoolifyWarnings: BundleWarnings(ctx, in, f)}
+	s := &SelectiveRestore{In: in, F: f, Target: ts, Blockers: PreflightSelective(ctx, in, f), CoolifyWarnings: BundleWarnings(ctx, in, f),
+		Warnings: dbx.InternalHostWarnings(f.Export, ts)}
 	for _, r := range f.Export.Roots {
 		if _, ok := ts.Existing[r.Table][r.UUID]; ok {
 			s.Conflicts = append(s.Conflicts, r)

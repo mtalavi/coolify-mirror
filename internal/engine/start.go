@@ -371,8 +371,9 @@ func serviceName(d docker.Details) string {
 }
 
 // deploySuffix is the deployment time Coolify appends to container (and,
-// for single-container applications, service) names: <name>-<12 digits>.
-var deploySuffix = regexp.MustCompile(`-\d{12}$`)
+// for single-container applications, service) names: <name>-<12 digits>
+// before Coolify 4.4, <name>-<YYYYMMDD>T<HHMMSS> since.
+var deploySuffix = regexp.MustCompile(`-(\d{12}|\d{8}T\d{6})$`)
 
 // stableService removes the per-deployment suffix, so the same service has
 // the same name on the source and after a restore.
