@@ -34,3 +34,17 @@ func TestHangWrap(t *testing.T) {
 		}
 	}
 }
+
+// Several domains show as the main one +N, without the container port.
+func TestDomainText(t *testing.T) {
+	for want, ds := range map[string][]string{
+		"(no domain)":     nil,
+		"vemela.app":      {"https://vemela.app:3000"},
+		"vemela.app +2":   {"https://api.vemela.app:4000", "https://s3.vemela.app:9000", "https://vemela.app:3000"},
+		"shop.example +1": {"http://www.shop.example", "http://shop.example"},
+	} {
+		if got := domainText(ds); got != want {
+			t.Errorf("domainText(%v) = %q, want %q", ds, got, want)
+		}
+	}
+}

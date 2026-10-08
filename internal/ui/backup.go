@@ -50,7 +50,9 @@ func domainText(ds []string) string {
 	case 1:
 		return coolify.ShowHost(ds[0])
 	}
-	return fmt.Sprintf("%s +%d", coolify.ShowHost(ds[0]), len(ds)-1)
+	main := append([]string(nil), ds...)
+	coolify.SortMainFirst(main)
+	return fmt.Sprintf("%s +%d", coolify.ShowHost(main[0]), len(ds)-1)
 }
 
 // resourceState is state() for one resource; a service with some of its
