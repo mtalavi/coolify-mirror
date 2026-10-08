@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -241,4 +242,21 @@ func composeDomains(raw string) []string {
 func Host(u string) string {
 	u = strings.TrimPrefix(strings.TrimPrefix(u, "https://"), "http://")
 	return strings.TrimSuffix(u, "/")
+}
+
+// ShowHost is a domain for display: Host without the port. In Coolify the
+// port of a domain (vemela.app:3000) is the container's port, not one that
+// visitors use.
+func ShowHost(u string) string {
+	h := Host(u)
+	host, path, hasPath := strings.Cut(h, "/")
+	if i := strings.LastIndex(host, ":"); i > 0 && !strings.Contains(host, "]") {
+		if _, err := strconv.Atoi(host[i+1:]); err == nil {
+			host = host[:i]
+		}
+	}
+	if hasPath {
+		return host + "/" + path
+	}
+	return host
 }

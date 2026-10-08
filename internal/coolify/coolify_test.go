@@ -78,3 +78,18 @@ func TestAppDomains(t *testing.T) {
 		t.Fatalf("dockerfile app domains = %v", d)
 	}
 }
+
+// In Coolify a domain's port is the container's port: displays leave it out.
+func TestShowHost(t *testing.T) {
+	for in, want := range map[string]string{
+		"https://vemela.app:3000":      "vemela.app",
+		"http://api.example.com:4000/": "api.example.com",
+		"https://example.com/api":      "example.com/api",
+		"https://example.com:8080/api": "example.com/api",
+		"shop.cmlab.test":              "shop.cmlab.test",
+	} {
+		if got := ShowHost(in); got != want {
+			t.Errorf("ShowHost(%q) = %q, want %q", in, got, want)
+		}
+	}
+}

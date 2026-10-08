@@ -320,7 +320,7 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 		}
 		var hosts []string
 		for _, d := range r.Resource.Domains {
-			hosts = append(hosts, coolify.Host(d))
+			hosts = append(hosts, coolify.ShowHost(d))
 		}
 		if len(hosts) > 0 {
 			for _, l := range hangWrap(strings.Join(hosts, " · "), inner-4, inner-4) {
