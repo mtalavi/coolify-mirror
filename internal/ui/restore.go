@@ -175,6 +175,9 @@ func restoreSelective(ctx context.Context, in *coolify.Instance, f *engine.Fetch
 	for _, d := range sr.DomainClashes {
 		lines = append(lines, sWarn.Render("! domain "+d))
 	}
+	for _, w := range sr.Warnings {
+		lines = append(lines, sWarn.Render("! "+w))
+	}
 	for _, w := range sr.CoolifyWarnings {
 		lines = append(lines, sMuted.Render("coolify: "+w))
 	}

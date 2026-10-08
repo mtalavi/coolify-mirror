@@ -14,6 +14,8 @@ type fk struct {
 	MorphCol string
 	// AsText: the column stores the id as a string (application_deployment_queues).
 	AsText bool
+	// Optional: only newer Coolify versions have this column.
+	Optional bool
 }
 
 const (
@@ -56,11 +58,15 @@ var foreignKeys = map[string][]fk{
 		{Col: "server_id", Table: refServer},
 		{Col: "destination_id", MorphCol: "destination_type"},
 	},
-	"service_applications":     {{Col: "service_id", Table: "services"}},
-	"service_databases":        {{Col: "service_id", Table: "services"}},
-	"environment_variables":    {{Col: "resourceable_id", MorphCol: "resourceable_type"}},
-	"local_persistent_volumes": {{Col: "resource_id", MorphCol: "resource_type"}},
-	"local_file_volumes":       {{Col: "resource_id", MorphCol: "resource_type"}},
+	"service_applications":  {{Col: "service_id", Table: "services"}},
+	"service_databases":     {{Col: "service_id", Table: "services"}},
+	"environment_variables": {{Col: "resourceable_id", MorphCol: "resourceable_type"}},
+	"local_persistent_volumes": {
+		{Col: "resource_id", MorphCol: "resource_type"},
+		// The volume of a SQLite database connected to an application (4.4+).
+		{Col: "standalone_sqlite_id", Table: "standalone_sqlites", Optional: true},
+	},
+	"local_file_volumes": {{Col: "resource_id", MorphCol: "resource_type"}},
 	"scheduled_tasks": {
 		{Col: "application_id", Table: "applications"}, {Col: "service_id", Table: "services"},
 		{Col: "team_id", Table: refTeam},
@@ -74,6 +80,13 @@ var foreignKeys = map[string][]fk{
 		{Col: "team_id", Table: refTeam},
 	},
 	"taggables": {{Col: "tag_id", Table: "tags"}, {Col: "taggable_id", MorphCol: "taggable_type"}},
+	// Secret managers (Doppler, Infisical, Vault; 4.4+): the team's token and
+	// the link that makes a resource read {{vault.KEY}} values from it.
+	"integration_tokens": {{Col: "team_id", Table: refTeam}},
+	"secret_manager_links": {
+		{Col: "resourceable_id", MorphCol: "resourceable_type"},
+		{Col: "integration_token_id", Table: "integration_tokens"},
+	},
 }
 
 func init() {
@@ -88,7 +101,7 @@ func init() {
 // insertOrder is the order rows are inserted in (parents before children).
 var insertOrder = func() []string {
 	order := []string{
-		"s3_storages", "private_keys", "github_apps", "gitlab_apps",
+		"s3_storages", "integration_tokens", "private_keys", "github_apps", "gitlab_apps",
 		"projects", "project_settings", "environments", "shared_environment_variables",
 		"standalone_dockers", "tags",
 	}
@@ -98,7 +111,7 @@ var insertOrder = func() []string {
 	return append(order,
 		"services", "service_applications", "service_databases",
 		"applications", "application_settings", "application_deployment_queues",
-		"environment_variables", "local_persistent_volumes", "local_file_volumes",
+		"environment_variables", "secret_manager_links", "local_persistent_volumes", "local_file_volumes",
 		"scheduled_tasks", "scheduled_database_backups", "scheduled_volume_backups",
 		"taggables",
 	)

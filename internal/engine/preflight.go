@@ -45,7 +45,7 @@ func targetContent(ctx context.Context, in *coolify.Instance) ([]string, error) 
 	q := `SELECT (SELECT count(*) FROM projects) AS projects,
   (SELECT count(*) FROM applications WHERE deleted_at IS NULL)
   + (SELECT count(*) FROM services WHERE deleted_at IS NULL)`
-	for _, k := range coolify.DatabaseKinds {
+	for _, k := range in.Kinds(ctx) {
 		q += "\n  + (SELECT count(*) FROM " + k.Table + " WHERE deleted_at IS NULL)"
 	}
 	q += ` AS resources,

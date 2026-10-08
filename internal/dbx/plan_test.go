@@ -195,6 +195,92 @@ func TestPlanSkip(t *testing.T) {
 	}
 }
 
+// A resource linked to a secret manager (Coolify 4.4) brings the link and the
+// team's token; an existing token on the target is reused.
+func TestPlanSecretManagerLink(t *testing.T) {
+	withLink := func() *Export {
+		ex := sampleExport()
+		ex.Tables["integration_tokens"] = []coolify.Row{{"id": num(21), "uuid": "tokuuid00000000000000001", "name": "Vault",
+			"provider": "vault", "team_id": num(5), "token": enc("s.root")}}
+		ex.Tables["secret_manager_links"] = []coolify.Row{{"id": num(22), "uuid": "linkuuid0000000000000001",
+			"resourceable_type": coolify.MorphApplication, "resourceable_id": num(7), "integration_token_id": num(21)}}
+		return ex
+	}
+	ts := func(existing map[string]map[string]int64) *TargetState {
+		s := target(existing)
+		for tbl, rows := range withLink().Tables {
+			for _, r := range rows {
+				for k := range r {
+					s.Columns[tbl][k] = "text"
+				}
+			}
+		}
+		return s
+	}
+	rowsOf := func(p *Plan, tbl string) []*planRow {
+		var out []*planRow
+		for _, pr := range p.rows {
+			if pr.table == tbl {
+				out = append(out, pr)
+			}
+		}
+		return out
+	}
+
+	p, err := BuildPlan(withLink(), ts(nil), func(coolify.Resource) Decision { return KeepUUID }, allocator(), fakeEnc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql, err := p.SQL()
+	if err != nil {
+		t.Fatal(err)
+	}
+	tok, link, app := rowsOf(p, "integration_tokens"), rowsOf(p, "secret_manager_links"), rowsOf(p, "applications")
+	if len(tok) != 1 || len(link) != 1 || len(app) != 1 {
+		t.Fatalf("token %d, link %d, app %d rows", len(tok), len(link), len(app))
+	}
+	if id, _ := Int64(link[0].row["integration_token_id"]); id != tok[0].newID {
+		t.Errorf("link integration_token_id=%d want %d", id, tok[0].newID)
+	}
+	if id, _ := Int64(link[0].row["resourceable_id"]); id != app[0].newID {
+		t.Errorf("link resourceable_id=%d want %d", id, app[0].newID)
+	}
+	if !strings.Contains(sql, `"token":"ENC(s.root)"`) || !strings.Contains(sql, `"team_id":0`) {
+		t.Errorf("token not re-encrypted for the target team:\n%s", sql)
+	}
+
+	// The same secret manager already exists on the target.
+	p, err = BuildPlan(withLink(), ts(map[string]map[string]int64{"integration_tokens": {"tokuuid00000000000000001": 40}}),
+		func(coolify.Resource) Decision { return KeepUUID }, allocator(), fakeEnc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.SQL(); err != nil {
+		t.Fatal(err)
+	}
+	if n := len(rowsOf(p, "integration_tokens")); n != 0 {
+		t.Errorf("existing token inserted again (%d rows)", n)
+	}
+	if l := rowsOf(p, "secret_manager_links"); len(l) != 1 {
+		t.Fatalf("link rows %d", len(l))
+	} else if id, _ := Int64(l[0].row["integration_token_id"]); id != 40 {
+		t.Errorf("link integration_token_id=%d want the existing 40", id)
+	}
+	if !strings.Contains(strings.Join(p.Notes, "\n"), `uses existing secret manager "Vault"`) {
+		t.Errorf("notes %v", p.Notes)
+	}
+
+	// A skipped application brings neither.
+	existing := map[string]map[string]int64{"applications": {"appuuid00000000000000001": 1}}
+	p, err = BuildPlan(withLink(), ts(existing), func(coolify.Resource) Decision { return Skip }, allocator(), fakeEnc)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := len(rowsOf(p, "integration_tokens")) + len(rowsOf(p, "secret_manager_links")); n != 0 {
+		t.Errorf("skipped app still brings %d secret manager rows", n)
+	}
+}
+
 func TestPHPUnserialize(t *testing.T) {
 	if s, ok := phpUnserializeString([]byte(`s:5:"héllo";`)); ok {
 		t.Fatalf("multibyte length must count bytes: %q", s)

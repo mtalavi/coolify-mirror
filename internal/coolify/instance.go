@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/mtalavi/coolify-mirror/internal/lcrypt"
 	"github.com/mtalavi/coolify-mirror/internal/run"
@@ -42,6 +43,9 @@ type Instance struct {
 	DockerRoot string
 	Hostname   string
 	Arch       string
+
+	tablesMu sync.Mutex
+	tables   map[string]bool
 }
 
 // Detect inspects this host. It fails with a readable reason when this is not a

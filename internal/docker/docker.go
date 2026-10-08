@@ -255,7 +255,7 @@ func State(ctx context.Context, id string) (running, paused bool) {
 
 // infraNames are Coolify's own containers (never paused or stopped by backups).
 var infraNames = map[string]bool{"coolify": true, "coolify-db": true, "coolify-redis": true,
-	"coolify-realtime": true, "coolify-proxy": true, "coolify-sentinel": true}
+	"coolify-realtime": true, "coolify-proxy": true, "coolify-proxy-logrotate": true, "coolify-sentinel": true}
 
 // BindUsers returns running, non-infrastructure containers that bind-mount
 // path, a directory inside it, or a directory containing it.

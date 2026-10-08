@@ -36,6 +36,7 @@ type TargetState struct {
 	Destinations      map[string]int64           // network -> standalone_dockers.id on the local server
 	TagsByName        map[string]int64
 	SharedKeys        map[string]bool // type|scope id|key
+	InternalHosts     []string        // Settings > Advanced: allowed internal hosts
 }
 
 // PlannedResource is a resource as it will exist on the target.
@@ -88,7 +89,8 @@ func LoadTarget(ctx context.Context, in *coolify.Instance, ex *Export, teamID in
 	}
 	ts := &TargetState{Columns: cols, TeamID: teamID, Existing: map[string]map[string]int64{},
 		EnvsByProjectName: map[int64]map[string]int64{}, EnvUUID: map[int64]string{},
-		Destinations: map[string]int64{}, TagsByName: map[string]int64{}, SharedKeys: map[string]bool{}}
+		Destinations: map[string]int64{}, TagsByName: map[string]int64{}, SharedKeys: map[string]bool{},
+		InternalHosts: readInternalHosts(ctx, in)}
 
 	for table, rows := range ex.Tables {
 		col := uuidColumn(table)
@@ -253,7 +255,7 @@ func BuildPlan(ex *Export, ts *TargetState, onConflict func(coolify.Resource) De
 		for _, row := range ex.Tables[table] {
 			oldID, _ := Int64(row["id"])
 			switch table {
-			case "s3_storages", "private_keys", "github_apps", "gitlab_apps":
+			case "s3_storages", "integration_tokens", "private_keys", "github_apps", "gitlab_apps":
 				if !need[table][oldID] {
 					continue
 				}
@@ -484,6 +486,8 @@ func humanTable(t string) string {
 		return "GitHub App"
 	case "gitlab_apps":
 		return "GitLab App"
+	case "integration_tokens":
+		return "secret manager"
 	}
 	return t
 }
@@ -604,7 +608,7 @@ func (o *ownerIndex) rootOf(table string, row coolify.Row) string {
 			return r
 		}
 		return parent("services", row["service_id"])
-	case "environment_variables":
+	case "environment_variables", "secret_manager_links":
 		return morph("resourceable_type", "resourceable_id")
 	case "local_persistent_volumes", "local_file_volumes":
 		return morph("resource_type", "resource_id")
@@ -651,6 +655,11 @@ func neededContext(ex *Export, included func(string, coolify.Row) bool) map[stri
 			mark("private_keys", row["private_key_id"])
 			mark("s3_storages", row["s3_storage_id"])
 			mark("tags", row["tag_id"])
+		}
+	}
+	for _, row := range ex.Tables["secret_manager_links"] {
+		if included("secret_manager_links", row) {
+			mark("integration_tokens", row["integration_token_id"])
 		}
 	}
 	for _, row := range ex.Tables["environments"] {

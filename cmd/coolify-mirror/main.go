@@ -831,6 +831,9 @@ func cmdRestore(ctx context.Context, args []string) error {
 		for _, d := range sr.DomainClashes {
 			fmt.Println("  ! domain clash:", d)
 		}
+		for _, w := range sr.Warnings {
+			fmt.Println("  !", w)
+		}
 		for _, w := range sr.CoolifyWarnings {
 			fmt.Println("  coolify:", w)
 		}

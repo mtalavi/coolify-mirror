@@ -130,7 +130,7 @@ WHERE t.deleted_at IS NULL`, &svcs)
 		out = append(out, res)
 	}
 
-	for _, d := range DatabaseKinds {
+	for _, d := range in.Kinds(ctx) {
 		var dbs []resRow
 		err = in.Query(ctx, fmt.Sprintf(`SELECT t.id, t.uuid, t.name, t.status,
   p.name AS project, p.uuid AS project_uuid, e.name AS environment, e.uuid AS environment_uuid,

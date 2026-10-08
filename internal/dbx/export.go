@@ -30,6 +30,9 @@ type Export struct {
 	Warnings       []string                 `json:"warnings,omitempty"`
 	// Drift: what this version could not carry from this Coolify (see drift.go).
 	Drift []string `json:"drift,omitempty"`
+	// InternalHosts: the private addresses this Coolify allows for outgoing
+	// connections (see internalhosts.go).
+	InternalHosts []string `json:"internal_hosts,omitempty"`
 }
 
 type collector struct {
@@ -61,6 +64,7 @@ func Collect(ctx context.Context, in *coolify.Instance, roots []coolify.Resource
 	if d, err := c.ex.FindDrift(ctx, in); err == nil {
 		c.ex.Drift = d
 	}
+	c.ex.InternalHosts = readInternalHosts(ctx, in)
 	return c.ex, nil
 }
 
@@ -188,6 +192,17 @@ func (c *collector) collect(roots []coolify.Resource) error {
 	if len(envWhere) > 0 {
 		if _, err := c.fetch("environment_variables", strings.Join(envWhere, " OR ")); err != nil {
 			return err
+		}
+		// A resource that reads {{vault.KEY}} values needs its secret manager link
+		// and the team's token for that secret manager (Coolify 4.4+).
+		if c.in.HasTable(c.ctx, "secret_manager_links") {
+			links, err := c.fetch("secret_manager_links", strings.Join(envWhere, " OR "))
+			if err != nil {
+				return err
+			}
+			if _, err := c.fetch("integration_tokens", "t.id IN "+coolify.SQLIntList(idsOf(links, "integration_token_id"))); err != nil {
+				return err
+			}
 		}
 	}
 	var pv, fv []coolify.Row
