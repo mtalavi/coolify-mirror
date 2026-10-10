@@ -20,6 +20,12 @@
       "status": "ok",
       "tool": "1.9.2",
       "date": "2026-10-09"
+    },
+    "4.4.6": {
+      "status": "fail",
+      "tool": "1.9.2",
+      "date": "2026-10-10",
+      "detail": "failed to open stdout fifo: error creating fifo /var/run/docker/containerd/07f0f489c7a97920f179388a49f38d6b2eee6dac14b9511b19c7eced22c828f1/f9ca83ed86c6ab12d765b47816a055506008c9a15b1bc9133f1d18e323e3d34a-stdout: no such file or directory\r source resources did not start "
     }
   }
 }
