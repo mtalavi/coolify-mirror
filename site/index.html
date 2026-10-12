@@ -23,6 +23,8 @@
 {"@context":"https://schema.org","@type":"SoftwareApplication","name":"Coolify Mirror","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (amd64, arm64)","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.9.3","url":"https://coolify-mirror.pages.dev/","downloadUrl":"https://github.com/mtalavi/coolify-mirror/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
 </script>
 <script defer src="assets/site.js"></script>
+<script defer src="assets/demo-frames.js"></script>
+<script defer src="assets/demo.js"></script>
 </head>
 <body>
 
@@ -48,17 +50,53 @@
 
 <section class="hero">
   <div class="wrap">
-    <div>
+    <div class="hero-head">
       <h1 class="reveal">Move Coolify apps between servers.</h1>
-      <p class="lead reveal" style="--d:.08s">Back up one app or a whole server. Paste one command on the new one. It arrives running, and verified.</p>
-      <div class="hero-cta reveal" style="--d:.16s">
-        <a class="btn btn-primary" href="#tutorial">Start the move<i class="ph ph-arrow-right" aria-hidden="true"></i></a>
-        <a class="btn btn-ghost" href="https://github.com/mtalavi/coolify-mirror"><i class="ph ph-github-logo" aria-hidden="true"></i>View on GitHub</a>
+      <div>
+        <p class="lead reveal" style="--d:.08s">Back up one app or a whole server. Paste one command on the new one. It arrives running, and verified.</p>
+        <div class="hero-cta reveal" style="--d:.16s">
+          <a class="btn btn-primary" href="#tutorial">Start the move<i class="ph ph-arrow-right" aria-hidden="true"></i></a>
+          <a class="btn btn-ghost" href="https://github.com/mtalavi/coolify-mirror"><i class="ph ph-github-logo" aria-hidden="true"></i>View on GitHub</a>
+        </div>
       </div>
     </div>
-    <div class="hero-shot reveal" style="--d:.12s">
-      <img class="shot" src="assets/img/01-menu.webp" width="1964" height="1084" alt="Terminal: coolify-mirror installed with one command, showing its main menu on the old server" fetchpriority="high" decoding="async">
-    </div>
+
+    <figure class="demo reveal" style="--d:.12s" data-demo aria-labelledby="demo-cap">
+      <div class="demo-stage">
+        <div class="term term-old is-active" aria-hidden="true">
+          <div class="term-bar"><span class="term-dots"><i></i><i></i><i></i></span><span class="term-title">root@old-server: ~</span><span class="term-tag">old server · 203.0.113.10</span></div>
+          <div class="term-body"><div class="term-screen"></div></div>
+          <span class="term-key"></span>
+        </div>
+        <div class="term term-new" aria-hidden="true">
+          <div class="term-bar"><span class="term-dots"><i></i><i></i><i></i></span><span class="term-title">root@new-server: ~</span><span class="term-tag">new server · 198.51.100.20</span></div>
+          <div class="term-body"><div class="term-screen"></div></div>
+          <span class="term-key"></span>
+        </div>
+        <div class="demo-browser" aria-hidden="true">
+          <div class="br-bar"><span class="term-dots"><i></i><i></i><i></i></span><span class="br-url"><i class="ph ph-globe-simple"></i>shop.cmlab.test</span></div>
+          <div class="br-page">
+            <div class="br-nav"><b>Shop</b><span>New</span><span>Bags</span><span>Shoes</span><span class="br-cart">Cart · 2</span></div>
+            <div class="br-hero"><b>Autumn edit</b><span>Same store, new server.</span></div>
+            <div class="br-grid"><div><i style="--h:258"></i><b>Canvas tote</b><span>€38</span></div><div><i style="--h:150"></i><b>Trail runner</b><span>€112</span></div><div><i style="--h:28"></i><b>Wool cap</b><span>€24</span></div></div>
+          </div>
+          <div class="br-status"><i class="ph ph-check-circle"></i>200 · served by new-server, data intact</div>
+        </div>
+        <img class="shot demo-fallback" src="assets/img/01-menu.webp" width="1964" height="1084" alt="Terminal: coolify-mirror installed with one command, showing its main menu on the old server" decoding="async">
+      </div>
+      <figcaption class="demo-bar">
+        <button class="icon-btn demo-play" type="button" aria-label="Pause the demo" data-pause="Pause the demo" data-play="Play the demo"><i class="ph ph-pause" aria-hidden="true"></i><i class="ph ph-play" aria-hidden="true"></i></button>
+        <ol class="demo-steps">
+          <li><button type="button" data-step data-caption="Old server: one command installs coolify-mirror and checks Coolify.">Install</button></li>
+          <li><button type="button" data-step data-caption="Pick a project. Its apps, databases and domains move together.">Pick</button></li>
+          <li><button type="button" data-step data-caption="Back up: settings, volumes, a database dump and the app images.">Back up</button></li>
+          <li><button type="button" data-step data-caption="Share it through Coolify's own proxy on port 443. You get one command.">Share</button></li>
+          <li><button type="button" data-step data-caption="New server: paste the command. It downloads, verifies, restores and starts everything.">Restore</button></li>
+          <li><button type="button" data-step data-caption="The site answers from the new server, running and verified.">Live</button></li>
+        </ol>
+        <p class="demo-cap" id="demo-cap">A real move, replayed: back up a project on one server and restore it on another.</p>
+      </figcaption>
+    </figure>
   </div>
 </section>
 
