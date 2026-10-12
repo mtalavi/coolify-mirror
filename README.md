@@ -17,6 +17,13 @@
 </p>
 
 <p align="center">
+  <a href="https://coolify-mirror.pages.dev"><picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/demo-dark.gif">
+    <img src="docs/demo-light.gif" width="100%" alt="Animated demo of a real move: on the old server one command installs coolify-mirror, a project is backed up and shared; on the new server the pasted command downloads, verifies and restores it, and the shop site answers from the new server">
+  </picture></a>
+</p>
+
+<p align="center">
   <a href="https://coolify-mirror.pages.dev"><b>Website</b></a> ·
   <a href="#-quick-start--move-apps-in-4-steps"><b>Quick start</b></a> ·
   <a href="#-install">Install</a> ·
