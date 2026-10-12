@@ -29,7 +29,18 @@ cleanup() {
   for c in "$SRC" "$DST"; do docker volume rm "$c-docker" "$c-containerd" "$c-data" >/dev/null 2>&1 || true; done
   docker network rm "$NET" >/dev/null 2>&1 || true
 }
-trap cleanup EXIT
+# Until coolify-mirror runs, any failure is a failure of the test servers
+# (Docker, install, seed): exit 2, so nothing is published about the tool.
+PHASE=setup
+on_exit() {
+  local rc=$?
+  cleanup
+  if [ "$rc" != 0 ] && [ "$rc" != 2 ] && [ "$PHASE" = setup ]; then
+    echo "SETUP FAILED: a preparation step failed (exit $rc)"
+    exit 2
+  fi
+}
+trap on_exit EXIT
 # E2E_REUSE=1 (with KEEP=1 before): use the servers of the last run as they are.
 if [ "${E2E_REUSE:-0}" = 1 ] && docker inspect "$SRC" "$DST" >/dev/null 2>&1; then
   SKIP_INSTALL=1
@@ -103,6 +114,7 @@ MARK="e2e-$(date +%s)-$RANDOM"
 on "$SRC" "docker exec \$(docker ps -q --filter name=^$WEB) sh -c 'echo $MARK > /usr/share/nginx/html/marker.txt'"
 on "$SRC" "docker exec $PG psql -U e2e -d e2e -v ON_ERROR_STOP=1 -c 'create table t(x int); insert into t select generate_series(1,1234)'" >/dev/null
 
+PHASE=tool
 log "back up and share on the source"
 docker cp "$BIN" "$SRC:/usr/local/bin/coolify-mirror"
 docker cp "$BIN" "$DST:/usr/local/bin/coolify-mirror"
