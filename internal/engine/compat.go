@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,15 +23,17 @@ import (
 // result of the automatic compatibility test (the "compat" branch, written by
 // .github/workflows/compat.yml for every new Coolify release). The outcome:
 //
-//   - something the tool cannot work without is missing, or the test failed
-//     for this Coolify version: the restore is refused before anything changes,
-//     with what is missing and how to update;
+//   - something the tool cannot work without is missing: backup and restore
+//     are refused before anything changes, with what is missing and how to
+//     update;
+//   - the published test failed for this Coolify version: backups still work
+//     (they change nothing), a restore is refused;
 //   - an optional part is missing: that feature falls back (and says so);
 //   - the version is just not tested yet: a warning - every safety check
 //     (trial import, rollback, verification of the result) still runs.
 
 // TestedCoolify lists the Coolify versions this release was tested with.
-var TestedCoolify = []string{"4.3.23", "4.4.2"}
+var TestedCoolify = []string{"4.3.23", "4.4.2", "4.4.6"}
 
 // RepoURL is the project's home page.
 const RepoURL = "https://github.com/mtalavi/coolify-mirror"
@@ -47,6 +50,17 @@ type Compat struct {
 	Status         string // "tested", "untested", "failed"
 	Blockers       []string
 	Warnings       []string
+	// Failed is the published failure of this or a newer coolify-mirror
+	// with this Coolify version: it refuses restores, not backups.
+	Failed string
+}
+
+// RestoreBlockers is what refuses a restore onto this Coolify.
+func (c *Compat) RestoreBlockers() []string {
+	if c.Failed == "" {
+		return c.Blockers
+	}
+	return append(append([]string{}, c.Blockers...), c.Failed)
 }
 
 // CompatEntry is one Coolify version in compat.json.
@@ -130,19 +144,39 @@ func CheckCompat(ctx context.Context, in *coolify.Instance) *Compat {
 }
 
 // applyCompatEntry adds the published test result for this Coolify version.
-// A failure of this or a newer coolify-mirror blocks. A failure of an older
-// one only warns, and not at all when this release was tested with this
-// Coolify version itself (it fixed what failed).
+// A failure of this or a newer coolify-mirror refuses restores. A failure of
+// an older one only warns, and not at all when this release was tested with
+// this Coolify version itself (it fixed what failed).
 func applyCompatEntry(c *Compat, e CompatEntry, update string) {
 	switch {
 	case e.Status == "ok":
 		c.Status = "tested"
 	case e.Status == "fail" && CompareVersions(Version, e.Tool) <= 0:
 		c.Status = "failed"
-		c.Blockers = append(c.Blockers, fmt.Sprintf("the automatic test of coolify-mirror %s with Coolify %s failed (%s) - %s", e.Tool, c.CoolifyVersion, e.Detail, update))
+		why := ""
+		if d := cleanDetail(e.Detail); d != "" {
+			why = " (" + d + ")"
+		}
+		c.Failed = fmt.Sprintf("the automatic test of coolify-mirror %s with Coolify %s failed%s - %s", e.Tool, c.CoolifyVersion, why, update)
 	case e.Status == "fail" && c.Status != "tested":
 		c.Warnings = append(c.Warnings, fmt.Sprintf("coolify-mirror %s did not work with Coolify %s; this newer version is not tested with it yet", e.Tool, c.CoolifyVersion))
 	}
+}
+
+// cleanDetail makes a published test detail one short readable line: no
+// control characters (a carriage return in it overwrote the line on screen),
+// no repeated spaces.
+func cleanDetail(s string) string {
+	s = strings.Join(strings.Fields(strings.Map(func(r rune) rune {
+		if r < ' ' || r == 0x7f {
+			return ' '
+		}
+		return r
+	}, s)), " ")
+	if r := []rune(s); len(r) > 160 {
+		s = string(r[:159]) + "…"
+	}
+	return s
 }
 
 func sortedFeatures(m map[string][]string) []string {
@@ -155,12 +189,21 @@ func sortedFeatures(m map[string][]string) []string {
 }
 
 // lookupCompat reads this Coolify version's test result (best effort: no
-// network means no entry).
+// network means no entry). COOLIFY_MIRROR_COMPAT_URL replaces the address;
+// "off" skips the lookup (the compatibility test itself uses that, so an
+// earlier published result never decides the new one).
 func lookupCompat(ctx context.Context, version string) (CompatEntry, bool) {
+	url := CompatURL
+	if u := os.Getenv("COOLIFY_MIRROR_COMPAT_URL"); u != "" {
+		url = u
+	}
+	if url == "off" {
+		return CompatEntry{}, false
+	}
 	var doc struct {
 		Coolify map[string]CompatEntry `json:"coolify"`
 	}
-	if err := getJSON(ctx, CompatURL, &doc); err != nil {
+	if err := getJSON(ctx, url, &doc); err != nil {
 		return CompatEntry{}, false
 	}
 	e, ok := doc.Coolify[strings.TrimPrefix(version, "v")]

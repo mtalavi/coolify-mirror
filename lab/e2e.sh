@@ -3,7 +3,8 @@
 # their own Docker) get the official Coolify of the given version; the source
 # gets real resources; coolify-mirror backs them up, shares them with a share
 # code and restores them on the target; then the data and the running state
-# are compared. Exit code 0 = compatible.
+# are compared. Exit code 0 = compatible, 1 = coolify-mirror failed, 2 = the
+# test servers could not be prepared (nothing about compatibility is known).
 #
 #   lab/e2e.sh COOLIFY_VERSION path/to/coolify-mirror-linux-amd64
 #
@@ -20,6 +21,7 @@ DST=cm-e2e-dst
 
 log() { printf '\n=== %s\n' "$*"; }
 on() { local c=$1; shift; docker exec "$c" bash -c "$*"; }
+setup_fail() { echo "SETUP FAILED: $*"; exit 2; }
 
 cleanup() {
   [ "${KEEP:-0}" = 1 ] && return
@@ -58,11 +60,12 @@ install() {
 }
 install "$SRC" & p1=$!
 install "$DST" & p2=$!
-wait $p1; wait $p2
+wait $p1 || setup_fail "Coolify $V could not be installed on $SRC"
+wait $p2 || setup_fail "Coolify $V could not be installed on $DST"
 for c in "$SRC" "$DST"; do
   got=$(on "$c" "docker inspect -f '{{.Config.Image}}' coolify")
   echo "$c: $got"
-  case "$got" in *":$V") ;; *) echo "expected Coolify $V"; exit 1 ;; esac
+  case "$got" in *":$V") ;; *) setup_fail "expected Coolify $V" ;; esac
 done
 fi
 
@@ -77,9 +80,10 @@ for i in $(seq 1 30); do
   [ -n "$TOKEN" ] && break
   sleep 10
 done
-[ -n "$TOKEN" ] || { echo "$out" | tail -20; echo "no API token"; exit 1; }
+[ -n "$TOKEN" ] || { echo "$out" | tail -20; setup_fail "no API token"; }
 docker cp "$HERE/e2e_seed.sh" "$SRC:/root/e2e_seed.sh"
-eval "$(on "$SRC" "bash /root/e2e_seed.sh '$TOKEN' '$REPO' '$BRANCH'" | grep -E '^(COMPOSE|PG|WEB)=')"
+seed=$(on "$SRC" "bash /root/e2e_seed.sh '$TOKEN' '$REPO' '$BRANCH'") || setup_fail "the source could not be seeded"
+eval "$(echo "$seed" | grep -E '^(COMPOSE|PG|WEB)=')"
 echo "compose=$COMPOSE pg=$PG web=$WEB"
 
 log "wait until everything runs on the source"
@@ -92,7 +96,7 @@ done
 for i in $(seq 1 180); do
   up=$(on "$SRC" "docker ps --format '{{.Names}} {{.Status}}'" || true)
   if echo "$up" | grep -q "^web-$COMPOSE.*healthy" && echo "$up" | grep -q "^$PG .*healthy" && echo "$up" | grep -q "^$WEB"; then break; fi
-  [ "$i" = 180 ] && { echo "$up"; echo "source resources did not start"; exit 1; }
+  [ "$i" = 180 ] && { echo "$up"; on "$SRC" 'for c in $(docker ps -a --filter status=restarting --filter status=exited -q); do docker logs --tail 5 $c 2>&1; done' || true; setup_fail "source resources did not start"; }
   sleep 5
 done
 MARK="e2e-$(date +%s)-$RANDOM"
@@ -102,7 +106,7 @@ on "$SRC" "docker exec $PG psql -U e2e -d e2e -v ON_ERROR_STOP=1 -c 'create tabl
 log "back up and share on the source"
 docker cp "$BIN" "$SRC:/usr/local/bin/coolify-mirror"
 docker cp "$BIN" "$DST:/usr/local/bin/coolify-mirror"
-on "$SRC" "nohup coolify-mirror backup --all --serve --mode direct --host $SRC >/root/share.out 2>&1 &"
+on "$SRC" "COOLIFY_MIRROR_COMPAT_URL=off nohup coolify-mirror backup --all --serve --mode direct --host $SRC >/root/share.out 2>&1 &"
 for i in $(seq 1 120); do
   CODE=$(on "$SRC" "sed -n 's/^  Share code: \([^ ]*\).*/\1/p' /root/share.out" || true)
   [ -n "$CODE" ] && break
@@ -115,7 +119,7 @@ echo "share code: $CODE"
 
 log "restore on the target with the share code"
 set +e
-on "$DST" "coolify-mirror restore $CODE --yes" | tee /tmp/cm-e2e-restore.log
+on "$DST" "COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror restore $CODE --yes" | tee /tmp/cm-e2e-restore.log
 rc=${PIPESTATUS[0]}
 set -e
 [ "$rc" = 0 ] || { echo "restore failed (exit $rc)"; exit 1; }
