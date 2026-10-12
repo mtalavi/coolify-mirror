@@ -22,10 +22,9 @@
       "date": "2026-10-09"
     },
     "4.4.6": {
-      "status": "fail",
-      "tool": "1.9.2",
-      "date": "2026-10-12",
-      "detail": "  ✗ Read Coolify configuration  backup not possible: the automatic test of coolify-mirror 1.9.2 with Coolify 4.4.6 failed (failed to open stdout fifo: error creating fifo /var/run/docker/containerd/07f0f489c7a97920f179388a49f38d6b2eee6dac14b9511b19c7eced22c828f1/f9ca83ed86c6ab12d765b47816a05550600"
+      "status": "ok",
+      "tool": "1.9.3",
+      "date": "2026-10-12"
     }
   }
 }
