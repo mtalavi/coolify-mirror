@@ -136,6 +136,21 @@ Coolify's own backup covers its database. Moving **one app** to a new server —
 | 🌐 **Domains last** | Right before anything starts you can keep or change every domain. |
 | ♻️ **Preflight + rollback** | Exact-version check, conflict and domain detection, disk space, bundle validation and a trial import in a rolled-back transaction run **before** anything changes; a failure in the middle puts the target back the way it was. |
 
+### Compared with copying the whole server
+
+The usual way to move Coolify is a script that packs `/data/coolify` and the Docker volumes and unpacks them on the new server over root SSH. That is fine for copying everything onto an empty machine. The differences:
+
+| | Copying the server (tar over SSH) | Coolify Mirror |
+|---|---|---|
+| What moves | Everything, always | One project, a few resources or the whole server |
+| Link between the servers | A root SSH key of the old server on the new one | A share code over HTTPS on port 443, no keys between servers |
+| The new server | Files are unpacked over whatever is there | Merged into a Coolify already in use, its other resources untouched (a whole-server restore needs an empty Coolify) |
+| Databases | Raw data files, consistent only with Docker stopped | Native dumps while they keep running |
+| Coolify version | Not checked | The same version on both servers, the tool says which one to upgrade |
+| Before anything changes | A connection test | Disk space, conflicts, domains and a trial import in a rolled-back transaction |
+| At the end | Nothing is checked | SUCCESS only when every resource runs as on the source and its domains answer |
+| If something fails | No way back | Rollback |
+
 ---
 
 ## 🚀 Install
