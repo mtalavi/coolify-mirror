@@ -13,12 +13,15 @@
 .ph.ph-download-simple:before{content:"\e20c"}
 .ph.ph-github-logo:before{content:"\e576"}
 .ph.ph-globe:before{content:"\e288"}
+.ph.ph-globe-simple:before{content:"\e28e"}
 .ph.ph-graph:before{content:"\eb58"}
 .ph.ph-hard-drives:before{content:"\e2a0"}
 .ph.ph-info:before{content:"\e2ce"}
 .ph.ph-lightning:before{content:"\e2de"}
 .ph.ph-list:before{content:"\e2f0"}
 .ph.ph-lock-key:before{content:"\e2fe"}
+.ph.ph-pause:before{content:"\e39e"}
+.ph.ph-play:before{content:"\e3d0"}
 .ph.ph-plus:before{content:"\e3d4"}
 .ph.ph-shield-check:before{content:"\e40c"}
 .ph.ph-sliders-horizontal:before{content:"\e434"}
