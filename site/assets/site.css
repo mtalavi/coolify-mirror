@@ -250,9 +250,9 @@ h3 { font-size: 1.22rem; letter-spacing: -0.02em; line-height: 1.25; font-weight
   .demo-bar { margin-top: 36px; }
 }
 @media (max-width: 560px) {
-  .demo-bar { grid-template-columns: 1fr; }
-  .demo-cap { grid-column: 1; }
-  .demo-play { display: none; }
+  .demo-bar { align-items: start; }
+  .demo-cap { grid-column: 1 / -1; }
+  .demo-play { width: 34px; height: 34px; }
   .demo-steps button { padding: 0 10px 0 8px; height: 34px; font-size: 13px; }
 }
 @media (prefers-reduced-motion: reduce) {
