@@ -1,6 +1,22 @@
 package engine
 
-import "testing"
+import (
+	"context"
+	"strings"
+	"testing"
+)
+
+// The compatibility test runs with COOLIFY_MIRROR_COMPAT_URL=off, so a
+// result published earlier can never fail the new test.
+func TestLookupCompatOff(t *testing.T) {
+	t.Setenv("COOLIFY_MIRROR_COMPAT_URL", "off")
+	saved := CompatURL
+	defer func() { CompatURL = saved }()
+	CompatURL = "http://127.0.0.1:1/must-not-be-used"
+	if _, ok := lookupCompat(context.Background(), "4.4.6"); ok {
+		t.Fatal("lookup was not skipped")
+	}
+}
 
 // Regression: 1.9.0 (tested with 4.4.2) said "✓ tested" and, below it,
 // "coolify-mirror 1.8.1 did not work with Coolify 4.4.2".
@@ -22,7 +38,9 @@ func TestApplyCompatEntry(t *testing.T) {
 	if c := run(false, CompatEntry{Status: "fail", Tool: "1.8.1"}); c.Status != "untested" || len(c.Warnings) != 1 {
 		t.Errorf("untested, older tool failed: %+v", c)
 	}
-	if c := run(true, CompatEntry{Status: "fail", Tool: "1.9.0"}); c.Status != "failed" || len(c.Blockers) != 1 {
+	// A published failure refuses restores only; backups keep working.
+	if c := run(true, CompatEntry{Status: "fail", Tool: "1.9.0", Detail: "boom\r source did not start "}); c.Status != "failed" ||
+		len(c.Blockers) != 0 || len(c.RestoreBlockers()) != 1 || strings.Contains(c.Failed, "\r") || !strings.Contains(c.Failed, "(boom source did not start)") {
 		t.Errorf("this release failed the published test: %+v", c)
 	}
 	if c := run(false, CompatEntry{Status: "ok", Tool: "1.9.0"}); c.Status != "tested" {

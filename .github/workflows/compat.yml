@@ -4,8 +4,9 @@ name: coolify-compat
 # has not been tested with, run the end-to-end test (lab/e2e.sh: two fresh
 # Coolify servers of that version, migrate real resources, compare) and publish
 # the result in compat.json on the "compat" branch. coolify-mirror reads that
-# file before a backup or restore: a failed version is refused with a clear
-# message, a passed one is shown as tested. A failure also opens an issue.
+# file before a backup or restore: a restore onto a failed version is refused
+# with a clear message, a passed one is shown as tested. A failure opens an
+# issue, a later pass closes it. The test itself never reads compat.json.
 
 on:
   schedule:
@@ -65,25 +66,32 @@ jobs:
       - name: End-to-end test
         id: e2e
         if: steps.pick.outputs.skip != 'true'
-        continue-on-error: true
         env:
           E2E_BRANCH: ${{ github.ref_name }}
         run: |
-          set -o pipefail
+          set +e -o pipefail
           bash lab/e2e.sh "${{ steps.pick.outputs.coolify }}" dist/coolify-mirror-linux-amd64 2>&1 | tee e2e.log
+          echo "rc=$?" >> "$GITHUB_OUTPUT"
       - name: Publish the result
         if: steps.pick.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           V: ${{ steps.pick.outputs.coolify }}
           TOOL: ${{ steps.pick.outputs.tool }}
-          OUTCOME: ${{ steps.e2e.outcome }}
+          RC: ${{ steps.e2e.outputs.rc }}
         run: |
           set -euo pipefail
+          # Exit code 2: the test servers could not be prepared (Docker,
+          # install, seed). That says nothing about coolify-mirror, so nothing
+          # is published and the next run tries again.
+          if [ "$RC" = 2 ]; then
+            echo "::error::the test could not run: $(grep 'SETUP FAILED' e2e.log | tail -1)"
+            exit 1
+          fi
           status=ok; detail=""
-          if [ "$OUTCOME" != success ]; then
+          if [ "$RC" != 0 ]; then
             status=fail
-            detail=$(grep -E 'BAD|failed|no SUCCESS|not |ERROR' e2e.log | tail -3 | tr '\n' ' ' | cut -c1-300)
+            detail=$(grep -E 'BAD|failed|no SUCCESS|not |ERROR' e2e.log | tail -3 | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tr -d '\r' | tr '\n' ' ' | tr -s ' ' | cut -c1-300)
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -100,6 +108,11 @@ jobs:
           git add compat.json
           git commit -qm "compat: Coolify $V with coolify-mirror $TOOL: $status"
           git push -q origin compat
+          if [ "$status" = ok ]; then
+            for n in $(gh issue list --state open --search "Coolify $V: compatibility test failed in:title" --json number --jq '.[].number'); do
+              gh issue close "$n" --comment "Passed now: coolify-mirror $TOOL works with Coolify $V (${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})."
+            done
+          fi
           if [ "$status" = fail ]; then
             title="Coolify $V: compatibility test failed (coolify-mirror $TOOL)"
             if [ -z "$(gh issue list --state open --search "$title in:title" --json number --jq '.[0].number')" ]; then
