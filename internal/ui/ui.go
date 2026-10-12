@@ -163,12 +163,14 @@ func checkServer(ctx context.Context) (*coolify.Instance, error) {
 	switch {
 	case len(compat.Blockers) > 0:
 		state = sErr.Render("✗ not supported")
+	case compat.Failed != "":
+		state = sErr.Render("✗ restore not supported")
 	case compat.Status != "tested":
 		state = sWarn.Render("not tested with this version yet")
 	}
 	fmt.Println(rule("This server"))
 	fmt.Println("  " + sBold.Render("Coolify "+in.Version) + sMuted.Render(fmt.Sprintf(" on %s (%s) · ", in.Hostname, v4)) + state)
-	for _, b := range compat.Blockers {
+	for _, b := range compat.RestoreBlockers() {
 		fmt.Println("  " + sErr.Render("✗ "+b))
 	}
 	for _, w := range compat.Warnings {

@@ -113,7 +113,7 @@ func PreflightFull(ctx context.Context, in *coolify.Instance, f *Fetched) []stri
 	if b := versionBlocker(in, f.Manifest); b != "" {
 		out = append(out, b)
 	}
-	out = append(out, CheckCompat(ctx, in).Blockers...)
+	out = append(out, CheckCompat(ctx, in).RestoreBlockers()...)
 	if len(out) == 0 {
 		b, _ := checkBundle(ctx, in, f)
 		out = append(out, b...)
@@ -156,7 +156,7 @@ func PreflightSelective(ctx context.Context, in *coolify.Instance, f *Fetched) [
 	if b := versionBlocker(in, f.Manifest); b != "" {
 		out = append(out, b)
 	}
-	out = append(out, CheckCompat(ctx, in).Blockers...)
+	out = append(out, CheckCompat(ctx, in).RestoreBlockers()...)
 	if s := SpaceWarning(in.DockerRoot, f.Manifest); s != "" {
 		out = append(out, "not enough disk space: "+s)
 	}

@@ -114,6 +114,9 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 	for _, w := range compat.Warnings {
 		pr.Warn("%s", w)
 	}
+	if compat.Failed != "" {
+		pr.Warn("backing up works, restoring onto Coolify %s is refused for now: %s", in.Version, compat.Failed)
+	}
 	if req.Mode == ModeFull {
 		err = b.discoverFull(ctx)
 	} else {
