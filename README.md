@@ -31,8 +31,7 @@
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-command-line">CLI</a> ·
   <a href="#-safety">Safety</a> ·
-  <a href="#-limitations">Limitations</a> ·
-  <a href="README.fa.md">فارسی</a>
+  <a href="#-limitations">Limitations</a>
 </p>
 
 ---
