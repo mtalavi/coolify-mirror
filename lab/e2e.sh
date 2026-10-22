@@ -62,7 +62,9 @@ done
 log "install Coolify $V on both servers"
 install() {
   on "$1" 'for i in $(seq 1 60); do systemctl is-system-running >/dev/null 2>&1 && break; [ "$(systemctl is-system-running 2>/dev/null)" = degraded ] && break; sleep 1; done; rm -f /run/nologin'
-  on "$1" "curl -fsSL https://cdn.coollabs.io/coolify/install.sh -o /root/coolify-install.sh && USER=root bash /root/coolify-install.sh $V" >"/tmp/$1-install.log" 2>&1
+  # The installer gives the coolify container 60 s to turn healthy and exits
+  # non-zero when a busy host needs longer (4.3.24); /api/health below decides.
+  on "$1" "curl -fsSL https://cdn.coollabs.io/coolify/install.sh -o /root/coolify-install.sh && USER=root bash /root/coolify-install.sh $V" >"/tmp/$1-install.log" 2>&1 || echo "installer exited non-zero on $1, waiting for /api/health" >>"/tmp/$1-install.log"
   for i in $(seq 1 120); do
     on "$1" 'curl -fsS http://localhost:8000/api/health' 2>/dev/null | grep -q OK && return 0
     sleep 5

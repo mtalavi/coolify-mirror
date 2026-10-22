@@ -20,7 +20,7 @@
 <link rel="stylesheet" href="assets/site.css">
 <link rel="stylesheet" href="assets/icons/phosphor.min.css">
 <script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Coolify Mirror","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (amd64, arm64)","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.9.3","url":"https://coolify-mirror.pages.dev/","downloadUrl":"https://github.com/mtalavi/coolify-mirror/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Coolify Mirror","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (amd64, arm64)","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.9.4","url":"https://coolify-mirror.pages.dev/","downloadUrl":"https://github.com/mtalavi/coolify-mirror/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
 </script>
 <script defer src="assets/site.js"></script>
 <script defer src="assets/demo-frames.js"></script>
@@ -451,6 +451,7 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
+      <div class="rel"><div><span class="v">1.9.4</span><span class="d">2026-10-22</span></div><div><h3>Coolify 4.4.7 and 4.3.24</h3><p>Tested with Coolify's security releases 4.4.7 and 4.3.24: a full move on two freshly installed servers for each. Update both servers to the same release before a move; Coolify's <code>patch.sh</code> takes every line to its fix release.</p></div></div>
       <div class="rel"><div><span class="v">1.9.3</span><span class="d">2026-10-12</span></div><div><h3>Coolify 4.4.6, and a sturdier daily test</h3><p>Tested with Coolify 4.4.6. A failed daily test no longer stops backups (only restores), and a test whose servers could not even start is no longer published as a failure — that had wrongly marked 4.4.6 as failed.</p></div></div>
       <div class="rel"><div><span class="v">1.9.2</span><span class="d">2026-10-08</span></div><div><h3>Tidier lists</h3><p>Domains without the container port (<code>vemela.app</code>, not <code>vemela.app:3000</code>), and <code>list</code> and <code>files</code> columns that stay aligned with long names — found in a test on a real 20-project server.</p></div></div>
       <div class="rel"><div><span class="v">1.9.1</span><span class="d">2026-10-08</span></div><div><h3>A clear compatibility line</h3><p>No more "did not work" warning from an older version under "✓ tested" when this release was tested with that Coolify.</p></div></div>
@@ -476,7 +477,7 @@
       <h2 id="faq-h">Questions</h2>
     </div>
     <div class="faq">
-      <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3 and v4.4 (tested with 4.3.23, 4.4.2 and 4.4.6), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
+      <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3 and v4.4 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6 and 4.4.7), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
       <details><summary>Does the old server go down during the backup?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>No. With Recommended settings, containers pause only for the seconds their volume copy takes, and databases are dumped while they run. Nothing is deleted on the old server.</p></details>
       <details><summary>Can the new server already have other projects?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Backing up apps merges them into the new Coolify and keeps everything that is there. An app that already exists can be restored as a copy or skipped. A whole-server backup only goes onto a fresh, empty Coolify.</p></details>
       <details><summary>The new server cannot connect to the old one.<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Port 443 of the old server is blocked. On the old server press q, choose Share a saved backup, the same backup, then Share a link on port 8123. Allow 8123 in your provider's firewall too, and run the new command it shows.</p></details>
