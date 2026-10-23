@@ -24,6 +24,12 @@ RUN cd /lib/systemd/system/sysinit.target.wants/ \
           /lib/systemd/system/basic.target.wants/* \
  && systemctl enable ssh
 
+# Enable the cpu controller at boot, before any `docker exec` process sits in
+# the root cgroup (which would make enabling it later fail with EBUSY). Docker
+# needs it for containers with a CPU weight, which Coolify sets:
+# "cpu.weight: no such file or directory" otherwise.
+COPY system-slice-cpu.conf /etc/systemd/system/system.slice.d/cpu.conf
+
 STOPSIGNAL SIGRTMIN+3
 VOLUME ["/var/lib/docker"]
 CMD ["/sbin/init"]

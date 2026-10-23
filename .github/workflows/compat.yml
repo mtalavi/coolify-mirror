@@ -91,7 +91,7 @@ jobs:
           status=ok; detail=""
           if [ "$RC" != 0 ]; then
             status=fail
-            detail=$(grep -E 'BAD|failed|no SUCCESS|not |ERROR' e2e.log | tail -3 | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tr -d '\r' | tr '\n' ' ' | tr -s ' ' | cut -c1-300)
+            detail=$(grep -v '^diag| ' e2e.log | grep -E 'BAD|failed|no SUCCESS|not |ERROR' | tail -3 | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' | tr -d '\r' | tr '\n' ' ' | tr -s ' ' | cut -c1-300)
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

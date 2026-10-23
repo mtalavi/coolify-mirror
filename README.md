@@ -31,7 +31,8 @@
   <a href="#-how-it-works">How it works</a> ·
   <a href="#-command-line">CLI</a> ·
   <a href="#-safety">Safety</a> ·
-  <a href="#-limitations">Limitations</a>
+  <a href="#-limitations">Limitations</a> ·
+  <a href="#-changelog">Changelog</a>
 </p>
 
 ---
@@ -436,6 +437,29 @@ Coolify ships often, and the tool relies on parts of it (database tables, PHP cl
 ## 🧪 Tested
 
 The [walkthrough](#-walkthrough--every-screen) is a real run of the released 1.9.1: the one-line installer on both servers, a whole project (two apps, Redis and Postgres) moved to a freshly installed Coolify 4.4.2 through port 443, verified and running in 2m30s, then every backup deleted with **ALL**. Automatically, for every new Coolify release: [`lab/e2e.sh`](lab/e2e.sh) (two fresh servers, official installer, a git compose app + Postgres + an image app with a volume and domains, backup → share code → restore, data compared through the proxy) — passing on 4.4.7 and 4.3.24 (1.9.4), 4.4.6 (1.9.3), 4.4.2 (1.9.0) and on 4.3.23 (1.5.0 to 1.8.1; 1.9.0 was checked on 4.3.23 by hand: five resources in three projects, the compose app started without a build). On Coolify 4.4.2 by hand: a SQLite database connected to an app and an app reading its secrets from HashiCorp Vault, moved through port 443 (321 SQLite rows, the Vault secret resolved on the new server once its address was allowed — the tool named it before the restore), restored a second time as a copy (the secret manager reused), and a whole-server move of five resources onto a fresh 4.4.2 (the compose app started from the restored images, every row and secret identical). By hand on real Coolify 4.3.23 installs (lab in [`lab/`](lab)): **a real migration with zero manual fixes** — healthy source → new backup → freshly installed Coolify → selective and full restore with `--verify-redeploy` (a multi-service compose app whose build uses a host policy script and a named buildx builder, a Dockerfile app, an image app, WordPress + MariaDB, Postgres): `SUCCESS`, the same secrets, volume data and database rows as the source, every domain answering through Traefik, and a full rebuild on the target; merge into an existing Coolify without touching its other resources; an app that exits and one that turns unhealthy after the restore reported as *NOT operational*; rollback leaving the target exactly as before; backups made by 1.2.0. Also: native Postgres/MariaDB dumps (identical row counts and checksums after restore), HTTPS share through Traefik passthrough with pin check (a wrong pin is refused, plain HTTP gets nothing), full restore refused on a non-empty Coolify and accepted on a fresh one, Postgres/MariaDB/Redis data, WordPress, compose apps, Git apps without rebuild, copies next to originals (a single-container app restored as a copy is checked under its new name), saved-file cleanup on both servers (all backups at once, some, or one; a backup shared in the background is unshared first; one shared from another window and a volume in use are refused), restore into a fresh never-used Coolify, full server restore with rollback (fault injection), interrupted backups, domain changes at the end, plus unit tests for Laravel encryption, the archive format, the import planner and resumable downloads.
+
+---
+
+## 📝 Changelog
+
+Every release with its binaries and checksums: [Releases](https://github.com/mtalavi/coolify-mirror/releases).
+
+- **1.9.4** · 2026-10-22 — **Coolify 4.4.7 and 4.3.24.** Tested with Coolify's security releases 4.4.7 and 4.3.24: a full move on two freshly installed servers for each. Update both servers to the same release before a move; Coolify's `patch.sh` takes every line to its fix release. The daily test's servers now always get the cpu cgroup controller: without it Docker there could not start containers with a CPU weight, which had wrongly marked 4.3.24 as failed on the test host.
+- **1.9.3** · 2026-10-12 — **Coolify 4.4.6, and a sturdier daily test.** Tested with Coolify 4.4.6. A failed daily test no longer stops backups (only restores), and a test whose servers could not even start is no longer published as a failure — that had wrongly marked 4.4.6 as failed.
+- **1.9.2** · 2026-10-08 — **Tidier lists.** Domains without the container port (`vemela.app`, not `vemela.app:3000`), and `list` and `files` columns that stay aligned with long names — found in a test on a real 20-project server.
+- **1.9.1** · 2026-10-08 — **A clear compatibility line.** No more "did not work" warning from an older version under "✓ tested" when this release was tested with that Coolify.
+- **1.9.0** · 2026-10-08 — **Coolify 4.4.** Works with Coolify 4.4 (tested on 4.4.2 and 4.3.23): Compose apps start from the restored images again, SQLite databases and secret-manager links (Vault, Doppler, Infisical) move with their apps, and a whole-server move no longer rebuilds Compose apps.
+- **1.8.1** · 2026-10-08 — **Tidier screens, safer domains.** Domains on their own line in the final box, a cleaner share screen, full progress notes, and a question before a Compose domain moves to a service that had none.
+- **1.8.0** · 2026-10-08 — **Pick projects.** A list like Coolify's dashboard: pick a project and its apps, databases, services and domains move together. A review before every backup, `backup --project`, and a sharper look.
+- **1.7.1** · 2026-10-07 — **A step-by-step guide.** A 4-step quick start and every screenshot retaken from a real move. Behind Coolify's proxy, the share screen names the other server instead of the proxy's address.
+- **1.7.0** · 2026-10-06 — **All backups at once.** The ALL line deletes every backup in one go, or pick some. On the command line: `files delete --backups`.
+- **1.6.0** · 2026-10-06 — **Saved files and disk space.** See and delete what the tool keeps on both servers. Enter picks the highlighted app, Recommended settings, and a built-in guide.
+- **1.5.0** · 2026-10-06 — **Share codes and one command.** One short command per server. Checks against every Coolify update, and `coolify-mirror update`.
+- **1.4.0** · 2026-10-06 — **Compose apps without a build.** Docker Compose apps start from the restored images, without cloning or building.
+- **1.3.1** · 2026-10-06 — **Verified restores.** Success only when the new server really runs the apps. Build dependencies on the host travel too, and `--verify-redeploy` proves the next deploy.
+- **1.2.0** · 2026-10-05 — **Pinned HTTPS and native dumps.** HTTPS-only transfer with a pinned certificate, native database dumps, a mandatory preflight, and Coolify's official transfer bundle inside.
+- **1.1.0** · 2026-10-04 — **Domains last, open source.** A domains step at the end of every restore. Released under MIT with a one-line installer.
+- **1.0.0** · 2026-10-01 — **First release.** Selective and full backups, sharing, restores with rollback, and the interactive menu.
 
 ---
 

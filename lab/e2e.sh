@@ -62,6 +62,7 @@ done
 log "install Coolify $V on both servers"
 install() {
   on "$1" 'for i in $(seq 1 60); do systemctl is-system-running >/dev/null 2>&1 && break; [ "$(systemctl is-system-running 2>/dev/null)" = degraded ] && break; sleep 1; done; rm -f /run/nologin'
+  cgroup_fix "$1"
   # The installer gives the coolify container 60 s to turn healthy and exits
   # non-zero when a busy host needs longer (4.3.24); /api/health below decides.
   on "$1" "curl -fsSL https://cdn.coollabs.io/coolify/install.sh -o /root/coolify-install.sh && USER=root bash /root/coolify-install.sh $V" >"/tmp/$1-install.log" 2>&1 || echo "installer exited non-zero on $1, waiting for /api/health" >>"/tmp/$1-install.log"
@@ -71,10 +72,25 @@ install() {
   done
   echo "Coolify did not come up on $1"; tail -40 "/tmp/$1-install.log"; return 1
 }
+# Docker inside the test servers needs the cpu cgroup controller for
+# containers with a CPU weight (Coolify sets one). `docker exec` puts its
+# processes into the server's root cgroup; when one is there at the moment
+# systemd enables the controllers (right after boot), the kernel refuses
+# (EBUSY) and none get enabled. So move whatever sits in the root cgroup into
+# init.scope and enable them here; without them the host is unfit.
+cgroup_fix() {
+  on "$1" 'cd /sys/fs/cgroup && for p in $(cat cgroup.procs); do echo "$p" >init.scope/cgroup.procs 2>/dev/null; done; echo "+cpu +io +memory +pids" >cgroup.subtree_control 2>/dev/null; true'
+}
+cgroup_ok() {
+  cgroup_fix "$1"
+  on "$1" 'grep -qw cpu /sys/fs/cgroup/cgroup.subtree_control' || setup_fail "no cpu cgroup controller on $1 (enabled: $(on "$1" 'cat /sys/fs/cgroup/cgroup.subtree_control' 2>&1))"
+}
 install "$SRC" & p1=$!
 install "$DST" & p2=$!
 wait $p1 || setup_fail "Coolify $V could not be installed on $SRC"
 wait $p2 || setup_fail "Coolify $V could not be installed on $DST"
+cgroup_ok "$SRC"
+cgroup_ok "$DST"
 for c in "$SRC" "$DST"; do
   got=$(on "$c" "docker inspect -f '{{.Config.Image}}' coolify")
   echo "$c: $got"
@@ -132,11 +148,18 @@ on "$SRC" 'grep -E "^  ! " /root/share.out' || true
 echo "share code: $CODE"
 
 log "restore on the target with the share code"
+cgroup_ok "$DST"
 set +e
 on "$DST" "COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror restore $CODE --yes" | tee /tmp/cm-e2e-restore.log
 rc=${PIPESTATUS[0]}
 set -e
-[ "$rc" = 0 ] || { echo "restore failed (exit $rc)"; exit 1; }
+if [ "$rc" != 0 ]; then
+  docker exec -i "$DST" bash -s <"$HERE/e2e_diag.sh" 2>&1 | sed 's/^/diag| /' | tee /tmp/cm-e2e-diag.log || true
+  # Docker on the test server could not create a container cgroup: a host
+  # problem, not a result about coolify-mirror or this Coolify version.
+  grep -q 'error setting cgroup config' /tmp/cm-e2e-diag.log && setup_fail "Docker on $DST could not set up container cgroups (see diag)"
+  echo "restore failed (exit $rc)"; exit 1
+fi
 grep -q '^SUCCESS' /tmp/cm-e2e-restore.log || { echo "no SUCCESS"; exit 1; }
 grep -q 'started from the restored images' /tmp/cm-e2e-restore.log || { echo "the compose app was not started from the restored images"; exit 1; }
 
