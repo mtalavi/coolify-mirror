@@ -32,10 +32,9 @@
       "date": "2026-10-22"
     },
     "4.3.24": {
-      "status": "fail",
+      "status": "ok",
       "tool": "1.9.4",
-      "date": "2026-10-23",
-      "detail": " ✗ e2e-db zmif37xqrclj59mtqnugspt6 created - not running properly after 6m01s - check it in Coolify ✗ e2e-web deployment failed - open the deployment log in Coolify restore failed (exit 1) "
+      "date": "2026-10-23"
     }
   }
 }
