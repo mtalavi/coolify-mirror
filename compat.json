@@ -35,7 +35,7 @@
       "status": "fail",
       "tool": "1.9.4",
       "date": "2026-10-23",
-      "detail": " ✓ e2e-compose running (4 containers stable, domains answer through the proxy) - Coolify built it on this server: the start command failed: ainer worker-ljg5ti50hunqlmbetapbjbwa-000009102994 Starting ✗ e2e-web deployment failed - open the deployment log in Coolify restore failed (exit 1) "
+      "detail": " ✗ e2e-db zmif37xqrclj59mtqnugspt6 created - not running properly after 6m01s - check it in Coolify ✗ e2e-web deployment failed - open the deployment log in Coolify restore failed (exit 1) "
     }
   }
 }
