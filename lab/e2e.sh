@@ -71,10 +71,17 @@ install() {
   done
   echo "Coolify did not come up on $1"; tail -40 "/tmp/$1-install.log"; return 1
 }
+# Docker inside the test servers needs the cpu cgroup controller for
+# containers with a CPU weight; without it the host is unfit for the test.
+cgroup_ok() {
+  on "$1" 'grep -qw cpu /sys/fs/cgroup/system.slice/cgroup.subtree_control || { systemctl set-property --runtime system.slice CPUAccounting=yes >/dev/null 2>&1; sleep 1; grep -qw cpu /sys/fs/cgroup/system.slice/cgroup.subtree_control; }'     || setup_fail "no cpu cgroup controller on $1 (controllers: $(on "$1" 'cat /sys/fs/cgroup/cgroup.controllers' 2>&1))"
+}
 install "$SRC" & p1=$!
 install "$DST" & p2=$!
 wait $p1 || setup_fail "Coolify $V could not be installed on $SRC"
 wait $p2 || setup_fail "Coolify $V could not be installed on $DST"
+cgroup_ok "$SRC"
+cgroup_ok "$DST"
 for c in "$SRC" "$DST"; do
   got=$(on "$c" "docker inspect -f '{{.Config.Image}}' coolify")
   echo "$c: $got"
@@ -132,12 +139,16 @@ on "$SRC" 'grep -E "^  ! " /root/share.out' || true
 echo "share code: $CODE"
 
 log "restore on the target with the share code"
+cgroup_ok "$DST"
 set +e
 on "$DST" "COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror restore $CODE --yes" | tee /tmp/cm-e2e-restore.log
 rc=${PIPESTATUS[0]}
 set -e
 if [ "$rc" != 0 ]; then
-  docker exec -i "$DST" bash -s <"$HERE/e2e_diag.sh" 2>&1 | sed 's/^/diag| /' || true
+  docker exec -i "$DST" bash -s <"$HERE/e2e_diag.sh" 2>&1 | sed 's/^/diag| /' | tee /tmp/cm-e2e-diag.log || true
+  # Docker on the test server could not create a container cgroup: a host
+  # problem, not a result about coolify-mirror or this Coolify version.
+  grep -q 'error setting cgroup config' /tmp/cm-e2e-diag.log && setup_fail "Docker on $DST could not set up container cgroups (see diag)"
   echo "restore failed (exit $rc)"; exit 1
 fi
 grep -q '^SUCCESS' /tmp/cm-e2e-restore.log || { echo "no SUCCESS"; exit 1; }

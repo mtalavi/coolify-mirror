@@ -24,6 +24,16 @@ RUN cd /lib/systemd/system/sysinit.target.wants/ \
           /lib/systemd/system/basic.target.wants/* \
  && systemctl enable ssh
 
+# Keep the cpu/memory/io/pids controllers enabled for every unit. Without
+# this, systemd may leave cpu out of system.slice and Docker cannot start a
+# container with a CPU weight (Coolify sets one): "cpu.weight: no such file".
+RUN mkdir -p /etc/systemd/system.conf.d  && printf '[Manager]
+DefaultCPUAccounting=yes
+DefaultMemoryAccounting=yes
+DefaultIOAccounting=yes
+DefaultTasksAccounting=yes
+'       >/etc/systemd/system.conf.d/accounting.conf
+
 STOPSIGNAL SIGRTMIN+3
 VOLUME ["/var/lib/docker"]
 CMD ["/sbin/init"]

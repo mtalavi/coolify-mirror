@@ -3,6 +3,7 @@
 # coolify-mirror restore log and Coolify's last deployment logs).
 free -m | sed -n 1,2p
 df -h / | tail -1
+echo "cgroup: $(cat /sys/fs/cgroup/cgroup.controllers) | system.slice: $(cat /sys/fs/cgroup/system.slice/cgroup.subtree_control 2>&1)"
 docker version --format 'docker {{.Server.Version}}' 2>&1
 docker ps -a --format '{{.Names}}  {{.Image}}  {{.Status}}'
 for c in $(docker ps -a --filter status=created --filter status=exited --filter status=restarting --filter status=dead -q); do
