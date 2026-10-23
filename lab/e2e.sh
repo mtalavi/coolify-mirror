@@ -74,7 +74,7 @@ install() {
 # Docker inside the test servers needs the cpu cgroup controller for
 # containers with a CPU weight; without it the host is unfit for the test.
 cgroup_ok() {
-  on "$1" 'grep -qw cpu /sys/fs/cgroup/system.slice/cgroup.subtree_control || { systemctl set-property --runtime system.slice CPUAccounting=yes >/dev/null 2>&1; sleep 1; grep -qw cpu /sys/fs/cgroup/system.slice/cgroup.subtree_control; }'     || setup_fail "no cpu cgroup controller on $1 (controllers: $(on "$1" 'cat /sys/fs/cgroup/cgroup.controllers' 2>&1))"
+  on "$1" 'grep -qw cpu /sys/fs/cgroup/system.slice/cgroup.subtree_control || { systemctl set-property --runtime system.slice CPUAccounting=yes >/dev/null 2>&1; sleep 1; grep -qw cpu /sys/fs/cgroup/system.slice/cgroup.subtree_control; }' || setup_fail "no cpu cgroup controller on $1 (controllers: $(on "$1" 'cat /sys/fs/cgroup/cgroup.controllers' 2>&1))"
 }
 install "$SRC" & p1=$!
 install "$DST" & p2=$!
