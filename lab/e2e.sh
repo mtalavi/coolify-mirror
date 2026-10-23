@@ -136,7 +136,10 @@ set +e
 on "$DST" "COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror restore $CODE --yes" | tee /tmp/cm-e2e-restore.log
 rc=${PIPESTATUS[0]}
 set -e
-[ "$rc" = 0 ] || { echo "restore failed (exit $rc)"; exit 1; }
+if [ "$rc" != 0 ]; then
+  docker exec -i "$DST" bash -s <"$HERE/e2e_diag.sh" 2>&1 | sed 's/^/diag| /' || true
+  echo "restore failed (exit $rc)"; exit 1
+fi
 grep -q '^SUCCESS' /tmp/cm-e2e-restore.log || { echo "no SUCCESS"; exit 1; }
 grep -q 'started from the restored images' /tmp/cm-e2e-restore.log || { echo "the compose app was not started from the restored images"; exit 1; }
 
