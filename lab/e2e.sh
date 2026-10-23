@@ -62,6 +62,7 @@ done
 log "install Coolify $V on both servers"
 install() {
   on "$1" 'for i in $(seq 1 60); do systemctl is-system-running >/dev/null 2>&1 && break; [ "$(systemctl is-system-running 2>/dev/null)" = degraded ] && break; sleep 1; done; rm -f /run/nologin'
+  cgroup_fix "$1"
   # The installer gives the coolify container 60 s to turn healthy and exits
   # non-zero when a busy host needs longer (4.3.24); /api/health below decides.
   on "$1" "curl -fsSL https://cdn.coollabs.io/coolify/install.sh -o /root/coolify-install.sh && USER=root bash /root/coolify-install.sh $V" >"/tmp/$1-install.log" 2>&1 || echo "installer exited non-zero on $1, waiting for /api/health" >>"/tmp/$1-install.log"
@@ -72,10 +73,17 @@ install() {
   echo "Coolify did not come up on $1"; tail -40 "/tmp/$1-install.log"; return 1
 }
 # Docker inside the test servers needs the cpu cgroup controller for
-# containers with a CPU weight; without it the host is unfit for the test.
+# containers with a CPU weight (Coolify sets one). `docker exec` puts its
+# processes into the server's root cgroup; when one is there at the moment
+# systemd enables the controllers (right after boot), the kernel refuses
+# (EBUSY) and none get enabled. So move whatever sits in the root cgroup into
+# init.scope and enable them here; without them the host is unfit.
+cgroup_fix() {
+  on "$1" 'cd /sys/fs/cgroup && for p in $(cat cgroup.procs); do echo "$p" >init.scope/cgroup.procs 2>/dev/null; done; echo "+cpu +io +memory +pids" >cgroup.subtree_control 2>/dev/null; true'
+}
 cgroup_ok() {
-  on "$1" 'grep -qw cpu /sys/fs/cgroup/cgroup.subtree_control' \
-    || setup_fail "no cpu cgroup controller on $1 (enabled: $(on "$1" 'cat /sys/fs/cgroup/cgroup.subtree_control' 2>&1))"
+  cgroup_fix "$1"
+  on "$1" 'grep -qw cpu /sys/fs/cgroup/cgroup.subtree_control' || setup_fail "no cpu cgroup controller on $1 (enabled: $(on "$1" 'cat /sys/fs/cgroup/cgroup.subtree_control' 2>&1))"
 }
 install "$SRC" & p1=$!
 install "$DST" & p2=$!
