@@ -3,28 +3,248 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Coolify Mirror: move Coolify apps between servers</title>
-<meta name="description" content="Back up one app or a whole Coolify server and restore it on another with one command. Data, databases, domains and images arrive running and verified. Open source, MIT.">
+<title>Coolify Mirror: migrate Coolify apps to a new server</title>
+<meta name="description" content="Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Free, open source.">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+<meta name="author" content="mtalavi">
 <link rel="canonical" href="https://coolify-mirror.pages.dev/">
+<link rel="alternate" type="text/markdown" href="https://coolify-mirror.pages.dev/llms.txt" title="Coolify Mirror for AI assistants (llms.txt)">
 <meta property="og:type" content="website">
-<meta property="og:title" content="Coolify Mirror: move Coolify apps between servers">
-<meta property="og:description" content="One command on each server. Data, databases, domains and images arrive running and verified.">
+<meta property="og:site_name" content="Coolify Mirror">
+<meta property="og:locale" content="en_US">
+<meta property="og:title" content="Coolify Mirror: migrate Coolify apps to a new server">
+<meta property="og:description" content="Back up on the old server, paste one command on the new one. Apps, databases, volumes and domains arrive running and verified.">
 <meta property="og:url" content="https://coolify-mirror.pages.dev/">
 <meta property="og:image" content="https://coolify-mirror.pages.dev/assets/img/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Coolify Mirror restoring a shop on a new server: every service running and verified, the site answering">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Coolify Mirror: migrate Coolify apps to a new server">
+<meta name="twitter:description" content="Back up on the old server, paste one command on the new one. Apps, databases, volumes and domains arrive running and verified.">
+<meta name="twitter:image" content="https://coolify-mirror.pages.dev/assets/img/og.png">
+<meta name="twitter:image:alt" content="Coolify Mirror restoring a shop on a new server: every service running and verified">
 <meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)">
 <meta name="theme-color" content="#f6f7f9" media="(prefers-color-scheme: light)">
 <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
 <link rel="preload" href="assets/fonts/geist-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="assets/img/01-menu.webp" as="image" type="image/webp">
 <link rel="stylesheet" href="assets/site.css">
 <link rel="stylesheet" href="assets/icons/phosphor.min.css">
-<script type="application/ld+json">
-{"@context":"https://schema.org","@type":"SoftwareApplication","name":"Coolify Mirror","applicationCategory":"DeveloperApplication","operatingSystem":"Linux (amd64, arm64)","license":"https://opensource.org/licenses/MIT","softwareVersion":"1.9.4","url":"https://coolify-mirror.pages.dev/","downloadUrl":"https://github.com/mtalavi/coolify-mirror/releases/latest","offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
-</script>
 <script defer src="assets/site.js"></script>
 <script defer src="assets/demo-frames.js"></script>
 <script defer src="assets/demo.js"></script>
+<script type="application/ld+json">
+{
+ "@context": "https://schema.org",
+ "@graph": [
+  {
+   "@type": "WebSite",
+   "@id": "https://coolify-mirror.pages.dev/#website",
+   "url": "https://coolify-mirror.pages.dev/",
+   "name": "Coolify Mirror",
+   "description": "Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Free, open source.",
+   "inLanguage": "en"
+  },
+  {
+   "@type": "SoftwareApplication",
+   "@id": "https://coolify-mirror.pages.dev/#app",
+   "name": "Coolify Mirror",
+   "alternateName": [
+    "coolify-mirror",
+    "Coolify migration tool"
+   ],
+   "description": "Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Free, open source.",
+   "url": "https://coolify-mirror.pages.dev/",
+   "inLanguage": "en",
+   "applicationCategory": "DeveloperApplication",
+   "applicationSubCategory": "Server migration, backup and restore",
+   "operatingSystem": "Linux (amd64, arm64)",
+   "softwareVersion": "1.9.5",
+   "softwareRequirements": "Coolify v4.3, v4.4 or v4.5 (same version on both servers), Linux amd64 or arm64, SSH as root or a sudo user",
+   "featureList": [
+    "Back up one app, several projects or a whole Coolify server",
+    "Restore with one pasted command (share code)",
+    "Encrypted backup (age) over HTTPS with a pinned certificate on port 443",
+    "Native PostgreSQL, MySQL and MariaDB dumps; Redis, SQLite, volumes and host files",
+    "Env vars, secrets, domains, images, proxy settings and secret-manager links",
+    "Preflight checks and rollback; SUCCESS only when every resource runs and answers",
+    "Coolify v4.3, v4.4 and v4.5, tested daily against new Coolify releases"
+   ],
+   "datePublished": "2026-10-01",
+   "dateModified": "2026-10-25",
+   "license": "https://opensource.org/licenses/MIT",
+   "isAccessibleForFree": true,
+   "offers": {
+    "@type": "Offer",
+    "price": "0",
+    "priceCurrency": "USD"
+   },
+   "downloadUrl": "https://github.com/mtalavi/coolify-mirror/releases/latest",
+   "installUrl": "https://github.com/mtalavi/coolify-mirror#-install",
+   "releaseNotes": "https://github.com/mtalavi/coolify-mirror/releases",
+   "screenshot": "https://coolify-mirror.pages.dev/assets/img/og.png",
+   "author": {
+    "@type": "Person",
+    "name": "mtalavi",
+    "url": "https://github.com/mtalavi"
+   },
+   "sameAs": [
+    "https://github.com/mtalavi/coolify-mirror"
+   ]
+  },
+  {
+   "@type": "SoftwareSourceCode",
+   "@id": "https://coolify-mirror.pages.dev/#code",
+   "name": "coolify-mirror",
+   "codeRepository": "https://github.com/mtalavi/coolify-mirror",
+   "programmingLanguage": "Go",
+   "license": "https://opensource.org/licenses/MIT",
+   "targetProduct": {
+    "@id": "https://coolify-mirror.pages.dev/#app"
+   }
+  },
+  {
+   "@type": "HowTo",
+   "@id": "https://coolify-mirror.pages.dev/#howto",
+   "name": "How to migrate Coolify apps to a new server",
+   "inLanguage": "en",
+   "tool": [
+    {
+     "@type": "HowToTool",
+     "name": "Coolify Mirror"
+    }
+   ],
+   "step": [
+    {
+     "@type": "HowToStep",
+     "position": 1,
+     "name": "Install the same Coolify version on the new server",
+     "text": "Coolify v4.3, v4.4 or v4.5; both servers must run exactly the same version."
+    },
+    {
+     "@type": "HowToStep",
+     "position": 2,
+     "name": "Back up on the old server",
+     "text": "Run curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh , choose Back up apps, pick the projects (or the whole server) and start the backup."
+    },
+    {
+     "@type": "HowToStep",
+     "position": 3,
+     "name": "Share the backup",
+     "text": "Choose to share through Coolify's proxy on port 443. The old server prints one command with a share code."
+    },
+    {
+     "@type": "HowToStep",
+     "position": 4,
+     "name": "Restore on the new server",
+     "text": "Paste that command on the new server. It downloads, verifies and restores everything, starts it through Coolify and checks every domain."
+    },
+    {
+     "@type": "HowToStep",
+     "position": 5,
+     "name": "Switch over",
+     "text": "Point DNS to the new server, move webhooks and scheduled tasks, then free the disk space on both servers."
+    }
+   ]
+  },
+  {
+   "@type": "FAQPage",
+   "@id": "https://coolify-mirror.pages.dev/#faq",
+   "inLanguage": "en",
+   "mainEntity": [
+    {
+     "@type": "Question",
+     "name": "How do I migrate Coolify to a new server?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Install Coolify on the new server, the same version as the old one. On the old server run the one-line installer, pick the projects (or the whole server), back them up and share the backup: it prints one command. Paste that command on the new server. It downloads and verifies the backup, restores apps, databases, volumes, env vars and domains, starts them through Coolify and checks that every domain answers. Then point your DNS to the new server."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can I move just one app or one project?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Pick one project, several, or a single app; the databases and services they use come along. They are merged into the new Coolify next to what is already there. A whole-server backup is the other option, for an empty new Coolify."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Which Coolify versions work?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Coolify v4.3, v4.4 and v4.5 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Does the old server go down during the backup?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. With Recommended settings, containers pause only for the seconds their volume copy takes, and databases are dumped while they run. Nothing is deleted on the old server."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Can the new server already have other projects?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. Backing up apps merges them into the new Coolify and keeps everything that is there. An app that already exists can be restored as a copy or skipped. A whole-server backup only goes onto a fresh, empty Coolify."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "The new server cannot connect to the old one.",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Port 443 of the old server is blocked. On the old server press q, choose Share a saved backup, the same backup, then Share a link on port 8123. Allow 8123 in your provider's firewall too, and run the new command it shows."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "My SSH connection dropped during the download.",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Keep the old server sharing and run the same command again: the download continues where it stopped. On big servers, run the tool inside tmux."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "The new server has no access to GitHub.",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "The old server also prints a second command that downloads the tool from the old server itself, over the same pinned connection."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "What does not move?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Resources on remote servers, preview deployments and Swarm. Webhooks and DNS keep pointing to the old server until you switch them. Between different CPU architectures, Coolify rebuilds the apps."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "How is this different from copying the whole server?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Copying /data/coolify and the Docker volumes over root SSH moves everything at once onto an empty server: database files are copied raw and nothing is checked afterwards. Coolify Mirror can move one project into a Coolify that is already in use, needs no SSH key between the servers (a share code on port 443), dumps databases while they run, checks version, space and conflicts before changing anything, rolls back on failure and reports success only when the apps answer on their domains."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "Is this an official Coolify tool?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "No. It is an independent open-source project under the MIT license, not affiliated with Coolify or coolLabs."
+     }
+    }
+   ]
+  }
+ ]
+}
+</script>
 </head>
 <body>
 
@@ -124,7 +344,7 @@
       <div class="facts">
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>SHA-256 checked on install</span>
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>Linux amd64 and arm64</span>
-        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Coolify 4.3 or 4.4, same version on both</span>
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Coolify 4.3, 4.4 or 4.5, same version on both</span>
       </div>
     </div>
   </div>
@@ -451,6 +671,7 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
+      <div class="rel"><div><span class="v">1.9.5</span><span class="d">2026-10-25</span></div><div><h3>Coolify 4.5</h3><p>Works with Coolify 4.5.0 (tested on two freshly installed servers, and again on 4.4.7 and 4.3.24). Coolify 4.5 changed its own Server Transfer exporter; backups carry Coolify's transfer bundle again, and the daily test now fails when a backup comes without it. Secrets that Coolify 4.5 encrypts at rest are re-encrypted for the new server like every other secret. The website answers the common migration questions and has a summary for AI assistants (<code>llms.txt</code>).</p></div></div>
       <div class="rel"><div><span class="v">1.9.4</span><span class="d">2026-10-22</span></div><div><h3>Coolify 4.4.7 and 4.3.24</h3><p>Tested with Coolify's security releases 4.4.7 and 4.3.24: a full move on two freshly installed servers for each. Update both servers to the same release before a move; Coolify's <code>patch.sh</code> takes every line to its fix release. The daily test's servers now always get the cpu cgroup controller: without it Docker there could not start containers with a CPU weight, which had wrongly marked 4.3.24 as failed on the test host.</p></div></div>
       <div class="rel"><div><span class="v">1.9.3</span><span class="d">2026-10-12</span></div><div><h3>Coolify 4.4.6, and a sturdier daily test</h3><p>Tested with Coolify 4.4.6. A failed daily test no longer stops backups (only restores), and a test whose servers could not even start is no longer published as a failure — that had wrongly marked 4.4.6 as failed.</p></div></div>
       <div class="rel"><div><span class="v">1.9.2</span><span class="d">2026-10-08</span></div><div><h3>Tidier lists</h3><p>Domains without the container port (<code>vemela.app</code>, not <code>vemela.app:3000</code>), and <code>list</code> and <code>files</code> columns that stay aligned with long names — found in a test on a real 20-project server.</p></div></div>
@@ -477,7 +698,9 @@
       <h2 id="faq-h">Questions</h2>
     </div>
     <div class="faq">
-      <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3 and v4.4 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6 and 4.4.7), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
+      <details><summary>How do I migrate Coolify to a new server?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Install Coolify on the new server, the same version as the old one. On the old server run the one-line installer, pick the projects (or the whole server), back them up and share the backup: it prints one command. Paste that command on the new server. It downloads and verifies the backup, restores apps, databases, volumes, env vars and domains, starts them through Coolify and checks that every domain answers. Then point your DNS to the new server.</p></details>
+      <details><summary>Can I move just one app or one project?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Pick one project, several, or a single app; the databases and services they use come along. They are merged into the new Coolify next to what is already there. A whole-server backup is the other option, for an empty new Coolify.</p></details>
+      <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3, v4.4 and v4.5 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
       <details><summary>Does the old server go down during the backup?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>No. With Recommended settings, containers pause only for the seconds their volume copy takes, and databases are dumped while they run. Nothing is deleted on the old server.</p></details>
       <details><summary>Can the new server already have other projects?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Backing up apps merges them into the new Coolify and keeps everything that is there. An app that already exists can be restored as a copy or skipped. A whole-server backup only goes onto a fresh, empty Coolify.</p></details>
       <details><summary>The new server cannot connect to the old one.<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Port 443 of the old server is blocked. On the old server press q, choose Share a saved backup, the same backup, then Share a link on port 8123. Allow 8123 in your provider's firewall too, and run the new command it shows.</p></details>

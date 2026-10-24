@@ -300,20 +300,39 @@ try {
             $databases = collect($server->databases())->unique(fn ($db) => $db::class.':'.$db->id)->filter($pick)->values();
             $services = $server->services()->get()->unique('id')->filter($pick)->values();
             $export = function () use ($server, $applications, $databases, $services) {
+                // The private methods change between releases (4.5.0 added a runner
+                // config to collectDependencies, dropped the server from exportProject
+                // and the URL from buildWarnings): call each one the way it is declared.
+                $arity = fn (string $m) => (new ReflectionMethod($this, $m))->getNumberOfParameters();
                 $projects = App\Models\Project::query()
                     ->whereIn('id', $this->collectProjectIds($applications, $databases, $services))
                     ->orderBy('name')->get();
                 $destinationUuidByKey = $this->destinationUuidMap($server);
-                $dependencies = $this->collectDependencies($server, $applications, $databases, $services);
+                $dependencies = $arity('collectDependencies') >= 5
+                    ? $this->collectDependencies($server, $applications, $databases, $services, null)
+                    : $this->collectDependencies($server, $applications, $databases, $services);
                 $sourceInstanceUrl = rtrim((string) (instanceSettings()->fqdn ?: config('app.url')), '/');
+                $second = (new ReflectionMethod($this, 'exportProject'))->getParameters()[1]->getType();
+                $projectWarnings = [];
+                $leftOutLinks = 0;
+                $projectPayloads = [];
+                foreach ($projects as $project) {
+                    $projectPayloads[] = ($second instanceof ReflectionNamedType && $second->getName() === Server::class)
+                        ? $this->exportProject($project, $server, $destinationUuidByKey, $applications, $databases, $services)
+                        : $this->exportProject($project, $destinationUuidByKey, $applications, $databases, $services, $projectWarnings, $leftOutLinks);
+                }
+                $warnings = $arity('buildWarnings') >= 3
+                    ? $this->buildWarnings($applications, $dependencies, $sourceInstanceUrl)
+                    : $this->buildWarnings($applications, $dependencies);
 
                 return App\Services\ServerTransfer\ServerTransferBundle::wrap([
                     'source_instance' => ['url' => $sourceInstanceUrl, 'name' => config('app.name')],
-                    'warnings' => $this->buildWarnings($applications, $dependencies, $sourceInstanceUrl),
+                    'warnings' => array_merge($warnings, $projectWarnings),
                     'private_key' => $this->exportPrivateKey($server->privateKey),
                     'private_keys' => $dependencies['private_keys']->map(fn ($k) => $this->exportPrivateKey($k))->values()->all(),
                     'github_apps' => $dependencies['github_apps']->map(fn ($a) => $this->exportGithubApp($a))->values()->all(),
                     'gitlab_apps' => $dependencies['gitlab_apps']->map(fn ($a) => $this->exportGitlabApp($a))->values()->all(),
+                    'gitea_apps' => isset($dependencies['gitea_apps']) ? $dependencies['gitea_apps']->map(fn ($a) => $this->exportGiteaApp($a))->values()->all() : [],
                     's3_storages' => $dependencies['s3_storages']->map(fn ($s) => $this->exportS3Storage($s))->values()->all(),
                     'cloud_provider_tokens' => $dependencies['cloud_provider_tokens']->map(fn ($t) => $this->exportCloudProviderToken($t))->values()->all(),
                     'ssl_certificates' => $this->exportSslCertificates($server),
@@ -321,7 +340,7 @@ try {
                     'server' => $this->exportServer($server),
                     'destinations' => $this->exportDestinations($server),
                     'shared_environment_variables' => ['server' => []],
-                    'projects' => $projects->map(fn ($p) => $this->exportProject($p, $server, $destinationUuidByKey, $applications, $databases, $services))->values()->all(),
+                    'projects' => $projectPayloads,
                 ]);
             };
             $result['supported'] = true;
