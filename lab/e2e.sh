@@ -125,7 +125,7 @@ done
 for i in $(seq 1 180); do
   up=$(on "$SRC" "docker ps --format '{{.Names}} {{.Status}}'" || true)
   if echo "$up" | grep -q "^web-$COMPOSE.*healthy" && echo "$up" | grep -q "^$PG .*healthy" && echo "$up" | grep -q "^$WEB"; then break; fi
-  [ "$i" = 180 ] && { echo "$up"; on "$SRC" 'for c in $(docker ps -a --filter status=restarting --filter status=exited -q); do docker logs --tail 5 $c 2>&1; done' || true; setup_fail "source resources did not start"; }
+  [ "$i" = 180 ] && { echo "$up"; docker exec -i "$SRC" bash -s <"$HERE/e2e_diag.sh" 2>&1 | sed 's/^/diag| /' || true; setup_fail "source resources did not start"; }
   sleep 5
 done
 MARK="e2e-$(date +%s)-$RANDOM"
