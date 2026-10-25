@@ -30,6 +30,11 @@ RUN cd /lib/systemd/system/sysinit.target.wants/ \
 # "cpu.weight: no such file or directory" otherwise.
 COPY system-slice-cpu.conf /etc/systemd/system/system.slice.d/cpu.conf
 
+# Pull Docker Hub images through Google's public mirror: the daily tests pull
+# the same images again and again and hit Docker Hub's anonymous rate limit.
+# Coolify's installer keeps these keys when it adds its own.
+COPY docker-daemon.json /etc/docker/daemon.json
+
 STOPSIGNAL SIGRTMIN+3
 VOLUME ["/var/lib/docker"]
 CMD ["/sbin/init"]

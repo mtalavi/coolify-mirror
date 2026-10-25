@@ -1,0 +1,43 @@
+# Coolify Mirror
+
+> Coolify Mirror (coolify-mirror) is a free, open-source (MIT) command-line tool that migrates Coolify apps between servers. It backs up one app, one or more projects, or a whole Coolify server, and restores it on another Coolify with one pasted command. Apps, databases, volumes, environment variables, secrets, domains, images and proxy settings arrive running and verified. Works with Coolify v4.3, v4.4 and v4.5 (both servers on the same version), on Linux amd64 and arm64. Not affiliated with Coolify or coolLabs.
+
+Current version: 1.9.5. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0; every new Coolify release is tested automatically every day.
+
+## How to migrate Coolify to a new server
+
+1. Install Coolify on the new server, exactly the same version as the old one.
+2. On the old server run: `curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh`
+3. In the menu choose "Back up apps", pick the projects (or "Back up the whole server"), start the backup, then share it through Coolify's proxy on port 443. The old server prints one command with a share code.
+4. Paste that command on the new server, for example: `curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore 203.0.113.10/hi4i-2dzx-hmeg-42qp-palx-52s7-zq`
+5. Answer Yes after reading the list, keep or change each domain. The tool restores everything, starts it through Coolify and reports "Restore complete · everything verified".
+6. Point DNS to the new server, move GitHub webhooks and scheduled tasks, and free the disk space on both servers (Saved files & disk space → All backups → ALL).
+
+## What moves
+
+- Projects, environments, applications, services and databases, with their env vars, secrets, tags, storages, scheduled tasks and backup schedules
+- PostgreSQL, MySQL and MariaDB as native dumps taken while they run; Redis, MongoDB, ClickHouse and SQLite data copied as files; Docker volumes and host folders
+- The exact Docker images that run (no rebuild needed), domains, proxy settings, Git sources and keys, S3 storages, secret-manager links (Vault, Doppler, Infisical)
+- Whole-server mode: the Coolify database, users, settings, keys, proxy and certificates, every volume and image (onto an empty Coolify only)
+
+## Safety
+
+- The backup is one age-encrypted file; it travels over HTTPS with a certificate pinned to the share code, through Coolify's own proxy on port 443 (or a direct port).
+- Before anything changes: same-version check, disk space, conflicts, domains, Coolify's bundle validation and a trial import in a rolled-back transaction.
+- A failed restore rolls back. Nothing is deleted: replaced volumes and folders are kept aside.
+- SUCCESS is printed only when every restored resource runs like on the source and its domains answer through the proxy.
+
+## Limits
+
+- Both servers must run exactly the same Coolify version (the tool says which one to upgrade).
+- Resources on remote servers, preview deployments and Swarm are not part of a selective backup.
+- DNS, GitHub webhooks and scheduled tasks must be switched to the new server by hand.
+- Coolify Cloud (app.coolify.io) is not a supported target: the tool needs the Coolify host itself.
+
+## Links
+
+- Website: https://coolify-mirror.pages.dev/
+- Source code and full documentation (README): https://github.com/mtalavi/coolify-mirror
+- Releases and changelog: https://github.com/mtalavi/coolify-mirror/releases
+- Daily compatibility results: https://github.com/mtalavi/coolify-mirror/blob/compat/compat.json
+- Security policy: https://github.com/mtalavi/coolify-mirror/blob/main/SECURITY.md

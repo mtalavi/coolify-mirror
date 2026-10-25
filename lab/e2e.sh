@@ -125,7 +125,7 @@ done
 for i in $(seq 1 180); do
   up=$(on "$SRC" "docker ps --format '{{.Names}} {{.Status}}'" || true)
   if echo "$up" | grep -q "^web-$COMPOSE.*healthy" && echo "$up" | grep -q "^$PG .*healthy" && echo "$up" | grep -q "^$WEB"; then break; fi
-  [ "$i" = 180 ] && { echo "$up"; on "$SRC" 'for c in $(docker ps -a --filter status=restarting --filter status=exited -q); do docker logs --tail 5 $c 2>&1; done' || true; setup_fail "source resources did not start"; }
+  [ "$i" = 180 ] && { echo "$up"; docker exec -i "$SRC" bash -s <"$HERE/e2e_diag.sh" 2>&1 | sed 's/^/diag| /' || true; setup_fail "source resources did not start"; }
   sleep 5
 done
 MARK="e2e-$(date +%s)-$RANDOM"
@@ -147,6 +147,12 @@ done
 on "$SRC" 'grep -E "^  ! " /root/share.out' || true
 echo "share code: $CODE"
 
+# Every backup carries Coolify's own Server Transfer bundle; losing it means
+# Coolify changed its exporter (as 4.5.0 did) and the tool must follow.
+if on "$SRC" "grep -q 'transfer export failed' /root/share.out"; then
+  on "$SRC" "grep 'transfer export failed' /root/share.out" || true
+  echo "BAD: the backup has no Coolify transfer bundle"; exit 1
+fi
 log "restore on the target with the share code"
 cgroup_ok "$DST"
 set +e
@@ -158,6 +164,8 @@ if [ "$rc" != 0 ]; then
   # Docker on the test server could not create a container cgroup: a host
   # problem, not a result about coolify-mirror or this Coolify version.
   grep -q 'error setting cgroup config' /tmp/cm-e2e-diag.log && setup_fail "Docker on $DST could not set up container cgroups (see diag)"
+  # The registry or the network of the test host failed while Coolify pulled an image.
+  grep -qE 'TLS handshake timeout|failed to fetch anonymous token|i/o timeout|toomanyrequests' /tmp/cm-e2e-diag.log && setup_fail "an image pull on $DST failed on the network or the registry (see diag)"
   echo "restore failed (exit $rc)"; exit 1
 fi
 grep -q '^SUCCESS' /tmp/cm-e2e-restore.log || { echo "no SUCCESS"; exit 1; }
