@@ -10,7 +10,7 @@ import (
 )
 
 // Version of this tool (set at build time with -ldflags).
-var Version = "1.9.7"
+var Version = "1.10.0"
 
 // FormatName identifies the backup layout.
 const FormatName = "github.com/mtalavi/coolify-mirror/1"
@@ -46,6 +46,9 @@ type Manifest struct {
 	Volumes     []VolumeEntry      `json:"volumes"`
 	Paths       []PathEntry        `json:"paths"`
 	Images      []ImageEntry       `json:"images"`
+	// RecoveryKeys are the public recovery keys the file is also encrypted
+	// to (it opens with any of their secret halves).
+	RecoveryKeys []string `json:"recovery_keys,omitempty"`
 	// HostRequirements: fingerprinted host files from backups made by an
 	// intermediate build; still validated on restore. New backups record
 	// host files in HostDeps (with their SHA-256).

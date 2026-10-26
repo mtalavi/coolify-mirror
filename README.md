@@ -13,7 +13,8 @@
 
 <p align="center">
   <b>Migrate Coolify to a new server: back up one domain, a few, or a whole Coolify server — then restore it on another Coolify by pasting one command.</b><br>
-  Projects, environments, env vars, secrets, volumes, files, images and proxy settings arrive intact and start through Coolify itself.
+  Projects, environments, env vars, secrets, volumes, files, images and proxy settings arrive intact and start through Coolify itself.<br>
+  <b>New in 1.10:</b> automatic off-site backups — every night to Google Drive, S3, SFTP or a folder; lost the server? <a href="#-automatic-off-site-backups--lost-the-server-back-in-minutes">back in minutes</a>.
 </p>
 
 <p align="center">
@@ -26,6 +27,7 @@
 <p align="center">
   <a href="https://coolify-mirror.pages.dev"><b>Website</b></a> ·
   <a href="#-quick-start--move-apps-in-4-steps"><b>Quick start</b></a> ·
+  <a href="#-automatic-off-site-backups--lost-the-server-back-in-minutes"><b>Off-site backups</b></a> ·
   <a href="#-install">Install</a> ·
   <a href="#-walkthrough--every-screen">Walkthrough</a> ·
   <a href="#-how-it-works">How it works</a> ·
@@ -117,6 +119,48 @@ sudo coolify-mirror
 | the new server has no GitHub access | use the second command the old server shows (*No GitHub access there?*) |
 | *Restored, but NOT operational* | the reason is printed right above it; full log in `/data/coolify-mirror/logs/` |
 </details>
+
+## 🛟 Automatic off-site backups — lost the server? Back in minutes
+
+A backup that lives on the server it protects is gone with that server. Coolify Mirror can make a **whole-server backup every night**, send it **anywhere [rclone](https://rclone.org) reaches** (Google Drive, S3 and S3-compatible storage, SFTP, Dropbox, OneDrive, Backblaze B2… 70+) or to a folder, **check the copy, then delete it from the server** so it never fills the disk. If the server burns, a new one is running again in minutes — with **one key you keep yourself**.
+
+**① Once: the recovery key** — it opens every backup on any server; it is shown once and never stored on the server. Send it to yourself by email and/or Telegram (Coolify's own mail settings and Telegram bot are used), and keep it in a password manager:
+
+```bash
+sudo coolify-mirror recovery-key create --email you@example.com --telegram 123456789
+```
+
+**② Once: the destination** — install rclone and add your Google Drive, S3 bucket or SFTP server (`rclone config`). The tool finds rclone and lets it do the transfer. A folder (another disk, a mount) works without rclone.
+
+```bash
+curl https://rclone.org/install.sh | sudo bash && rclone config
+```
+
+**③ Every night** — back up, upload, check, delete here, keep the 7 newest there, tell you if it fails:
+
+```bash
+sudo coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify-backups --keep-remote 7 --keep-local 0
+sudo coolify-mirror notify set --email you@example.com --on failure
+```
+
+The same as one command for your own scripts or cron: `sudo coolify-mirror backup --full --to gdrive:coolify-backups --keep-remote 7 --keep-local 0` (exit code 0 = uploaded and checked; on any failure the backup stays on the server). The menu has it all too: **Automatic backups**.
+
+**④ The day the server is lost** — on a new server: install Coolify **of the version in the backup's name** (`coolify-myserver-full-coolify4.5.0-20261027-033000.cmb` → `curl -fsSL https://cdn.coollabs.io/coolify/install.sh | sudo bash -s 4.5.0`), add the same rclone destination (`rclone config` with the same account, or your saved `rclone.conf`), then:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore gdrive:coolify-backups --recovery-key AGE-SECRET-KEY-1…
+```
+
+It takes the newest backup of that folder (or a file, or an `https://` address), sees whether it is a whole server or apps, restores it, starts everything through Coolify, checks every domain — and the panel answers on the new server's own address. Point your DNS to the new IP and you are back.
+
+| | |
+|---|---|
+| Encryption | each backup is encrypted to its own key **and** to the recovery key (age X25519); a stolen server or storage account cannot open it |
+| Disk space | needs room for one backup while it uploads; deleted here only after the copy is checked (size + checksum via `rclone check`) |
+| Cleaning | only this server's backups of the same kind are rotated — other servers sharing the folder, and backups you made by hand, are never touched |
+| Schedule | a systemd timer: survives reboots, runs a missed time after the server starts again · `schedule list`, `schedule run NAME`, `schedule remove NAME` |
+| Reports | email / Telegram on failure (or every run) · last result in the menu and `schedule list` |
+| Iran | Google Drive and Telegram are blocked from servers inside Iran — use an S3 bucket or SFTP inside the country, and email |
 
 ---
 
@@ -370,6 +414,10 @@ coolify-mirror restore FILE.cmb --key KEY --yes \
   --set-domain shop.com=shop.new.com --set-domain www.shop.com=-
 coolify-mirror restore FULL-CODE --yes --panel-url keep # whole server: keep this panel's address (default)
 coolify-mirror repair-panel [URL|-]                     # panel unreachable after an older whole-server restore
+coolify-mirror recovery-key create --email you@example.com  # the key that opens every backup anywhere
+coolify-mirror backup --full --to gdrive:coolify --keep-remote 7 --keep-local 0   # off-site: upload, check, free the disk
+coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify --keep-remote 7 # every night (systemd timer)
+coolify-mirror restore gdrive:coolify --recovery-key AGE-SECRET-KEY-1…           # newest backup, on a new server
 coolify-mirror start-all                                # start anything stopped (compose apps from their images)
 coolify-mirror update                                   # install the latest release (SHA-256 checked)
 coolify-mirror files                                    # what the tool keeps here, with sizes
@@ -388,9 +436,14 @@ coolify-mirror files delete NAME… | --backups | --all [--yes]   # free the dis
 | | `--include-backups` | full: also `/data/coolify/backups` |
 | | `--output DIR` | default `/data/coolify-mirror/backups` |
 | | `--serve --mode proxy\|direct --port 8123 --host IP --open-firewall` | share right after (HTTPS; proxy = port 443) |
+| | `--to DEST --keep-remote N --keep-local N --notify failure\|always\|never` | off-site: upload to an rclone remote (`name:folder`) or a folder, check it, keep N there (default 7) and N here (default 0) |
+| `recovery-key` | `create [--email A] [--telegram ID]` · `show` · `add age1…` · `send KEY` · `remove` | the key that opens every new backup on any server |
+| `schedule` | `add --at 03:30 [--name N] <backup flags with --to>` · `list` · `run NAME` · `remove NAME` | backups on a systemd timer |
+| `notify` | `set --email A --telegram ID [--on failure\|always\|never] [--smtp-host …] [--telegram-token …]` · `test` · `show` · `off` | where reports and the recovery key go (Coolify's mail / Telegram settings by default) |
 | `serve` | `--key`, `--mode`, `--port`, `--host`, `--open-firewall`, `--detach`, `--ttl 24h` | share an existing file |
 | `restore` | `CODE` / link / file | a share code `HOST[:PORT]/xxxx-…`, a full link, or a `.cmb` file |
 | | `--key KEY` | for a file (or a link without `#key=`) |
+| | `--recovery-key KEY` / `--recovery-key-file F` | open a backup made with a recovery key; the source may be an rclone path (`gdrive:folder` = its newest backup), a folder or an `https://` address |
 | | `--yes` | no questions |
 | | `--on-conflict copy\|skip` | resource already exists here |
 | | `--team ID` | target team (selective) |
@@ -460,6 +513,7 @@ The [walkthrough](#-walkthrough--every-screen) is a real run of the released 1.9
 
 Every release with its binaries and checksums: [Releases](https://github.com/mtalavi/coolify-mirror/releases).
 
+- **1.10.0** · 2026-10-27 — **Automatic off-site backups.** Every night (or from your own script) a whole-server backup goes to Google Drive, S3, SFTP, Dropbox or a folder through rclone, is checked there and only then deleted here; the newest N are kept there and N here. Each backup is also encrypted to a recovery key that is shown once and can be sent to you by email or Telegram, so it opens on any new server: `restore gdrive:folder --recovery-key …` takes the newest backup and brings the whole server back. Backup file names now carry the Coolify version they need. Restore also takes a folder, an rclone path or an https:// address; failures are reported by email or Telegram.
 - **1.9.7** · 2026-10-26 — **Whole-server restore keeps its panel; copy with one key.** A whole-server restore carried the old server's panel address and IPs, so the new panel answered only on the old domain (“not registered” on its own). The panel now keeps this server's address (or the one you choose), Coolify rebuilds its proxy route, and the restore checks the panel answers. `sudo coolify-mirror repair-panel` fixes a server restored with an older version. Press `c` on the share screen to copy the command to your own clipboard (`s`: the short one); the last restore question now says plainly that No keeps everything running; `coolify-mirror help` starts with the everyday commands; an identical `docker-compose.custom.yml` no longer warns. The daily test now also moves a whole server.
 - **1.9.6** · 2026-10-26 — **No hang with sudo.** The menu no longer hangs after the banner when it is started with `curl … | sudo sh` on Debian 12 or Ubuntu: sudo's `use_pty` put it in the background of a terminal that gets no keyboard, so the system stopped it. It now reads the keyboard from your own terminal. A Docker daemon that does not answer ends with a clear message after 30 s instead of a silent wait, and the log names any command that runs longer than 10 s.
 - **1.9.5** · 2026-10-25 — **Coolify 4.5.** Works with Coolify 4.5.0 (tested on two freshly installed servers, and again on 4.4.7 and 4.3.24). Coolify 4.5 changed its own Server Transfer exporter; backups carry Coolify's transfer bundle again, and the daily test now fails when a backup comes without it. Secrets that Coolify 4.5 encrypts at rest are re-encrypted for the new server like every other secret. The website answers the common migration questions and has a summary for AI assistants (`llms.txt`).

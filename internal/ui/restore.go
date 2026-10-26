@@ -22,6 +22,9 @@ func restoreFlow(ctx context.Context, in *coolify.Instance) error {
 }
 
 func checkSource(s string) error {
+	if engine.IsOffsiteSource(s) {
+		return nil
+	}
 	loc, key, isURL, err := transfer.ParseSource(s)
 	if err != nil {
 		return err
@@ -30,7 +33,7 @@ func checkSource(s string) error {
 		return errors.New("the link must include the #key=… part at the end (or use the share code)")
 	}
 	if !isURL && !strings.HasSuffix(loc, ".cmb") {
-		return errors.New("type the share code (1.2.3.4/abcd-…), or paste the https://… link or the path of a .cmb file")
+		return errors.New("type the share code (1.2.3.4/abcd-…), an rclone path (gdrive:folder), a folder, an https:// address or the path of a .cmb file")
 	}
 	return nil
 }
@@ -42,25 +45,57 @@ func restoreSource(ctx context.Context, in *coolify.Instance, link string) error
 		if err := checkSource(link); err != nil {
 			return err
 		}
-	} else if err := huh.NewForm(huh.NewGroup(
-		huh.NewInput().
-			Title("Type or paste the share code shown on the source server").
-			Description("It looks like 1.2.3.4/abcd-efgh-ijkl-mnop-qrst-uvwx-yz (a full https://… link or a local .cmb file path also works)").
-			Value(&link).
-			Validate(checkSource),
-	)).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
-		return err
+	} else {
+		from := "code"
+		opts := []huh.Option[string]{
+			huh.NewOption("A share code from the other server", "code"),
+			huh.NewOption("From a storage: Google Drive, S3… (rclone) or a folder - after losing a server", "store"),
+			huh.NewOption("A file or an https:// address", "path"),
+		}
+		if err := huh.NewForm(huh.NewGroup(huh.NewSelect[string]().Title("Where is the backup?").Options(opts...).Value(&from))).
+			WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
+			return err
+		}
+		switch from {
+		case "store":
+			p, err := pickStoredBackup(ctx)
+			if err != nil {
+				return err
+			}
+			link = p
+		default:
+			title, desc := "Type or paste the share code shown on the source server", "It looks like 1.2.3.4/abcd-efgh-ijkl-mnop-qrst-uvwx-yz"
+			if from == "path" {
+				title, desc = "Path of the backup file, or its https:// address", "/data/coolify-mirror/backups/….cmb, https://…/backup.cmb, or an rclone path like gdrive:folder/file.cmb"
+			}
+			if err := huh.NewForm(huh.NewGroup(huh.NewInput().Title(title).Description(desc).Value(&link).Validate(checkSource))).
+				WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
+				return err
+			}
+		}
 	}
 	var err error
 
 	key := ""
-	if loc, k, isURL, _ := transfer.ParseSource(link); !isURL && k == "" {
-		if _, err := os.Stat(loc + ".key"); err != nil {
-			if err := huh.NewForm(huh.NewGroup(huh.NewInput().Title("Key of this backup file").
-				Description("It was shown on the source server when the backup was created").Value(&key))).
-				WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
-				return err
+	askKey := engine.IsOffsiteSource(link)
+	if !askKey {
+		if loc, k, isURL, _ := transfer.ParseSource(link); !isURL && k == "" {
+			if _, err := os.Stat(loc + ".key"); err != nil {
+				askKey = true
 			}
+		}
+	}
+	if askKey {
+		if err := huh.NewForm(huh.NewGroup(huh.NewInput().EchoMode(huh.EchoModePassword).Title("Recovery key (or the key of this backup)").
+			Description("AGE-SECRET-KEY-1… - the recovery key you saved (or received by email/Telegram)").Value(&key).
+			Validate(func(s string) error {
+				if strings.TrimSpace(s) == "" {
+					return errors.New("the backup does not open without its key")
+				}
+				return nil
+			}))).
+			WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
+			return err
 		}
 	}
 	pr := engine.NewProgress("Download")

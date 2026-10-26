@@ -1,6 +1,11 @@
 // Package archive implements the backup file format:
 //
-//	"COOLIFY-MIRROR/1\n" + age(scrypt passphrase)( zstd( tar ) )
+//	"COOLIFY-MIRROR/1\n" + age(key)( zstd( tar ) )
+//
+// The key of a backup is a random scrypt passphrase, or - when the server has
+// a recovery key - a random X25519 identity ("AGE-SECRET-KEY-1..."): the file
+// is then encrypted to that identity and to the public recovery key too, so
+// it opens with either (the recovery key never leaves the person's hands).
 //
 // The tar stream holds a manifest, the database export and every file of the
 // saved volumes, directories and images, each under its own path prefix, with
@@ -16,6 +21,7 @@ import (
 	"io"
 	"os"
 	"runtime"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -53,8 +59,17 @@ func (c *countWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
-// Create starts a new backup file at path, encrypted with passphrase.
-func Create(path, passphrase string) (*Writer, error) {
+// IdentityPrefix starts a key that is an age X25519 identity, not a passphrase.
+const IdentityPrefix = "AGE-SECRET-KEY-1"
+
+// Create starts a new backup file at path, encrypted with key. With
+// recovery recipients (age1... public keys) key must be an X25519 identity and
+// the file opens with that identity or with any recovery key.
+func Create(path, key string, recovery ...string) (*Writer, error) {
+	recipients, err := recipientsFor(key, recovery)
+	if err != nil {
+		return nil, err
+	}
 	f, err := os.OpenFile(path, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
 	if err != nil {
 		return nil, err
@@ -66,13 +81,7 @@ func Create(path, passphrase string) (*Writer, error) {
 		f.Close()
 		return nil, err
 	}
-	r, err := age.NewScryptRecipient(passphrase)
-	if err != nil {
-		f.Close()
-		return nil, err
-	}
-	r.SetWorkFactor(scryptWorkFactor)
-	w.enc, err = age.Encrypt(w.bw, r)
+	w.enc, err = age.Encrypt(w.bw, recipients...)
 	if err != nil {
 		f.Close()
 		return nil, err
@@ -224,7 +233,7 @@ func Open(path, passphrase string) (*Reader, error) {
 		f.Close()
 		return nil, ErrNotBackup
 	}
-	id, err := age.NewScryptIdentity(passphrase)
+	id, err := identityFor(passphrase)
 	if err != nil {
 		f.Close()
 		return nil, err
@@ -269,4 +278,66 @@ func (r *Reader) Close() error {
 // ReadAllEntries is a helper that fully reads the current entry (small files only).
 func (r *Reader) ReadAllEntries(max int64) ([]byte, error) {
 	return io.ReadAll(io.LimitReader(r.tr, max))
+}
+
+// recipientsFor turns a backup key (and recovery public keys) into age recipients.
+func recipientsFor(key string, recovery []string) ([]age.Recipient, error) {
+	if !strings.HasPrefix(key, IdentityPrefix) {
+		if len(recovery) > 0 {
+			return nil, errors.New("a backup with a recovery key needs an X25519 backup key")
+		}
+		r, err := age.NewScryptRecipient(key)
+		if err != nil {
+			return nil, err
+		}
+		r.SetWorkFactor(scryptWorkFactor)
+		return []age.Recipient{r}, nil
+	}
+	id, err := age.ParseX25519Identity(key)
+	if err != nil {
+		return nil, fmt.Errorf("backup key: %w", err)
+	}
+	out := []age.Recipient{id.Recipient()}
+	for _, rk := range recovery {
+		r, err := age.ParseX25519Recipient(strings.TrimSpace(rk))
+		if err != nil {
+			return nil, fmt.Errorf("recovery key %q: %w", rk, err)
+		}
+		out = append(out, r)
+	}
+	return out, nil
+}
+
+// identityFor turns a backup key or a recovery key into an age identity.
+func identityFor(key string) (age.Identity, error) {
+	key = strings.TrimSpace(key)
+	if strings.HasPrefix(key, IdentityPrefix) {
+		return age.ParseX25519Identity(key)
+	}
+	return age.NewScryptIdentity(key)
+}
+
+// NewIdentityKey returns a fresh X25519 identity: the key of a backup that is
+// also encrypted to recovery keys, or a new recovery key.
+func NewIdentityKey() (secret, public string, err error) {
+	id, err := age.GenerateX25519Identity()
+	if err != nil {
+		return "", "", err
+	}
+	return id.String(), id.Recipient().String(), nil
+}
+
+// PublicKeyOf returns the age1... public key of an identity key.
+func PublicKeyOf(secret string) (string, error) {
+	id, err := age.ParseX25519Identity(strings.TrimSpace(secret))
+	if err != nil {
+		return "", err
+	}
+	return id.Recipient().String(), nil
+}
+
+// ValidPublicKey reports whether s is an age X25519 public key (age1...).
+func ValidPublicKey(s string) error {
+	_, err := age.ParseX25519Recipient(strings.TrimSpace(s))
+	return err
 }

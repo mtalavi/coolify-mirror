@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Coolify Mirror: migrate Coolify apps to a new server</title>
-<meta name="description" content="Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Free, open source.">
+<meta name="description" content="Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Automatic off-site backups to Google Drive, S3 or SFTP. Free, open source.">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
 <meta name="author" content="mtalavi">
 <meta name="google-site-verification" content="kRphF6oYFOTv1FtH5qiZWhbEOJZ8w8_vcy_gHArjTc4">
@@ -43,7 +43,7 @@
    "@id": "https://coolify-mirror.pages.dev/#website",
    "url": "https://coolify-mirror.pages.dev/",
    "name": "Coolify Mirror",
-   "description": "Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Free, open source.",
+   "description": "Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Automatic off-site backups to Google Drive, S3 or SFTP. Free, open source.",
    "inLanguage": "en"
   },
   {
@@ -54,16 +54,17 @@
     "coolify-mirror",
     "Coolify migration tool"
    ],
-   "description": "Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Free, open source.",
+   "description": "Coolify migration tool: back up one app, a project or a whole Coolify server and restore it on a new server with one command. Databases, volumes, env vars, domains and images arrive running and verified. Automatic off-site backups to Google Drive, S3 or SFTP. Free, open source.",
    "url": "https://coolify-mirror.pages.dev/",
    "inLanguage": "en",
    "applicationCategory": "DeveloperApplication",
    "applicationSubCategory": "Server migration, backup and restore",
    "operatingSystem": "Linux (amd64, arm64)",
-   "softwareVersion": "1.9.7",
+   "softwareVersion": "1.10.0",
    "softwareRequirements": "Coolify v4.3, v4.4 or v4.5 (same version on both servers), Linux amd64 or arm64, SSH as root or a sudo user",
    "featureList": [
     "Back up one app, several projects or a whole Coolify server",
+    "Automatic off-site backups to Google Drive, S3, SFTP or a folder (rclone), restored on a new server with one recovery key",
     "Restore with one pasted command (share code), copied with one key",
     "Encrypted backup (age) over HTTPS with a pinned certificate on port 443",
     "Native PostgreSQL, MySQL and MariaDB dumps; Redis, SQLite, volumes and host files",
@@ -72,7 +73,7 @@
     "Coolify v4.3, v4.4 and v4.5, tested daily against new Coolify releases"
    ],
    "datePublished": "2026-10-01",
-   "dateModified": "2026-10-26",
+   "dateModified": "2026-10-27",
    "license": "https://opensource.org/licenses/MIT",
    "isAccessibleForFree": true,
    "offers": {
@@ -171,6 +172,22 @@
     },
     {
      "@type": "Question",
+     "name": "Can it back up automatically to Google Drive or S3?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Yes. sudo coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify-backups --keep-remote 7 backs up every night, uploads through rclone (Google Drive, S3, SFTP, Dropbox and 70+ more) or to a folder, checks the copy and then deletes it from the server. A failed run is reported by email or Telegram."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "The server is gone. How do I get everything back?",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "On a new server install the Coolify version written in the backup’s name, set up the same rclone destination, and run curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore gdrive:coolify-backups --recovery-key AGE-SECRET-KEY-1…. It restores the newest backup, starts everything and checks every domain."
+     }
+    },
+    {
+     "@type": "Question",
      "name": "The panel does not open after a whole-server restore (“not registered”)",
      "acceptedAnswer": {
       "@type": "Answer",
@@ -262,6 +279,7 @@
     <a class="brand" href="#top" aria-label="Coolify Mirror, home"><img src="assets/mark.svg" alt="" width="26" height="26">Coolify Mirror</a>
     <nav class="nav-links" aria-label="Sections">
       <a href="#tutorial">Tutorial</a>
+      <a href="#offsite">Off-site backups</a>
       <a href="#what-moves">What moves</a>
       <a href="#case-studies">Case studies</a>
       <a href="#stack">Under the hood</a>
@@ -354,6 +372,45 @@
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>SHA-256 checked on install</span>
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>Linux amd64 and arm64</span>
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>Coolify 4.3, 4.4 or 4.5, same version on both</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band" id="offsite" aria-labelledby="offsite-h">
+  <div class="wrap band-grid">
+    <div>
+      <h2 id="offsite-h">Lost the server? Back in minutes.</h2>
+      <p>Every night a whole-server backup goes to Google Drive, S3, SFTP, Dropbox or a folder &mdash; anywhere <a href="https://rclone.org">rclone</a> reaches. The copy is checked, then deleted from the server, so the disk never fills.</p>
+      <p>On a new server, one command with your recovery key brings everything back: apps, databases, domains, users, and the panel on the new address. The backup&rsquo;s name says which Coolify version to install first.</p>
+    </div>
+    <div class="cmds">
+      <div>
+        <div class="cmd-label"><i class="ph ph-lock-key" aria-hidden="true"></i>Once: the recovery key (shown once, sent to you by email or Telegram)</div>
+        <div class="cmd">
+          <code><span class="p">$ </span>sudo coolify-mirror recovery-key create --email you@example.com --telegram 123456789</code>
+          <button class="copy" type="button" aria-label="Copy" data-label="Copy" data-copied="Copied" data-copy="sudo coolify-mirror recovery-key create --email you@example.com --telegram 123456789"><i class="ph ph-copy" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div>
+        <div class="cmd-label"><i class="ph ph-upload-simple" aria-hidden="true"></i>Every night: back up, upload, check, delete here, keep 7 there</div>
+        <div class="cmd">
+          <code><span class="p">$ </span>sudo coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify-backups --keep-remote 7 --keep-local 0</code>
+          <button class="copy" type="button" aria-label="Copy" data-label="Copy" data-copied="Copied" data-copy="sudo coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify-backups --keep-remote 7 --keep-local 0"><i class="ph ph-copy" aria-hidden="true"></i></button>
+        </div>
+      </div>
+      <div>
+        <div class="cmd-label"><i class="ph ph-download-simple" aria-hidden="true"></i>The day the server is lost, on a new one</div>
+        <div class="cmd">
+          <code><span class="p">$ </span>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore gdrive:coolify-backups --recovery-key AGE-SECRET-KEY-1…</code>
+          <span class="tag">example</span>
+        </div>
+      </div>
+      <div class="facts">
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Encrypted to your recovery key</span>
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Deleted here only after the copy is checked</span>
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Email / Telegram when a run fails</span>
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Also one command for your own scripts</span>
       </div>
     </div>
   </div>
@@ -680,6 +737,7 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
+      <div class="rel"><div><span class="v">1.10.0</span><span class="d">2026-10-27</span></div><div><h3>Automatic off-site backups</h3><p>Every night (or from your own script) a whole-server backup goes to Google Drive, S3, SFTP, Dropbox or a folder through rclone, is checked there and only then deleted here; the newest N are kept there and N here. Each backup is also encrypted to a recovery key that is shown once and can be sent to you by email or Telegram, so it opens on any new server: <code>restore gdrive:folder --recovery-key …</code> takes the newest backup and brings the whole server back. Backup file names now carry the Coolify version they need. Restore also takes a folder, an rclone path or an https:// address; failures are reported by email or Telegram.</p></div></div>
       <div class="rel"><div><span class="v">1.9.7</span><span class="d">2026-10-26</span></div><div><h3>Whole-server restore keeps its panel; copy with one key</h3><p>A whole-server restore carried the old server's panel address and IPs, so the new panel answered only on the old domain (&ldquo;not registered&rdquo; on its own). The panel now keeps this server's address (or the one you choose), Coolify rebuilds its proxy route, and the restore checks the panel answers. <code>sudo coolify-mirror repair-panel</code> fixes a server restored with an older version. Press <kbd>c</kbd> on the share screen to copy the command to your own clipboard (<kbd>s</kbd>: the short one); the last restore question now says plainly that No keeps everything running; <code>coolify-mirror help</code> starts with the everyday commands; an identical <code>docker-compose.custom.yml</code> no longer warns. The daily test now also moves a whole server.</p></div></div>
       <div class="rel"><div><span class="v">1.9.6</span><span class="d">2026-10-26</span></div><div><h3>No hang with sudo</h3><p>The menu no longer hangs after the banner when it is started with <code>curl … | sudo sh</code> on Debian 12 or Ubuntu: sudo's <code>use_pty</code> put it in the background of a terminal that gets no keyboard, so the system stopped it. It now reads the keyboard from your own terminal. A Docker daemon that does not answer ends with a clear message after 30 s instead of a silent wait, and the log names any command that runs longer than 10 s.</p></div></div>
       <div class="rel"><div><span class="v">1.9.5</span><span class="d">2026-10-25</span></div><div><h3>Coolify 4.5</h3><p>Works with Coolify 4.5.0 (tested on two freshly installed servers, and again on 4.4.7 and 4.3.24). Coolify 4.5 changed its own Server Transfer exporter; backups carry Coolify's transfer bundle again, and the daily test now fails when a backup comes without it. Secrets that Coolify 4.5 encrypts at rest are re-encrypted for the new server like every other secret. The website answers the common migration questions and has a summary for AI assistants (<code>llms.txt</code>).</p></div></div>
@@ -711,6 +769,8 @@
     <div class="faq">
       <details><summary>How do I migrate Coolify to a new server?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Install Coolify on the new server, the same version as the old one. On the old server run the one-line installer, pick the projects (or the whole server), back them up and share the backup: it prints one command. Paste that command on the new server. It downloads and verifies the backup, restores apps, databases, volumes, env vars and domains, starts them through Coolify and checks that every domain answers. Then point your DNS to the new server.</p></details>
       <details><summary>Can I move just one app or one project?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Pick one project, several, or a single app; the databases and services they use come along. They are merged into the new Coolify next to what is already there. A whole-server backup is the other option, for an empty new Coolify.</p></details>
+      <details><summary>Can it back up automatically to Google Drive or S3?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. <code>sudo coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify-backups --keep-remote 7</code> backs up every night, uploads through rclone (Google Drive, S3, SFTP, Dropbox and 70+ more) or to a folder, checks the copy and then deletes it from the server. A failed run is reported by email or Telegram.</p></details>
+      <details><summary>The server is gone. How do I get everything back?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>On a new server install the Coolify version written in the backup&rsquo;s name, set up the same rclone destination, and run <code>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore gdrive:coolify-backups --recovery-key AGE-SECRET-KEY-1…</code>. It restores the newest backup, starts everything and checks every domain.</p></details>
       <details><summary>The panel does not open after a whole-server restore (&ldquo;not registered&rdquo;)<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Versions before 1.9.7 restored the old server&rsquo;s panel address too, so the proxy only knew the old domain. Since 1.9.7 the panel keeps this server&rsquo;s own address and IPs and the restore checks it answers. A server restored earlier: run <code>sudo coolify-mirror repair-panel</code> (add the panel address, or <code>-</code> for none).</p></details>
       <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3, v4.4 and v4.5 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
       <details><summary>Does the old server go down during the backup?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>No. With Recommended settings, containers pause only for the seconds their volume copy takes, and databases are dumped while they run. Nothing is deleted on the old server.</p></details>

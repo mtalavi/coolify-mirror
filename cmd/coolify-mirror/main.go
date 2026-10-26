@@ -70,6 +70,12 @@ func realMain(args []string) int {
 		err = cmdServe(ctx, args)
 	case "serve-internal":
 		err = cmdServeInternal(ctx, args)
+	case "recovery-key":
+		err = cmdRecoveryKey(ctx, args)
+	case "notify":
+		err = cmdNotify(ctx, args)
+	case "schedule":
+		err = cmdSchedule(ctx, args)
 	case "repair-panel":
 		err = cmdRepairPanel(ctx, args)
 	case "start-all":
@@ -117,6 +123,22 @@ Everyday use
   sudo coolify-mirror update                install the latest release (checksum verified)
   coolify-mirror help                       this help
 
+Automatic off-site backups (back in minutes after losing the server)
+  sudo coolify-mirror recovery-key create [--email ADDR] [--telegram CHAT_ID]
+                                            the key that opens every backup on any server; shown once,
+                                            optionally sent by email/Telegram (never kept here)
+  sudo coolify-mirror backup --full --to gdrive:coolify --keep-remote 7 --keep-local 0
+                                            back up, upload (rclone remote or a folder), check the copy,
+                                            then delete it here; keep the 7 newest there
+  sudo coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify --keep-remote 7
+                                            the same every day (systemd timer); schedule list|run NAME|remove NAME
+  sudo coolify-mirror restore gdrive:coolify --recovery-key AGE-SECRET-KEY-1…
+                                            on a new server: the newest backup of that folder, full or apps
+  sudo coolify-mirror notify set --email ADDR --telegram CHAT_ID [--on failure|always|never]
+                                            where reports go (Coolify's mail settings / Telegram bot are used);
+                                            notify test · notify show · own SMTP: --smtp-host H --smtp-port 587
+                                            --smtp-user U --smtp-password P --smtp-from ADDR; own bot: --telegram-token T
+
 Backup
   sudo coolify-mirror list                  the projects, their resources and domains
   sudo coolify-mirror backup [flags]
@@ -132,6 +154,10 @@ Backup
         --include-backups               full mode: include /data/coolify/backups
         --output DIR                    where to write the file (default /data/coolify-mirror/backups)
         --serve                         share the file over HTTPS when done
+        --to DEST                       upload to an rclone remote (name:folder) or a folder, check the copy
+        --keep-remote N                 with --to: keep the N newest backups there (default 7, 0 = all)
+        --keep-local N                  with --to: keep the N newest uploaded backups here (default 0)
+        --notify failure|always|never   with --to: report this run (default: notify set --on)
 
 Share
   sudo coolify-mirror serve FILE [flags]  share an existing backup file
@@ -142,6 +168,9 @@ Restore
   sudo coolify-mirror restore CODE [flags]  download, verify and restore a shared backup
                                         (a link or a .cmb file also works)
         --key KEY                       if the link has no #key=... part
+        --recovery-key KEY              the recovery key (AGE-SECRET-KEY-1…); --recovery-key-file FILE
+                                        CODE can also be an rclone path (gdrive:folder[/file.cmb]), a folder
+                                        or an https:// address: a folder gives its newest backup
         --yes                           do not ask for confirmation
         --on-conflict copy|skip         selective restore: resource already exists here
         --team ID                       selective restore: target team (default 0)
@@ -454,12 +483,27 @@ func cmdBackup(ctx context.Context, args []string) error {
 	port := fs.Int("port", engine.DefaultPort, "")
 	host := fs.String("host", "", "")
 	openFW := fs.Bool("open-firewall", false, "")
+	to := fs.String("to", "", "")
+	keepRemote := fs.Int("keep-remote", 7, "")
+	keepLocal := fs.Int("keep-local", 0, "")
+	notifyOn := fs.String("notify", "", "")
+	schedName := fs.String("schedule-name", "", "")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
+	var off *offsiteRun // --to: upload, check, then free the disk here
+	if *to != "" {
+		if *serve {
+			return errors.New("--to and --serve do not go together")
+		}
+		off = &offsiteRun{dest: *to, keepRemote: *keepRemote, keepLocal: *keepLocal, notifyOn: *notifyOn, name: *schedName, started: time.Now()}
+		if err := off.precheck(ctx); err != nil {
+			return off.fail(ctx, nil, err)
+		}
+	}
 	in, err := detect(ctx)
 	if err != nil {
-		return err
+		return off.fail(ctx, nil, err)
 	}
 	req := engine.BackupRequest{Mode: engine.ModeSelective, OutputDir: *output, Consistency: *consistency,
 		Images: *images, IncludeBackups: *includeBackups}
@@ -472,7 +516,7 @@ func cmdBackup(ctx context.Context, args []string) error {
 		}
 		sel, err := selectResources(rs, *all, splitList(*projects), splitList(*domains), splitList(*uuids))
 		if err != nil {
-			return err
+			return off.fail(ctx, in, err)
 		}
 		if !*noDeps {
 			deps, err := engine.ResolveDependencies(ctx, in, sel, rs)
@@ -491,7 +535,10 @@ func cmdBackup(ctx context.Context, args []string) error {
 	res, err := engine.Backup(ctx, in, req, pr)
 	stopPrint()
 	if err != nil {
-		return err
+		return off.fail(ctx, in, err)
+	}
+	if off != nil {
+		return off.finish(ctx, in, res)
 	}
 	fmt.Printf("\nBackup complete in %s\n  file: %s\n  size: %s (data: %s)\n  key:  %s\n",
 		engine.HumanDuration(res.Duration), res.Path, engine.HumanBytes(res.Size), engine.HumanBytes(res.RawBytes), res.Key)
@@ -770,6 +817,9 @@ func cmdRestore(ctx context.Context, args []string) error {
 	verifyRedeploy := fs.Bool("verify-redeploy", false, "")
 	keepDownload := fs.Bool("keep-download", false, "")
 	panelURL := fs.String("panel-url", engine.PanelKeep, "")
+	recoveryKey := fs.String("recovery-key", "", "")
+	recoveryKeyFile := fs.String("recovery-key-file", "", "")
+	_ = fs.Bool("latest", true, "") // a folder or a remote folder always gives its newest backup
 	var setDomains multiFlag
 	fs.Var(&setDomains, "set-domain", "")
 	src, rest := firstArg(args)
@@ -780,9 +830,19 @@ func cmdRestore(ctx context.Context, args []string) error {
 		return errors.New("usage: coolify-mirror restore CODE|LINK|FILE")
 	}
 	// In a terminal without options: the same interactive restore as the menu.
-	if !*yes && *key == "" && !*noStart && !*verifyRedeploy && len(setDomains) == 0 && *panelURL == engine.PanelKeep &&
+	if !*yes && *key == "" && *recoveryKey == "" && *recoveryKeyFile == "" && !*noStart && !*verifyRedeploy && len(setDomains) == 0 && *panelURL == engine.PanelKeep &&
 		term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		return ui.RunRestore(ctx, src)
+	}
+	if *key == "" && *recoveryKeyFile != "" {
+		b, err := os.ReadFile(*recoveryKeyFile)
+		if err != nil {
+			return err
+		}
+		*recoveryKey = strings.TrimSpace(string(b))
+	}
+	if *key == "" {
+		*key = strings.TrimSpace(*recoveryKey)
 	}
 	if *key == "" {
 		*key = os.Getenv(engine.KeyEnv)
