@@ -141,10 +141,11 @@ on "$SRC" "docker exec $PG psql -U e2e -d e2e -v ON_ERROR_STOP=1 -c 'create tabl
 
 # Full mode: give each panel its own domain, the way a real server has it,
 # and check that the proxy serves it before the move.
-panel() { # server host
-  on "$1" "docker exec coolify php artisan tinker --execute='\$s = \\App\\Models\\InstanceSettings::get(); \$s->fqdn = \"http://$2\"; \$s->save(); \\App\\Models\\Server::find(0)->setupDynamicProxyConfiguration();'" >/dev/null
+panel() { # server host [scheme]
+  local sch="${3:-http}"
+  on "$1" "docker exec coolify php artisan tinker --execute='\$s = \\App\\Models\\InstanceSettings::get(); \$s->fqdn = \"$sch://$2\"; \$s->save(); \\App\\Models\\Server::find(0)->setupDynamicProxyConfiguration();'" >/dev/null
   for i in $(seq 1 30); do
-    on "$1" "curl -fsS --resolve $2:80:127.0.0.1 http://$2/api/health" 2>/dev/null | grep -q OK && return 0
+    on "$1" "curl -fsSk --resolve $2:80:127.0.0.1 --resolve $2:443:127.0.0.1 $sch://$2/api/health" 2>/dev/null | grep -q OK && return 0
     sleep 3
   done
   return 1
@@ -152,9 +153,10 @@ panel() { # server host
 if [ "$MODE" = full ]; then
   log "give both panels their own domain"
   panel "$SRC" panel-src.e2e.test || setup_fail "the source panel does not answer on panel-src.e2e.test"
-  panel "$DST" panel-dst.e2e.test || setup_fail "the target panel does not answer on panel-dst.e2e.test"
+  # https on the target: its route is checked without a trusted certificate
+  panel "$DST" panel-dst.e2e.test https || setup_fail "the target panel does not answer on panel-dst.e2e.test"
   DST_IP=$(on "$DST" "docker exec coolify-db psql -U coolify -d coolify -Atc 'select public_ipv4 from instance_settings'")
-  echo "source panel http://panel-src.e2e.test, target panel http://panel-dst.e2e.test (target IP $DST_IP)"
+  echo "source panel http://panel-src.e2e.test, target panel https://panel-dst.e2e.test (target IP $DST_IP)"
 fi
 
 PHASE=tool
@@ -216,10 +218,10 @@ echo "$got" | grep -q "marker=$CMARK" && echo "ok  compose app volume data throu
 if [ "$MODE" = full ]; then
   got=$(on "$DST" "curl -fsS -m 10 http://127.0.0.1:8000/api/health" || true)
   [ "$got" = OK ] && echo "ok  panel on port 8000" || { echo "BAD panel on port 8000: '$got'"; fail=1; }
-  got=$(on "$DST" "curl -fsS -m 10 --resolve panel-dst.e2e.test:80:127.0.0.1 http://panel-dst.e2e.test/api/health" || true)
+  got=$(on "$DST" "curl -fsSk -m 10 --resolve panel-dst.e2e.test:443:127.0.0.1 https://panel-dst.e2e.test/api/health" || true)
   [ "$got" = OK ] && echo "ok  panel on its own domain through the proxy" || { echo "BAD panel on panel-dst.e2e.test: '$got'"; fail=1; }
   got=$(on "$DST" "docker exec coolify-db psql -U coolify -d coolify -Atc \"select coalesce(fqdn,'') || ' ' || coalesce(public_ipv4,'') from instance_settings\"" || true)
-  [ "$got" = "http://panel-dst.e2e.test $DST_IP" ] && echo "ok  panel address and IP of the target kept" || { echo "BAD panel identity: '$got'"; fail=1; }
+  [ "$got" = "https://panel-dst.e2e.test $DST_IP" ] && echo "ok  panel address and IP of the target kept" || { echo "BAD panel identity: '$got'"; fail=1; }
 fi
 [ "$fail" = 0 ] || exit 1
 echo
