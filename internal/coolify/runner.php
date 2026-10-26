@@ -52,6 +52,18 @@ try {
             $result['version'] = (string) config('constants.coolify.version');
             break;
 
+        case 'panel_proxy':
+            // The proxy route of the panel, written by Coolify itself from
+            // instance_settings.fqdn (what saving Settings does).
+            $localhost = Server::find(0);
+            if ($localhost && method_exists($localhost, 'setupDynamicProxyConfiguration')) {
+                $localhost->setupDynamicProxyConfiguration();
+                $result['ok'] = true;
+            } else {
+                $result['ok'] = false;
+            }
+            break;
+
         case 'capabilities':
             // Everything of Coolify this helper relies on, per feature: a
             // Coolify update that renames or removes something is reported

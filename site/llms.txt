@@ -2,7 +2,7 @@
 
 > Coolify Mirror (coolify-mirror) is a free, open-source (MIT) command-line tool that migrates Coolify apps between servers. It backs up one app, one or more projects, or a whole Coolify server, and restores it on another Coolify with one pasted command. Apps, databases, volumes, environment variables, secrets, domains, images and proxy settings arrive running and verified. Works with Coolify v4.3, v4.4 and v4.5 (both servers on the same version), on Linux amd64 and arm64. Not affiliated with Coolify or coolLabs.
 
-Current version: 1.9.6. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0; every new Coolify release is tested automatically every day.
+Current version: 1.9.7. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0; every new Coolify release is tested automatically every day.
 
 ## How to migrate Coolify to a new server
 
@@ -33,6 +33,13 @@ Current version: 1.9.6. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 
 - Resources on remote servers, preview deployments and Swarm are not part of a selective backup.
 - DNS, GitHub webhooks and scheduled tasks must be switched to the new server by hand.
 - Coolify Cloud (app.coolify.io) is not a supported target: the tool needs the Coolify host itself.
+
+## Good to know
+
+- After the first install it is a normal command: `sudo coolify-mirror` (menu), `sudo coolify-mirror restore CODE`, `coolify-mirror help`.
+- On the share screen, `c` copies the command for the new server to your own clipboard (OSC 52, also over SSH); `s` copies the short one.
+- A whole-server restore keeps the new server's own panel address and IPs (`--panel-url keep|source|none|URL`) and checks the panel answers.
+- Panel unreachable after a whole-server restore made with an older version: `sudo coolify-mirror repair-panel`.
 
 ## Links
 

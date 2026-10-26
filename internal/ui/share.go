@@ -90,13 +90,15 @@ func shareScreen(ctx context.Context, in *coolify.Instance, file, key string, op
 // printed on their own lines, never inside a box, so they copy cleanly.
 func printShareInstructions(sh *engine.Share) {
 	fmt.Println()
-	fmt.Println(sBold.Render("  On the other Coolify server, run this one command") + sMuted.Render(" (installs coolify-mirror and restores):"))
+	fmt.Println(sBold.Render("  On the other Coolify server, run one of these") + sMuted.Render("  (press c or s below to copy it)"))
 	fmt.Println()
+	fmt.Println(sBold.Render("  c") + "  coolify-mirror not installed there yet - installs it and restores:")
 	fmt.Println("  " + sLink.Render(sh.RestoreCommand()))
 	fmt.Println()
-	fmt.Println(sMuted.Render("  Share code  ") + sAccent.Render(sh.Code))
-	fmt.Println(sMuted.Render("  coolify-mirror already there? Type the code in its menu (Restore a backup), or run:"))
-	fmt.Println("  " + sh.RestoreLocalCommand())
+	fmt.Println(sBold.Render("  s") + "  coolify-mirror already installed there:")
+	fmt.Println("  " + sLink.Render(sh.RestoreLocalCommand()))
+	fmt.Println()
+	fmt.Println(sMuted.Render("  Share code  ") + sAccent.Render(sh.Code) + sMuted.Render("  (or type it in the menu there: Restore a backup)"))
 	fmt.Println()
 	fmt.Println(sMuted.Render("  No GitHub access there? This gets the tool from this server instead:"))
 	fmt.Println(sMuted.Render("  " + sh.ToolCommand()))
@@ -123,6 +125,7 @@ type shareModel struct {
 	completed  int
 	background bool
 	width      int
+	copied     string // what the last c/s copied (shown under the keys)
 }
 
 func newShareModel(sh *engine.Share) *shareModel {
@@ -150,6 +153,12 @@ func (m *shareModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "b":
 			m.background = true
 			return m, tea.Quit
+		case "c":
+			copyToClipboard(m.sh.RestoreCommand())
+			m.copied = "the install + restore command"
+		case "s":
+			copyToClipboard(m.sh.RestoreLocalCommand())
+			m.copied = "the short command (coolify-mirror already installed there)"
 		}
 	case spinner.TickMsg:
 		var cmd tea.Cmd
@@ -221,7 +230,11 @@ func (m *shareModel) View() string {
 		b.WriteString("\n  " + sOK.Render("The other server has the backup.") + " It verifies and restores it on its own - you can stop sharing now.\n")
 		b.WriteString(sMuted.Render("  Once the restore there is done, free the space here: menu → "+filesMenuName) + "\n")
 	}
-	b.WriteString(sMuted.Render("\n  q stop sharing · b keep sharing in the background (24 h) and exit") + "\n")
+	b.WriteString(sMuted.Render("\n  c copy the install + restore command · s copy the short one · q stop sharing · b keep sharing in the background (24 h) and exit") + "\n")
+	if m.copied != "" {
+		b.WriteString("  " + sOK.Render("✓ Copied "+m.copied+" to your clipboard") + " - paste it on the other server (right-click, or Ctrl+Shift+V).\n")
+		b.WriteString(sMuted.Render("    Nothing in the clipboard? This terminal does not allow it: select the command above with the mouse instead.") + "\n")
+	}
 	return b.String()
 }
 

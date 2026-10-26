@@ -70,6 +70,8 @@ func realMain(args []string) int {
 		err = cmdServe(ctx, args)
 	case "serve-internal":
 		err = cmdServeInternal(ctx, args)
+	case "repair-panel":
+		err = cmdRepairPanel(ctx, args)
 	case "start-all":
 		err = cmdStartAll(ctx)
 	case "update":
@@ -102,14 +104,22 @@ func realMain(args []string) int {
 }
 
 func usage() {
-	fmt.Print(`coolify-mirror ` + engine.Version + ` - full backup & restore / mirror for Coolify
+	fmt.Print(`coolify-mirror ` + engine.Version + ` - move Coolify apps between servers (backup & restore)
 
-Run it as root on a Coolify server:
+Installed as a command: run it as root (sudo) on a Coolify server.
 
-  ./coolify-mirror                      interactive menu (arrow keys)
+Everyday use
+  sudo coolify-mirror                       the menu (arrow keys, Enter, Esc = back)
+  sudo coolify-mirror backup --project Shop --serve
+                                            back up a project and print the command for the other server
+  sudo coolify-mirror restore CODE          restore what the other server shares (CODE = HOST/xxxx-xxxx-…)
+  sudo coolify-mirror files                 what coolify-mirror keeps here, with sizes
+  sudo coolify-mirror update                install the latest release (checksum verified)
+  coolify-mirror help                       this help
 
-  ./coolify-mirror list                 show the projects, their resources and domains
-  ./coolify-mirror backup [flags]       create a backup
+Backup
+  sudo coolify-mirror list                  the projects, their resources and domains
+  sudo coolify-mirror backup [flags]
         --project NAME,…                whole projects: everything in them (name as in Coolify,
                                         name/environment, or a domain of the project)
         --full                          whole Coolify server (instead of selected resources)
@@ -122,11 +132,15 @@ Run it as root on a Coolify server:
         --include-backups               full mode: include /data/coolify/backups
         --output DIR                    where to write the file (default /data/coolify-mirror/backups)
         --serve                         share the file over HTTPS when done
-  ./coolify-mirror serve FILE [flags]   share an existing backup file
+
+Share
+  sudo coolify-mirror serve FILE [flags]  share an existing backup file
         --mode direct|proxy             direct HTTPS port (default 8123) or through Coolify's proxy on port 443
         --port 8123  --host IP  --open-firewall  --detach  --ttl 24h
-  ./coolify-mirror restore CODE        download, verify and restore a shared backup
-                                        (CODE = HOST/xxxx-xxxx-… shown on the source; a link or a .cmb file also works)
+
+Restore
+  sudo coolify-mirror restore CODE [flags]  download, verify and restore a shared backup
+                                        (a link or a .cmb file also works)
         --key KEY                       if the link has no #key=... part
         --yes                           do not ask for confirmation
         --on-conflict copy|skip         selective restore: resource already exists here
@@ -137,16 +151,21 @@ Run it as root on a Coolify server:
         --keep-download                 keep the downloaded file after a successful restore
         --set-domain OLD=NEW            replace a restored domain (repeatable, e.g. a.com=b.com);
                                         without --yes every domain is asked for at the end
-  ./coolify-mirror files                list what coolify-mirror keeps here (backups, downloads,
-                                        safety copies of restores, logs) with sizes
-  ./coolify-mirror files delete NAME…   delete them to free disk space (NAME as listed)
+        --panel-url keep|source|none|URL
+                                        whole-server restore: the address of this Coolify panel
+                                        (default keep: the address this server had before)
+
+Maintenance
+  sudo coolify-mirror files delete NAME…  delete them to free disk space (NAME as listed)
         --backups                       every backup (made here or downloaded) not in use
         --all                           everything that is not in use
         --yes                           do not ask for confirmation
-  ./coolify-mirror update               install the latest release of coolify-mirror (checksum verified)
-  ./coolify-mirror start-all            ask Coolify to start every resource on this server
+  sudo coolify-mirror repair-panel [URL]  make this server's Coolify panel answer again after a
+                                        whole-server restore: its own IPs (and URL), proxy rebuilt
+  sudo coolify-mirror start-all           ask Coolify to start every resource on this server
                                         that has no running container (recovery helper)
 
+Not installed yet:  ` + engine.InstallCommand + `
 Guide with a screenshot of every screen: ` + engine.SiteURL + `
 Source, releases and issues:            ` + engine.RepoURL + `
 `)
@@ -671,8 +690,10 @@ func serveLoop(ctx context.Context, in *coolify.Instance, file, key string, opt 
 		return err
 	}
 	defer sh.Stop()
-	fmt.Printf("\nSharing %s (%s mode)\n\n  On the other Coolify server, run this one command (installs coolify-mirror and restores):\n\n    %s\n\n", filepath.Base(file), sh.Mode, sh.RestoreCommand())
-	fmt.Printf("  Share code: %s  (coolify-mirror already there? sudo coolify-mirror restore %s)\n", sh.Code, sh.Code)
+	fmt.Printf("\nSharing %s (%s mode)\n\n  On the other Coolify server, run one of these:\n\n", filepath.Base(file), sh.Mode)
+	fmt.Printf("  coolify-mirror not installed there yet - installs it and restores:\n    %s\n\n", sh.RestoreCommand())
+	fmt.Printf("  coolify-mirror already installed there:\n    %s\n\n", sh.RestoreLocalCommand())
+	fmt.Printf("  Share code: %s\n", sh.Code)
 	fmt.Printf("  No GitHub access there? This gets the tool from this server instead:\n    %s\n\n", sh.ToolCommand())
 	fmt.Println("Waiting for downloads - press Ctrl+C to stop sharing.")
 	var expire <-chan time.Time
@@ -748,6 +769,7 @@ func cmdRestore(ctx context.Context, args []string) error {
 	noStart := fs.Bool("no-start", false, "")
 	verifyRedeploy := fs.Bool("verify-redeploy", false, "")
 	keepDownload := fs.Bool("keep-download", false, "")
+	panelURL := fs.String("panel-url", engine.PanelKeep, "")
 	var setDomains multiFlag
 	fs.Var(&setDomains, "set-domain", "")
 	src, rest := firstArg(args)
@@ -758,7 +780,7 @@ func cmdRestore(ctx context.Context, args []string) error {
 		return errors.New("usage: coolify-mirror restore CODE|LINK|FILE")
 	}
 	// In a terminal without options: the same interactive restore as the menu.
-	if !*yes && *key == "" && !*noStart && !*verifyRedeploy && len(setDomains) == 0 &&
+	if !*yes && *key == "" && !*noStart && !*verifyRedeploy && len(setDomains) == 0 && *panelURL == engine.PanelKeep &&
 		term.IsTerminal(int(os.Stdin.Fd())) && term.IsTerminal(int(os.Stdout.Fd())) {
 		return ui.RunRestore(ctx, src)
 	}
@@ -816,7 +838,7 @@ func cmdRestore(ctx context.Context, args []string) error {
 		}
 		pr := engine.NewProgress("Restore")
 		stop := printProgress(pr)
-		report, err = engine.ApplyFull(ctx, in, f, pr)
+		report, err = engine.ApplyFull(ctx, in, f, pr, engine.FullOptions{PanelURL: *panelURL})
 		stop()
 		if err != nil {
 			return err
@@ -1135,4 +1157,47 @@ func cliDomains(ctx context.Context, in *coolify.Instance, rep *engine.RestoreRe
 		}
 	}
 	return engine.ApplyDomains(ctx, in, rep.Resources, fields)
+}
+
+// cmdRepairPanel gives this server's Coolify its own panel address and IPs
+// back and rebuilds the proxy route of the panel (for servers restored with a
+// whole-server backup by a version before 1.9.7).
+func cmdRepairPanel(ctx context.Context, args []string) error {
+	in, err := detect(ctx)
+	if err != nil {
+		return err
+	}
+	cur, err := engine.ReadPanel(ctx, in)
+	if err != nil {
+		return err
+	}
+	want := ""
+	if len(args) > 0 {
+		want = args[0]
+	} else if term.IsTerminal(int(os.Stdin.Fd())) {
+		shown := cur.URL
+		if shown == "" {
+			shown = "none (http://IP:8000)"
+		}
+		fmt.Printf("Panel address now: %s\nEnter = keep it, '-' = no domain (open the panel at http://IP:8000), or type the address of this server's panel: ", shown)
+		line, _ := bufio.NewReader(os.Stdin).ReadString('\n')
+		want = strings.TrimSpace(line)
+	}
+	p, problems, err := engine.RepairPanel(ctx, in, want)
+	if err != nil {
+		return err
+	}
+	shown := p.URL
+	if shown == "" {
+		shown = "http://" + p.IPv4 + ":8000"
+	}
+	fmt.Printf("Panel: %s  (public IPv4 %s)\n", shown, p.IPv4)
+	if len(problems) > 0 {
+		for _, pr := range problems {
+			fmt.Println("  ! " + pr)
+		}
+		return errors.New("the panel does not answer everywhere yet - check the DNS of its address and the firewall (ports 80, 443, 8000)")
+	}
+	fmt.Println("OK: the panel answers" + map[bool]string{true: " on port 8000 and through the proxy", false: " on port 8000"}[p.URL != ""])
+	return nil
 }
