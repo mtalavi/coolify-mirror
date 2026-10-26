@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
 	"net"
@@ -139,22 +138,19 @@ func CheckPanel(ctx context.Context, panelURL string, wait time.Duration) []stri
 	if err != nil {
 		return []string{"the panel address " + panelURL + " is not valid"}
 	}
-	port := "80"
-	if u.Scheme == "https" {
-		port = "443"
-	}
-	if err := pollHealth(ctx, u.Scheme+"://127.0.0.1:"+port+"/api/health", u.Hostname(), wait); err != nil {
+	// Plain HTTP on port 80 with the panel's host name: an https panel's
+	// route answers with a redirect to https://host (an unknown host gets an
+	// error page), so no certificate has to be issued or trusted yet.
+	if err := pollHealth(ctx, "http://127.0.0.1/api/health", u.Hostname(), wait); err != nil {
 		problems = append(problems, "the Coolify panel does not answer on "+panelURL+" through the proxy: "+err.Error())
 	}
 	return problems
 }
 
-// pollHealth GETs u (with Host/SNI host when set) until it returns "OK".
+// pollHealth GETs u (with the Host header when set) until it returns "OK",
+// or with a host, a redirect to https://host (the proxy route of an https panel).
 func pollHealth(ctx context.Context, u, host string, wait time.Duration) error {
-	tr := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true, ServerName: host}, // a fresh certificate may not be issued yet
-		DialContext:     (&net.Dialer{Timeout: 5 * time.Second}).DialContext,
-	}
+	tr := &http.Transport{DialContext: (&net.Dialer{Timeout: 5 * time.Second}).DialContext}
 	cl := &http.Client{Transport: tr, Timeout: 10 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	deadline := time.Now().Add(wait)
@@ -169,6 +165,9 @@ func pollHealth(ctx context.Context, u, host string, wait time.Duration) error {
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
 			resp.Body.Close()
 			if resp.StatusCode == http.StatusOK && strings.TrimSpace(string(body)) == "OK" {
+				return nil
+			}
+			if loc := resp.Header.Get("Location"); host != "" && resp.StatusCode/100 == 3 && strings.HasPrefix(loc, "https://"+host) {
 				return nil
 			}
 			last = fmt.Errorf("HTTP %d", resp.StatusCode)
