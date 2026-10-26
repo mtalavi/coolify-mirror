@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/mtalavi/coolify-mirror/internal/lcrypt"
 	"github.com/mtalavi/coolify-mirror/internal/run"
@@ -57,8 +58,8 @@ func Detect(ctx context.Context) (*Instance, error) {
 	if !run.Exists("docker") {
 		return nil, errors.New("docker is not installed on this server")
 	}
-	if _, err := run.Text(ctx, "docker", "version", "--format", "{{.Server.Version}}"); err != nil {
-		return nil, fmt.Errorf("cannot talk to the Docker daemon: %w", err)
+	if err := dockerAnswers(ctx); err != nil {
+		return nil, err
 	}
 	env, err := LoadEnv(EnvPath)
 	if err != nil {
@@ -112,7 +113,33 @@ func versionFromImage(img string) string {
 
 // ContainerState returns docker's State.Status for a container.
 func ContainerState(ctx context.Context, name string) (string, error) {
-	return run.Text(ctx, "docker", "inspect", "--format", "{{.State.Status}}", name)
+	qctx, cancel := context.WithTimeout(ctx, dockerAnswerTimeout)
+	defer cancel()
+	st, err := run.Text(qctx, "docker", "inspect", "--format", "{{.State.Status}}", name)
+	if err != nil && qctx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+		return "", errDockerSilent
+	}
+	return st, err
+}
+
+// dockerAnswerTimeout bounds the quick Docker queries made before anything
+// else, so a stuck Docker daemon ends with a message instead of a silent wait.
+const dockerAnswerTimeout = 30 * time.Second
+
+var errDockerSilent = errors.New("the Docker daemon on this server does not answer (no reply within 30 s) - " +
+	"check it with: systemctl status docker  (a restart may help: systemctl restart docker)")
+
+// dockerAnswers checks that the Docker daemon replies.
+func dockerAnswers(ctx context.Context) error {
+	qctx, cancel := context.WithTimeout(ctx, dockerAnswerTimeout)
+	defer cancel()
+	if _, err := run.Text(qctx, "docker", "version", "--format", "{{.Server.Version}}"); err != nil {
+		if qctx.Err() == context.DeadlineExceeded && ctx.Err() == nil {
+			return errDockerSilent
+		}
+		return fmt.Errorf("cannot talk to the Docker daemon: %w", err)
+	}
+	return nil
 }
 
 func (in *Instance) phpVersion(ctx context.Context) (string, error) {

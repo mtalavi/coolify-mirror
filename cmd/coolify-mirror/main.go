@@ -47,6 +47,11 @@ func realMain(args []string) int {
 	if cmd != "serve-internal" {
 		openLog(cmd)
 	}
+	if cmd != "serve-internal" {
+		// Under `curl … | sudo sh` the keyboard may belong to another terminal;
+		// prompts and the menu read it from there (see ui.UseForegroundTTY).
+		_ = ui.UseForegroundTTY()
+	}
 	var err error
 	switch cmd {
 	case "":
