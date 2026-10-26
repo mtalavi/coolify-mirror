@@ -465,10 +465,10 @@ func IsOffsiteSource(s string) bool {
 // folder) gives its newest backup.
 func FetchOffsite(ctx context.Context, src string, progress func(done, total int64)) (string, error) {
 	src = strings.TrimSpace(src)
-	if err := os.MkdirAll(IncomingDir, 0o700); err != nil {
-		return "", err
-	}
 	if strings.HasPrefix(src, "http://") || strings.HasPrefix(src, "https://") {
+		if err := os.MkdirAll(IncomingDir, 0o700); err != nil {
+			return "", err
+		}
 		return downloadURL(ctx, src, progress)
 	}
 	if !IsRemote(src) {
@@ -489,6 +489,9 @@ func FetchOffsite(ctx context.Context, src string, progress func(done, total int
 		return list[0].Path, nil
 	}
 	if err := checkRemote(ctx, src); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(IncomingDir, 0o700); err != nil {
 		return "", err
 	}
 	file := src
