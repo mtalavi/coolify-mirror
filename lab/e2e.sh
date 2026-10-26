@@ -8,9 +8,16 @@
 #
 #   lab/e2e.sh COOLIFY_VERSION path/to/coolify-mirror-linux-amd64
 #
+# E2E_MODE=full moves the whole server instead (backup --full): both panels
+# get their own domain first, and the target's panel must still answer on
+# its own IP and domain afterwards (the restored database carries the
+# source's panel address).
+#
 # Needs Docker on the host (privileged containers). KEEP=1 keeps the servers.
 set -euo pipefail
 V="${1:?Coolify version, e.g. 4.3.23}"
+MODE="${E2E_MODE:-selective}"
+case "$MODE" in selective|full) ;; *) echo "E2E_MODE must be selective or full" >&2; exit 2 ;; esac
 BIN="$(cd "$(dirname "${2:?coolify-mirror binary}")" && pwd)/$(basename "$2")"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${E2E_REPO:-https://github.com/mtalavi/coolify-mirror}"
@@ -132,11 +139,31 @@ MARK="e2e-$(date +%s)-$RANDOM"
 on "$SRC" "docker exec \$(docker ps -q --filter name=^$WEB) sh -c 'echo $MARK > /usr/share/nginx/html/marker.txt'"
 on "$SRC" "docker exec $PG psql -U e2e -d e2e -v ON_ERROR_STOP=1 -c 'create table t(x int); insert into t select generate_series(1,1234)'" >/dev/null
 
+# Full mode: give each panel its own domain, the way a real server has it,
+# and check that the proxy serves it before the move.
+panel() { # server host
+  on "$1" "docker exec coolify php artisan tinker --execute='\$s = \\App\\Models\\InstanceSettings::get(); \$s->fqdn = \"http://$2\"; \$s->save(); \\App\\Models\\Server::find(0)->setupDynamicProxyConfiguration();'" >/dev/null
+  for i in $(seq 1 30); do
+    on "$1" "curl -fsS --resolve $2:80:127.0.0.1 http://$2/api/health" 2>/dev/null | grep -q OK && return 0
+    sleep 3
+  done
+  return 1
+}
+if [ "$MODE" = full ]; then
+  log "give both panels their own domain"
+  panel "$SRC" panel-src.e2e.test || setup_fail "the source panel does not answer on panel-src.e2e.test"
+  panel "$DST" panel-dst.e2e.test || setup_fail "the target panel does not answer on panel-dst.e2e.test"
+  DST_IP=$(on "$DST" "docker exec coolify-db psql -U coolify -d coolify -Atc 'select public_ipv4 from instance_settings'")
+  echo "source panel http://panel-src.e2e.test, target panel http://panel-dst.e2e.test (target IP $DST_IP)"
+fi
+
 PHASE=tool
 log "back up and share on the source"
 docker cp "$BIN" "$SRC:/usr/local/bin/coolify-mirror"
 docker cp "$BIN" "$DST:/usr/local/bin/coolify-mirror"
-on "$SRC" "COOLIFY_MIRROR_COMPAT_URL=off nohup coolify-mirror backup --all --serve --mode direct --host $SRC >/root/share.out 2>&1 &"
+WHAT="--all"
+[ "$MODE" = full ] && WHAT="--full"
+on "$SRC" "COOLIFY_MIRROR_COMPAT_URL=off nohup coolify-mirror backup $WHAT --serve --mode direct --host $SRC >/root/share.out 2>&1 &"
 for i in $(seq 1 120); do
   CODE=$(on "$SRC" "sed -n 's/^  Share code: \([^ ]*\).*/\1/p' /root/share.out" || true)
   [ -n "$CODE" ] && break
@@ -152,6 +179,11 @@ echo "share code: $CODE"
 if on "$SRC" "grep -q 'transfer export failed' /root/share.out"; then
   on "$SRC" "grep 'transfer export failed' /root/share.out" || true
   echo "BAD: the backup has no Coolify transfer bundle"; exit 1
+fi
+# E2E_SHARE_ONLY=1 (with KEEP=1): stop here, for trying the restore by hand.
+if [ "${E2E_SHARE_ONLY:-0}" = 1 ]; then
+  echo "SHARE_CODE=$CODE"
+  exit 0
 fi
 log "restore on the target with the share code"
 cgroup_ok "$DST"
@@ -181,6 +213,15 @@ got=$(on "$DST" "docker exec \$(docker ps -q --filter name=^web-$COMPOSE) printe
 [ "$got" = e2e-secret-token-42 ] && echo "ok  compose app secret" || { echo "BAD compose secret: $got"; fail=1; }
 got=$(on "$DST" "curl -fsS --resolve web.e2e.test:80:127.0.0.1 http://web.e2e.test/" || true)
 echo "$got" | grep -q "marker=$CMARK" && echo "ok  compose app volume data through the proxy" || { echo "BAD compose app: '$got'"; fail=1; }
+if [ "$MODE" = full ]; then
+  got=$(on "$DST" "curl -fsS -m 10 http://127.0.0.1:8000/api/health" || true)
+  [ "$got" = OK ] && echo "ok  panel on port 8000" || { echo "BAD panel on port 8000: '$got'"; fail=1; }
+  got=$(on "$DST" "curl -fsS -m 10 --resolve panel-dst.e2e.test:80:127.0.0.1 http://panel-dst.e2e.test/api/health" || true)
+  [ "$got" = OK ] && echo "ok  panel on its own domain through the proxy" || { echo "BAD panel on panel-dst.e2e.test: '$got'"; fail=1; }
+  got=$(on "$DST" "docker exec coolify-db psql -U coolify -d coolify -Atc \"select coalesce(fqdn,'') || ' ' || coalesce(public_ipv4,'') from instance_settings\"" || true)
+  [ "$got" = "http://panel-dst.e2e.test $DST_IP" ] && echo "ok  panel address and IP of the target kept" || { echo "BAD panel identity: '$got'"; fail=1; }
+fi
 [ "$fail" = 0 ] || exit 1
 echo
+[ "$MODE" = full ] && echo "FULL RESTORE OK"
 echo "COMPATIBLE: coolify-mirror $("$BIN" version 2>/dev/null | awk '{print $2}') with Coolify $V"

@@ -34,7 +34,7 @@ jobs:
     # This public repository keeps pull-request CI on GitHub-hosted runners.
     # Only the trusted scheduled/manual compatibility job uses the Hestia host.
     runs-on: [self-hosted, Linux, X64, hestia, coolify-mirror, docker, trusted]
-    timeout-minutes: 100
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-go@v7
@@ -70,8 +70,15 @@ jobs:
           E2E_BRANCH: ${{ github.ref_name }}
         run: |
           set +e -o pipefail
+          # Selective move first, then the whole server (backup --full) on
+          # fresh servers; both must pass.
           bash lab/e2e.sh "${{ steps.pick.outputs.coolify }}" dist/coolify-mirror-linux-amd64 2>&1 | tee e2e.log
-          echo "rc=$?" >> "$GITHUB_OUTPUT"
+          rc=$?
+          if [ "$rc" = 0 ]; then
+            E2E_MODE=full bash lab/e2e.sh "${{ steps.pick.outputs.coolify }}" dist/coolify-mirror-linux-amd64 2>&1 | tee -a e2e.log
+            rc=$?
+          fi
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
       - name: Publish the result
         if: steps.pick.outputs.skip != 'true'
         env:

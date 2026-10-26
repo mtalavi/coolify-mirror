@@ -59,13 +59,13 @@ The menu opens. Answer the screens like this:
 | *Ready to back up* | check the list → **Start the backup** |
 | *How should the other server get this backup?* | **Share a link through Coolify's proxy on port 443** |
 
-A green line starting with `curl` appears — **copy it**. It ends with the **share code** (`203.0.113.10/hi4i-2dzx-…`). Keep this window open while the new server downloads (it shows the progress), or press `b` to keep sharing in the background for 24 h.
+Two commands for the new server appear. Press **`c`** to copy the first one (it installs coolify-mirror and restores) straight to your own computer's clipboard — even over SSH, in Windows Terminal, iTerm2, WezTerm and most modern terminals; otherwise select it with the mouse. If coolify-mirror is already installed there, press **`s`** for the short one: `sudo coolify-mirror restore CODE`. Both end with the **share code** (`203.0.113.10/hi4i-2dzx-…`). Keep this window open while the new server downloads (it shows the progress), or press `b` to keep sharing in the background for 24 h.
 
 <img src="docs/shots/07-share.png" width="760" alt="the command for the new server">
 
 ### ② New server — restore
 
-SSH into the **new** server and **paste the line you copied**. It looks like this:
+SSH into the **new** server and **paste the command you copied** (right-click or `Ctrl+Shift+V`). It looks like this:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore 203.0.113.10/hi4i-2dzx-hmeg-42qp-palx-52s7-zq
@@ -77,7 +77,8 @@ It installs the tool, downloads the backup and verifies it. **Nothing changes on
 |---|---|
 | *Restore these resources into this Coolify?* | read the list → **Yes** |
 | *Domains* | `enter` on each line keeps the domain — or type the new one |
-| *Rebuild N application(s) once now?* (only for apps Coolify builds) | **Yes** proves the next deploy works here · on a slow connection **No** (redeploy later from Coolify) |
+| *Everything is running. Also rebuild the N app(s) from Git now?* (only for apps Coolify builds) | **No** (recommended): done, everything keeps running as it is · **Yes**: downloads the code from Git and builds it here once, to prove later deploys work (slow) |
+| *Address of this Coolify panel* (whole-server restore only) | keep **this server's address** (recommended) — the old server's address only once its DNS points here |
 
 Wait for the green **Restore complete · everything verified**, then open the new Coolify: the project is there, running.
 
@@ -169,7 +170,18 @@ curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install
 
 The last part is the **share code**: the source address and a 128-bit secret. The share token, the TLS key of the share (Ed25519 — the target accepts only that certificate) and the key that unlocks the backup's own key are all derived from it, so nothing else has to be copied. Once sharing stops, the code is useless.
 
-The installer picks `amd64`/`arm64`, downloads the [latest release](https://github.com/mtalavi/coolify-mirror/releases/latest), verifies its SHA-256 and installs `/usr/local/bin/coolify-mirror` (it retries GitHub hiccups). Pin a version with `… | sudo VERSION=v1.5.0 sh`, only install with `NO_RUN=1`. Later: `sudo coolify-mirror`, and `sudo coolify-mirror update` for a new release.
+The installer picks `amd64`/`arm64`, downloads the [latest release](https://github.com/mtalavi/coolify-mirror/releases/latest), verifies its SHA-256 and installs `/usr/local/bin/coolify-mirror` (it retries GitHub hiccups). Pin a version with `… | sudo VERSION=v1.5.0 sh`, only install with `NO_RUN=1`.
+
+**After the first install it is a normal command** — no long line any more:
+
+```bash
+sudo coolify-mirror                  # the menu
+sudo coolify-mirror restore CODE     # restore a share code
+sudo coolify-mirror update           # install a new release
+coolify-mirror help                  # every command, with examples
+```
+
+It works the same with `curl … | sudo sh` on Debian and Ubuntu, whose `sudo` runs piped commands in the background of its own terminal (`use_pty`): the menu reads the keyboard from your terminal.
 
 > [!TIP]
 > A target without GitHub access: the source also prints a command that downloads the tool **from the source server itself** over the same pinned connection and restores.
@@ -325,7 +337,7 @@ flowchart LR
 
 **Selective backup** (one or more resources) exports their rows from Coolify's Postgres — application, service, database, environment variables, storages, tags, scheduled tasks, backup schedules, S3, keys, GitHub App, secret manager links (Vault, Doppler, Infisical — Coolify 4.4), deployment snapshot — plus their volumes, file mounts and images. On restore, every row gets a fresh ID, every encrypted value (env vars, passwords, keys) is decrypted with the source key and re-encrypted with the target's `APP_KEY`, and the import runs in **one transaction**.
 
-**Full backup** takes the whole Coolify: database dump, `.env` (including `APP_KEY`), SSH keys, proxy config and certificates, and every resource's data. A full restore is only allowed onto a **fresh, empty** Coolify; it still makes a safety copy and rolls back on any error. To move resources into a Coolify that already has projects, use a selective backup — it merges.
+**Full backup** takes the whole Coolify: database dump, `.env` (including `APP_KEY`), SSH keys, proxy config and certificates, and every resource's data. A full restore is only allowed onto a **fresh, empty** Coolify; it still makes a safety copy and rolls back on any error. The panel's address and public IPs belong to the machine, not to the backup: the target keeps its own (or the one you choose), Coolify rebuilds the proxy route of its panel, and the restore checks that the panel answers on port 8000 and on its address. To move resources into a Coolify that already has projects, use a selective backup — it merges.
 
 **Databases.** PostgreSQL, MySQL and MariaDB containers (standalone or inside a service) are saved with their native dump tool while they run. On restore their data volume is created empty, initialised by the same image with the same credentials in a temporary container (no network), the dump is loaded, and only then does Coolify start the real container. Other engines (Redis, MongoDB, ClickHouse, SQLite on Coolify 4.4…) are copied as files with the chosen consistency mode. A SQLite database connected to an app is added with the app and its shared volume is saved once.
 
@@ -356,6 +368,8 @@ coolify-mirror restore 203.0.113.10/k7qf-2m9x-…       # share code (in a termi
 coolify-mirror restore 203.0.113.10/k7qf-2m9x-… --yes # no questions
 coolify-mirror restore FILE.cmb --key KEY --yes \
   --set-domain shop.com=shop.new.com --set-domain www.shop.com=-
+coolify-mirror restore FULL-CODE --yes --panel-url keep # whole server: keep this panel's address (default)
+coolify-mirror repair-panel [URL|-]                     # panel unreachable after an older whole-server restore
 coolify-mirror start-all                                # start anything stopped (compose apps from their images)
 coolify-mirror update                                   # install the latest release (SHA-256 checked)
 coolify-mirror files                                    # what the tool keeps here, with sizes
@@ -384,6 +398,8 @@ coolify-mirror files delete NAME… | --backups | --all [--yes]   # free the dis
 | | `--no-start` | restore but don't start |
 | | `--verify-redeploy` | after starting, rebuild every app Coolify builds (same commit, no cache) and check it again |
 | | `--keep-download` | keep the downloaded file |
+| | `--panel-url keep\|source\|none\|URL` | whole-server restore: the address of this Coolify panel (`keep` = this server's own, the default) |
+| `repair-panel` | `[URL\|-]` | after a whole-server restore made with a version before 1.9.7: this server's IPs and panel address back, Coolify rebuilds the panel's proxy route, then it checks the panel answers |
 | `files` | `delete NAME…` / `--backups` / `--all` / `--yes` | list, or delete, saved backups, downloads, safety copies, old volumes, logs (`--backups`: every backup not in use) |
 </details>
 
@@ -444,6 +460,7 @@ The [walkthrough](#-walkthrough--every-screen) is a real run of the released 1.9
 
 Every release with its binaries and checksums: [Releases](https://github.com/mtalavi/coolify-mirror/releases).
 
+- **1.9.7** · 2026-10-26 — **Whole-server restore keeps its panel; copy with one key.** A whole-server restore carried the old server's panel address and IPs, so the new panel answered only on the old domain (“not registered” on its own). The panel now keeps this server's address (or the one you choose), Coolify rebuilds its proxy route, and the restore checks the panel answers. `sudo coolify-mirror repair-panel` fixes a server restored with an older version. Press `c` on the share screen to copy the command to your own clipboard (`s`: the short one); the last restore question now says plainly that No keeps everything running; `coolify-mirror help` starts with the everyday commands; an identical `docker-compose.custom.yml` no longer warns. The daily test now also moves a whole server.
 - **1.9.6** · 2026-10-26 — **No hang with sudo.** The menu no longer hangs after the banner when it is started with `curl … | sudo sh` on Debian 12 or Ubuntu: sudo's `use_pty` put it in the background of a terminal that gets no keyboard, so the system stopped it. It now reads the keyboard from your own terminal. A Docker daemon that does not answer ends with a clear message after 30 s instead of a silent wait, and the log names any command that runs longer than 10 s.
 - **1.9.5** · 2026-10-25 — **Coolify 4.5.** Works with Coolify 4.5.0 (tested on two freshly installed servers, and again on 4.4.7 and 4.3.24). Coolify 4.5 changed its own Server Transfer exporter; backups carry Coolify's transfer bundle again, and the daily test now fails when a backup comes without it. Secrets that Coolify 4.5 encrypts at rest are re-encrypted for the new server like every other secret. The website answers the common migration questions and has a summary for AI assistants (`llms.txt`).
 - **1.9.4** · 2026-10-22 — **Coolify 4.4.7 and 4.3.24.** Tested with Coolify's security releases 4.4.7 and 4.3.24: a full move on two freshly installed servers for each. Update both servers to the same release before a move; Coolify's `patch.sh` takes every line to its fix release. The daily test's servers now always get the cpu cgroup controller: without it Docker there could not start containers with a CPU weight, which had wrongly marked 4.3.24 as failed on the test host.

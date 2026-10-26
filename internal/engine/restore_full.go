@@ -83,7 +83,7 @@ func CheckFull(ctx context.Context, in *coolify.Instance, f *Fetched) (*FullChec
 
 // ApplyFull replaces this server's Coolify with the backup: database, .env key,
 // SSH keys, proxy configuration, every volume and directory, and images.
-func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progress) (rep *RestoreReport, err error) {
+func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progress, opt FullOptions) (rep *RestoreReport, err error) {
 	defer func() { pr.End(err) }()
 	unlock, err := Lock()
 	if err != nil {
@@ -95,6 +95,14 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 	}
 	start := time.Now()
 	man := f.Manifest
+	// The panel address and public IPs belong to this machine (see panel.go).
+	before, err := ReadPanel(ctx, in)
+	if err != nil {
+		return nil, fmt.Errorf("read this server's panel address: %w", err)
+	}
+	if before.IPv4 == "" {
+		before.IPv4, before.IPv6 = in.PublicIPs(ctx)
+	}
 	stamp := time.Now().Format("20060102-150405")
 	safety := filepath.Join(HomeDir, "pre-restore-"+stamp)
 
@@ -114,6 +122,7 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 		imgSteps[i] = pr.Add(fmt.Sprintf("Images (%d)", len(im.Refs)), im.Size)
 	}
 	stEnv := pr.Add("Install the source APP_KEY", 0)
+	stPanel := pr.Add("Keep this server's panel address and IPs", 0)
 	stSSH := pr.Add("Authorize Coolify's SSH key for this server", 0)
 	stStart := pr.Add("Start Coolify", 0)
 	stDeps := pr.Add("Check build and runtime dependencies", 0)
@@ -268,11 +277,22 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 					return true, err
 				}
 				dst := filepath.Join(coolify.SourceDir, "docker-compose.custom.yml")
-				if _, e := os.Stat(dst); e == nil {
-					pr.Warn("kept this server's docker-compose.custom.yml (the source had one too)")
-					return true, nil
+				cur, e := os.ReadFile(dst)
+				if e != nil {
+					return true, os.WriteFile(dst, b, 0o600)
 				}
-				return true, os.WriteFile(dst, b, 0o600)
+				if bytes.Equal(bytes.TrimSpace(cur), bytes.TrimSpace(b)) {
+					return true, nil // the same overrides on both servers
+				}
+				// Overrides of Coolify's own containers (limits, ports) are
+				// usually made for this machine: keep them, put the source's
+				// next to them for comparison.
+				aside := dst + ".from-source"
+				if e := os.WriteFile(aside, b, 0o600); e != nil {
+					return true, e
+				}
+				pr.Warn("kept this server's docker-compose.custom.yml; the source's differs and is saved as %s (compare: diff %s %s)", aside, dst, aside)
+				return true, nil
 			case entryDockerConfig:
 				b, err := io.ReadAll(io.LimitReader(r, 4<<20))
 				if err != nil {
@@ -347,6 +367,31 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 	run.Logf("env keys taken from the source: %v", changed)
 	stEnv.Finish("APP_KEY set")
 
+	// 3b. Panel identity: this server's own address and IPs, not the source's.
+	stPanel.Begin("")
+	source, e := ReadPanel(ctx, in)
+	if e != nil {
+		err = fmt.Errorf("read the restored panel address: %w", e)
+		stPanel.Fail(err)
+		return nil, err
+	}
+	panel := Panel{IPv4: before.IPv4, IPv6: before.IPv6}
+	if panel.URL, err = ResolvePanelURL(opt.PanelURL, before, source); err != nil {
+		stPanel.Fail(err)
+		return nil, err
+	}
+	if err = WritePanel(ctx, in, panel, source); err != nil {
+		err = fmt.Errorf("save the panel address: %w", err)
+		stPanel.Fail(err)
+		return nil, err
+	}
+	run.Logf("panel: %+v (source had %+v, this server had %+v)", panel, source, before)
+	panelShown := panel.URL
+	if panelShown == "" {
+		panelShown = "http://" + panel.IPv4 + ":8000"
+	}
+	stPanel.Finish(panelShown)
+
 	// 4. SSH: Coolify reaches this host over SSH with the restored localhost key.
 	stSSH.Begin("")
 	srcCrypt, _ := lcrypt.New(srcKey, strings.Join(prev, ","))
@@ -381,19 +426,28 @@ func ApplyFull(ctx context.Context, in *coolify.Instance, f *Fetched, pr *Progre
 			pr.Warn("could not remove some old containers: %v", e)
 		}
 	}
-	// The proxy may still run with this server's previous configuration.
+	// Coolify wrote the panel route on start (app:init); write it once more
+	// explicitly, then restart the proxy that may still run with the
+	// previous configuration.
+	if e := RebuildPanelProxy(ctx, in); e != nil {
+		pr.Warn("could not rebuild the proxy route of the panel: %v - run: sudo coolify-mirror repair-panel", e)
+	}
 	restartProxy(ctx, in, pr)
+	stStart.SetDetail("checking the panel")
+	panelProblems := CheckPanel(ctx, panel.URL, 3*time.Minute)
 	stStart.Finish("healthy")
 
 	stDeps.Begin("")
 	problems := checkHostDeps(ctx, man, func(s string) string { return s }, func(string) bool { return false })
+	problems = append(problems, panelProblems...)
 	if len(problems) > 0 {
 		stDeps.Fail(fmt.Errorf("%d missing", len(problems)))
 	} else {
 		stDeps.Finish(fmt.Sprintf("%d checked", len(man.HostDeps)))
 	}
 
-	notes := append([]string{"a safety copy of the previous Coolify database and .env is in " + safety + " (delete it from the menu, 'Saved files & disk space', once everything works)"}, builderNotes...)
+	notes := append([]string{"the Coolify panel of this server: " + panelShown + panelNote(panel, source),
+		"a safety copy of the previous Coolify database and .env is in " + safety + " (delete it from the menu, 'Saved files & disk space', once everything works)"}, builderNotes...)
 	if av := undo.asideVolumes(); len(av) > 0 {
 		notes = append(notes, "previous data of volumes that already existed is kept in: "+strings.Join(av, ", ")+" (delete them from the menu, 'Saved files & disk space', once everything works)")
 	}
@@ -639,4 +693,15 @@ ORDER BY application_id, created_at DESC, id DESC`, &deps); err != nil {
 		out = append(out, pl)
 	}
 	return out
+}
+
+// panelNote explains where the panel address came from.
+func panelNote(p, source Panel) string {
+	switch {
+	case source.URL != "" && p.URL == source.URL:
+		return " (the old server's address: point its DNS to this server)"
+	case source.URL != "" && p.URL != source.URL:
+		return " (this server's own address; the old server used " + source.URL + ")"
+	}
+	return ""
 }

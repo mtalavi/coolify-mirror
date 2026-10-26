@@ -10,7 +10,7 @@ import (
 )
 
 // Version of this tool (set at build time with -ldflags).
-var Version = "1.9.6"
+var Version = "1.9.7"
 
 // FormatName identifies the backup layout.
 const FormatName = "github.com/mtalavi/coolify-mirror/1"
@@ -79,6 +79,8 @@ type SourceInfo struct {
 	IPv6           string `json:"ipv6,omitempty"`
 	CoolifyVersion string `json:"coolify_version"`
 	Arch           string `json:"arch"`
+	// PanelURL is the address of the source's Coolify panel (instance fqdn).
+	PanelURL string `json:"panel_url,omitempty"`
 }
 
 // VolumeEntry is one saved docker volume.

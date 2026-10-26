@@ -97,8 +97,9 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 	}
 	b := &backupper{in: in, req: req, pr: pr, pathSeen: map[string]bool{}, volSeen: map[string]bool{}, imgSeen: map[string]bool{}}
 	v4, v6 := in.PublicIPs(ctx)
+	srcPanel, _ := ReadPanel(ctx, in)
 	b.man = &Manifest{Format: FormatName, ToolVersion: Version, CreatedAt: time.Now().UTC(), Mode: req.Mode,
-		Source:  SourceInfo{Hostname: in.Hostname, IPv4: v4, IPv6: v6, CoolifyVersion: in.Version, Arch: in.Arch},
+		Source:  SourceInfo{Hostname: in.Hostname, IPv4: v4, IPv6: v6, CoolifyVersion: in.Version, Arch: in.Arch, PanelURL: srcPanel.URL},
 		Options: BackupOptions{Consistency: req.Consistency, Images: req.Images, IncludeBackups: req.IncludeBackups}}
 
 	stRead := pr.Add("Read Coolify configuration", 0)

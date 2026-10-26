@@ -60,11 +60,11 @@
    "applicationCategory": "DeveloperApplication",
    "applicationSubCategory": "Server migration, backup and restore",
    "operatingSystem": "Linux (amd64, arm64)",
-   "softwareVersion": "1.9.6",
+   "softwareVersion": "1.9.7",
    "softwareRequirements": "Coolify v4.3, v4.4 or v4.5 (same version on both servers), Linux amd64 or arm64, SSH as root or a sudo user",
    "featureList": [
     "Back up one app, several projects or a whole Coolify server",
-    "Restore with one pasted command (share code)",
+    "Restore with one pasted command (share code), copied with one key",
     "Encrypted backup (age) over HTTPS with a pinned certificate on port 443",
     "Native PostgreSQL, MySQL and MariaDB dumps; Redis, SQLite, volumes and host files",
     "Env vars, secrets, domains, images, proxy settings and secret-manager links",
@@ -72,7 +72,7 @@
     "Coolify v4.3, v4.4 and v4.5, tested daily against new Coolify releases"
    ],
    "datePublished": "2026-10-01",
-   "dateModified": "2026-10-25",
+   "dateModified": "2026-10-26",
    "license": "https://opensource.org/licenses/MIT",
    "isAccessibleForFree": true,
    "offers": {
@@ -167,6 +167,14 @@
      "acceptedAnswer": {
       "@type": "Answer",
       "text": "Yes. Pick one project, several, or a single app; the databases and services they use come along. They are merged into the new Coolify next to what is already there. A whole-server backup is the other option, for an empty new Coolify."
+     }
+    },
+    {
+     "@type": "Question",
+     "name": "The panel does not open after a whole-server restore (“not registered”)",
+     "acceptedAnswer": {
+      "@type": "Answer",
+      "text": "Versions before 1.9.7 restored the old server’s panel address too, so the proxy only knew the old domain. Since 1.9.7 the panel keeps this server’s own address and IPs and the restore checks it answers. A server restored earlier: run sudo coolify-mirror repair-panel (add the panel address, or - for none)."
      }
     },
     {
@@ -423,7 +431,7 @@
           <li><div><span class="q">Which project should be backed up?</span><span class="a">Arrow keys to the project, then enter: everything in it comes along. Several: space on each, then enter.</span></div></li>
           <li><div><span class="q">Ready to back up</span><span class="a">Check the list, then Start the backup</span></div></li>
           <li><div><span class="q">How should the other server get this backup?</span><span class="a">Share a link through Coolify's proxy on port 443</span></div></li>
-          <li><div><span class="q">On the other Coolify server, run this one command</span><span class="a">Copy the green <code>curl</code> line.</span></div></li>
+          <li><div><span class="q">On the other Coolify server, run one of these</span><span class="a">Press <kbd>c</kbd>: the command is in your clipboard, even over SSH. Already installed there? <kbd>s</kbd> copies the short <code>sudo coolify-mirror restore CODE</code>.</span></div></li>
         </ol>
         <p class="note"><i class="ph ph-info" aria-hidden="true"></i><span>Keep this window open while the new server downloads, or press <kbd>b</kbd> to keep sharing in the background for 24 hours.</span></p>
       </div>
@@ -439,7 +447,7 @@
           <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/04-options.webp" data-w="1647" data-h="865" data-alt="Ready to back up: the Shop project with its four resources and the settings" data-cap="Ready to back up: what goes in, project by project, and the settings.">Review</button>
           <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/05-progress.webp" data-w="1847" data-h="830" data-alt="Backup progress" data-cap="Every step with size, speed and time left.">Progress</button>
           <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/06-done.webp" data-w="1847" data-h="1266" data-alt="Backup complete and the share question" data-cap="Backup complete. Share through port 443.">Share</button>
-          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/07-share.webp" data-w="1964" data-h="865" data-alt="The command and share code for the new server" data-cap="Copy the green line for the new server.">The command</button>
+          <button class="thumb" type="button" aria-pressed="false" data-src="assets/img/07-share.webp" data-w="1964" data-h="865" data-alt="The command and share code for the new server" data-cap="Press c to copy the command for the new server (s for the short one).">The command</button>
         </div>
       </div>
     </div>
@@ -457,10 +465,10 @@
           <li><div><span class="q">Getting the backup</span><span class="a">Installs, downloads and checks every byte. Nothing changes yet.</span></div></li>
           <li><div><span class="q">Restore these resources into this Coolify?</span><span class="a">Read the list, then Yes.</span></div></li>
           <li><div><span class="q">Domains</span><span class="a">Enter keeps each domain, or type the new one.</span></div></li>
-          <li><div><span class="q">Rebuild N application(s) once now?</span><span class="a">Yes proves the next deploy works here. Slow connection: No.</span></div></li>
+          <li><div><span class="q">Everything is running. Also rebuild the app(s) from Git now?</span><span class="a">No: done, everything keeps running (recommended). Yes: builds again from Git, slow, only to prove later deploys.</span></div></li>
           <li><div><span class="q">Restore complete · everything verified</span><span class="a">Done. Open the new Coolify.</span></div></li>
         </ol>
-        <p class="note"><i class="ph ph-info" aria-hidden="true"></i><span>The rebuild question only appears for apps Coolify builds from Git. Already have the tool here? Run <code>sudo coolify-mirror</code> and choose Restore a backup.</span></p>
+        <p class="note"><i class="ph ph-info" aria-hidden="true"></i><span>The rebuild question only appears for apps Coolify builds from Git. Whole-server restore: the panel keeps this server's own address and IPs. After the first install the tool is a command: <code>sudo coolify-mirror</code>, <code>coolify-mirror help</code>.</span></p>
       </div>
       <div class="gallery">
         <figure>
@@ -672,6 +680,7 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
+      <div class="rel"><div><span class="v">1.9.7</span><span class="d">2026-10-26</span></div><div><h3>Whole-server restore keeps its panel; copy with one key</h3><p>A whole-server restore carried the old server's panel address and IPs, so the new panel answered only on the old domain (&ldquo;not registered&rdquo; on its own). The panel now keeps this server's address (or the one you choose), Coolify rebuilds its proxy route, and the restore checks the panel answers. <code>sudo coolify-mirror repair-panel</code> fixes a server restored with an older version. Press <kbd>c</kbd> on the share screen to copy the command to your own clipboard (<kbd>s</kbd>: the short one); the last restore question now says plainly that No keeps everything running; <code>coolify-mirror help</code> starts with the everyday commands; an identical <code>docker-compose.custom.yml</code> no longer warns. The daily test now also moves a whole server.</p></div></div>
       <div class="rel"><div><span class="v">1.9.6</span><span class="d">2026-10-26</span></div><div><h3>No hang with sudo</h3><p>The menu no longer hangs after the banner when it is started with <code>curl … | sudo sh</code> on Debian 12 or Ubuntu: sudo's <code>use_pty</code> put it in the background of a terminal that gets no keyboard, so the system stopped it. It now reads the keyboard from your own terminal. A Docker daemon that does not answer ends with a clear message after 30 s instead of a silent wait, and the log names any command that runs longer than 10 s.</p></div></div>
       <div class="rel"><div><span class="v">1.9.5</span><span class="d">2026-10-25</span></div><div><h3>Coolify 4.5</h3><p>Works with Coolify 4.5.0 (tested on two freshly installed servers, and again on 4.4.7 and 4.3.24). Coolify 4.5 changed its own Server Transfer exporter; backups carry Coolify's transfer bundle again, and the daily test now fails when a backup comes without it. Secrets that Coolify 4.5 encrypts at rest are re-encrypted for the new server like every other secret. The website answers the common migration questions and has a summary for AI assistants (<code>llms.txt</code>).</p></div></div>
       <div class="rel"><div><span class="v">1.9.4</span><span class="d">2026-10-22</span></div><div><h3>Coolify 4.4.7 and 4.3.24</h3><p>Tested with Coolify's security releases 4.4.7 and 4.3.24: a full move on two freshly installed servers for each. Update both servers to the same release before a move; Coolify's <code>patch.sh</code> takes every line to its fix release. The daily test's servers now always get the cpu cgroup controller: without it Docker there could not start containers with a CPU weight, which had wrongly marked 4.3.24 as failed on the test host.</p></div></div>
@@ -702,6 +711,7 @@
     <div class="faq">
       <details><summary>How do I migrate Coolify to a new server?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Install Coolify on the new server, the same version as the old one. On the old server run the one-line installer, pick the projects (or the whole server), back them up and share the backup: it prints one command. Paste that command on the new server. It downloads and verifies the backup, restores apps, databases, volumes, env vars and domains, starts them through Coolify and checks that every domain answers. Then point your DNS to the new server.</p></details>
       <details><summary>Can I move just one app or one project?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Pick one project, several, or a single app; the databases and services they use come along. They are merged into the new Coolify next to what is already there. A whole-server backup is the other option, for an empty new Coolify.</p></details>
+      <details><summary>The panel does not open after a whole-server restore (&ldquo;not registered&rdquo;)<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Versions before 1.9.7 restored the old server&rsquo;s panel address too, so the proxy only knew the old domain. Since 1.9.7 the panel keeps this server&rsquo;s own address and IPs and the restore checks it answers. A server restored earlier: run <code>sudo coolify-mirror repair-panel</code> (add the panel address, or <code>-</code> for none).</p></details>
       <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3, v4.4 and v4.5 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
       <details><summary>Does the old server go down during the backup?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>No. With Recommended settings, containers pause only for the seconds their volume copy takes, and databases are dumped while they run. Nothing is deleted on the old server.</p></details>
       <details><summary>Can the new server already have other projects?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Backing up apps merges them into the new Coolify and keeps everything that is there. An app that already exists can be restored as a copy or skipped. A whole-server backup only goes onto a fresh, empty Coolify.</p></details>

@@ -246,11 +246,18 @@ func restoreFull(ctx context.Context, in *coolify.Instance, f *engine.Fetched) e
 	if err != nil {
 		return err
 	}
+	opt, err := askPanelURL(ctx, in, f)
+	if errors.Is(err, huh.ErrUserAborted) {
+		return errNotRestored
+	}
+	if err != nil {
+		return err
+	}
 	pr := engine.NewProgress("Full restore")
 	var rep *engine.RestoreReport
 	err = runWithProgress(ctx, "Restoring the whole Coolify", pr, func(ctx context.Context) error {
 		var err error
-		rep, err = engine.ApplyFull(ctx, in, f, pr)
+		rep, err = engine.ApplyFull(ctx, in, f, pr, opt)
 		return err
 	})
 	if err != nil {
@@ -359,12 +366,24 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	if builds == 0 {
 		return nil
 	}
-	ok, err := confirm(ctx, fmt.Sprintf("Rebuild %d application(s) once now?", builds),
-		"They run from the restored images. One rebuild here (same commit, no cache) proves that the next deploy works on this server without the old one.\nLike any first deploy it downloads base images and packages - on a slow connection answer No and redeploy later from Coolify.", true)
+	// Everything already runs. Spell out what each answer does: a bare "Yes"
+	// read like "keep it", while it means a slow fresh build from Git.
+	const keep, rebuild = "keep", "rebuild"
+	choice := keep
+	err = huh.NewForm(huh.NewGroup(
+		huh.NewSelect[string]().
+			Title(fmt.Sprintf("Everything is running. Also rebuild the %d app(s) from Git now?", builds)).
+			Description("An optional test: it proves the next deploy works on this server without the old one.").
+			Options(
+				huh.NewOption("No  - done: keep everything running exactly as it is now (recommended)", keep),
+				huh.NewOption(fmt.Sprintf("Yes - download the code from Git again and build the %d app(s) here (slow, needs internet)", builds), rebuild),
+			).
+			Value(&choice),
+	)).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx)
 	if errors.Is(err, huh.ErrUserAborted) {
 		return nil // the restore is complete; esc only skips the rebuild
 	}
-	if err != nil || !ok {
+	if err != nil || choice != rebuild {
 		return err
 	}
 	pr = engine.NewProgress("Redeploy check")
@@ -537,4 +556,51 @@ func hostList(v string) []string {
 		return []string{"(none)"}
 	}
 	return out
+}
+
+// askPanelURL asks which address the restored Coolify panel answers on. The
+// default keeps this server's own: the source's address points to the old
+// server until its DNS is moved, and with it the panel was unreachable here.
+func askPanelURL(ctx context.Context, in *coolify.Instance, f *engine.Fetched) (engine.FullOptions, error) {
+	cur, err := engine.ReadPanel(ctx, in)
+	if err != nil {
+		return engine.FullOptions{}, err
+	}
+	ip := cur.IPv4
+	if ip == "" {
+		ip, _ = in.PublicIPs(ctx)
+	}
+	direct := "http://" + ip + ":8000"
+	src := f.Manifest.Source.PanelURL
+	choice := engine.PanelKeep
+	var opts []huh.Option[string]
+	if cur.URL != "" {
+		opts = append(opts, huh.NewOption("Keep this server's address  "+cur.URL+"  (recommended)", engine.PanelKeep))
+	} else {
+		opts = append(opts, huh.NewOption("Keep it as it is: no domain, open the panel at "+direct+"  (recommended)", engine.PanelKeep))
+	}
+	if src != "" && src != cur.URL {
+		opts = append(opts, huh.NewOption("Use the old server's address  "+src+"  (only once its DNS points to this server)", engine.PanelSource))
+	}
+	if cur.URL != "" {
+		opts = append(opts, huh.NewOption("No domain: open the panel at "+direct, engine.PanelNone))
+	}
+	opts = append(opts, huh.NewOption("Type another address…", "type"))
+	if err := huh.NewForm(huh.NewGroup(huh.NewSelect[string]().
+		Title("Address of this Coolify panel after the restore").
+		Description("The address and the IPs of the panel belong to this server, not to the backup.").
+		Options(opts...).Value(&choice))).WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx); err != nil {
+		return engine.FullOptions{}, err
+	}
+	if choice != "type" {
+		return engine.FullOptions{PanelURL: choice}, nil
+	}
+	typed := ""
+	err = huh.NewForm(huh.NewGroup(huh.NewInput().
+		Title("Panel address").
+		Description("For example https://coolify.example.com - its DNS must point to this server").
+		Value(&typed).
+		Validate(func(s string) error { _, err := engine.NormalizePanelURL(s); return err }))).
+		WithTheme(theme()).WithKeyMap(keys()).RunWithContext(ctx)
+	return engine.FullOptions{PanelURL: typed}, err
 }
