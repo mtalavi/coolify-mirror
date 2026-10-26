@@ -42,6 +42,9 @@ func mainOption(icon, name, what, value string) huh.Option[string] {
 
 // Run starts the interactive menu.
 func Run(ctx context.Context) error {
+	if err := UseForegroundTTY(); err != nil {
+		return err
+	}
 	Banner()
 	fmt.Println()
 	in, err := checkServer(ctx)
@@ -117,6 +120,9 @@ func Run(ctx context.Context) error {
 // RunRestore restores a share code, link or file interactively (the menu's
 // restore, without the menu).
 func RunRestore(ctx context.Context, source string) error {
+	if err := UseForegroundTTY(); err != nil {
+		return err
+	}
 	Banner()
 	fmt.Println()
 	in, err := checkServer(ctx)

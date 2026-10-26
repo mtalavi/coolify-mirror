@@ -94,7 +94,13 @@ func Do(ctx context.Context, s Spec) ([]byte, error) {
 		cmd.Env = append(os.Environ(), s.Env...)
 	}
 	start := time.Now()
+	// A command that hangs (a stuck Docker daemon) must still show up in the
+	// log, which otherwise only gets a line once the command returns.
+	slow := time.AfterFunc(10*time.Second, func() {
+		Logf("still running after 10s: %s", s.display())
+	})
 	err := cmd.Run()
+	slow.Stop()
 	Logf("exec %s (%s) err=%v", s.display(), time.Since(start).Round(time.Millisecond), err)
 	if err != nil {
 		code := -1
