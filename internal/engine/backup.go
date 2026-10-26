@@ -183,11 +183,23 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 	}
 	stFinal := pr.Add("Finish and verify backup file", 0)
 
+	// With a recovery key the backup gets an X25519 key and is encrypted to
+	// the recovery key too: it then opens on any server after losing this one.
 	key := NewPassphrase()
-	name := fmt.Sprintf("coolify-%s-%s-%s.cmb", safeName(in.Hostname), req.Mode, time.Now().Format("20060102-150405"))
+	cfg, err := LoadConfig()
+	if err != nil {
+		return nil, err
+	}
+	if len(cfg.RecoveryKeys) > 0 {
+		if key, _, err = archive.NewIdentityKey(); err != nil {
+			return nil, err
+		}
+		b.man.RecoveryKeys = cfg.RecoveryKeys
+	}
+	name := BackupFileName(in.Hostname, req.Mode, in.Version, time.Now())
 	final := filepath.Join(req.OutputDir, name)
 	tmp := final + ".part"
-	w, err := archive.Create(tmp, key)
+	w, err := archive.Create(tmp, key, cfg.RecoveryKeys...)
 	if err != nil {
 		return nil, err
 	}

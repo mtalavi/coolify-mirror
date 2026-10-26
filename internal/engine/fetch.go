@@ -42,6 +42,27 @@ func (s *Step) SetDone(n int64) {
 // Fetch downloads the backup (when source is a link), verifies it completely
 // and reads its manifest. key may be empty when the link carries #key=.
 func Fetch(ctx context.Context, source, key string, pr *Progress) (f *Fetched, err error) {
+	// A backup kept off this server (a folder, an rclone remote, an https://
+	// address): bring it here first; a folder gives its newest backup.
+	offsite := false
+	if IsOffsiteSource(source) {
+		st := pr.Add("Download backup", 0)
+		st.Begin(source)
+		local, err := FetchOffsite(ctx, source, func(done, total int64) {
+			if total > 0 {
+				st.SetWeight(total)
+			}
+			st.SetDone(done)
+		})
+		if err != nil {
+			st.Fail(err)
+			return nil, err
+		}
+		fi, _ := os.Stat(local)
+		st.Finish(filepath.Base(local) + "  " + HumanBytes(fi.Size()))
+		offsite = strings.HasPrefix(local, IncomingDir+string(filepath.Separator))
+		source = local
+	}
 	loc, linkKey, isURL, err := transfer.ParseSource(source)
 	if err != nil {
 		return nil, err
@@ -61,6 +82,9 @@ func Fetch(ctx context.Context, source, key string, pr *Progress) (f *Fetched, e
 		}
 	}
 	if key == "" {
+		if !isURL {
+			return nil, errors.New("this backup file has no key next to it - give its key or the recovery key (--key / --recovery-key)")
+		}
 		return nil, errors.New("the link has no key - paste the complete link including the #key=… part")
 	}
 	local := loc
@@ -122,7 +146,7 @@ func Fetch(ctx context.Context, source, key string, pr *Progress) (f *Fetched, e
 	if err != nil {
 		return nil, err
 	}
-	return &Fetched{Path: local, Key: key, Manifest: man, Export: ex, Bundle: bundle, Size: fi.Size(), Downloaded: isURL}, nil
+	return &Fetched{Path: local, Key: key, Manifest: man, Export: ex, Bundle: bundle, Size: fi.Size(), Downloaded: isURL || offsite}, nil
 }
 
 // Inspect reads the manifest, the official transfer bundle (when present) and

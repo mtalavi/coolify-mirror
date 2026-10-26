@@ -26,6 +26,7 @@ const (
 	actRestore        = "restore"
 	actShare          = "share"
 	actFiles          = "files"
+	actAuto           = "auto"
 	actGuide          = "guide"
 	actQuit           = "quit"
 )
@@ -63,6 +64,7 @@ func Run(ctx context.Context) error {
 					mainOption("⇑", "Back up the whole server", "Coolify itself, its settings and every project", actBackupFull),
 					mainOption("↓", "Restore a backup", "type the share code from the other server", actRestore),
 					mainOption("↔", "Share a saved backup", "send a backup made earlier to another server", actShare),
+					mainOption("⟳", autoMenuName, "every night to Google Drive, S3, a folder… - back in minutes after losing the server", actAuto),
 					mainOption("≡", filesMenuName, "see and delete old backups (all or some), safety copies", actFiles),
 					mainOption("?", "How it works", "step-by-step guide · "+strings.TrimPrefix(engine.SiteURL, "https://"), actGuide),
 					mainOption("×", "Quit", "", actQuit),
@@ -88,6 +90,8 @@ func Run(ctx context.Context) error {
 			}
 		case actShare:
 			err = shareExisting(ctx, in)
+		case actAuto:
+			err = automaticBackups(ctx, in)
 		case actFiles:
 			err = savedFiles(ctx)
 		case actGuide:

@@ -17,7 +17,7 @@
 set -euo pipefail
 V="${1:?Coolify version, e.g. 4.3.23}"
 MODE="${E2E_MODE:-selective}"
-case "$MODE" in selective|full) ;; *) echo "E2E_MODE must be selective or full" >&2; exit 2 ;; esac
+case "$MODE" in selective|full|offsite) ;; *) echo "E2E_MODE must be selective, full or offsite" >&2; exit 2 ;; esac
 BIN="$(cd "$(dirname "${2:?coolify-mirror binary}")" && pwd)/$(basename "$2")"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 REPO="${E2E_REPO:-https://github.com/mtalavi/coolify-mirror}"
@@ -25,6 +25,7 @@ BRANCH="${E2E_BRANCH:-main}"
 NET=cm-e2e
 SRC=cm-e2e-src
 DST=cm-e2e-dst
+STORE=cm-e2e-store
 
 log() { printf '\n=== %s\n' "$*"; }
 on() { local c=$1; shift; docker exec "$c" bash -c "$*"; }
@@ -32,7 +33,7 @@ setup_fail() { echo "SETUP FAILED: $*"; exit 2; }
 
 cleanup() {
   [ "${KEEP:-0}" = 1 ] && return
-  docker rm -f "$SRC" "$DST" >/dev/null 2>&1 || true
+  docker rm -f "$SRC" "$DST" "$STORE" >/dev/null 2>&1 || true
   for c in "$SRC" "$DST"; do docker volume rm "$c-docker" "$c-containerd" "$c-data" >/dev/null 2>&1 || true; done
   docker network rm "$NET" >/dev/null 2>&1 || true
 }
@@ -150,7 +151,7 @@ panel() { # server host [scheme]
   done
   return 1
 }
-if [ "$MODE" = full ]; then
+if [ "$MODE" != selective ]; then
   log "give both panels their own domain"
   panel "$SRC" panel-src.e2e.test || setup_fail "the source panel does not answer on panel-src.e2e.test"
   # https on the target: its route is checked without a trusted certificate
@@ -163,6 +164,7 @@ PHASE=tool
 log "back up and share on the source"
 docker cp "$BIN" "$SRC:/usr/local/bin/coolify-mirror"
 docker cp "$BIN" "$DST:/usr/local/bin/coolify-mirror"
+if [ "$MODE" != offsite ]; then
 WHAT="--all"
 [ "$MODE" = full ] && WHAT="--full"
 on "$SRC" "COOLIFY_MIRROR_COMPAT_URL=off nohup coolify-mirror backup $WHAT --serve --mode direct --host $SRC >/root/share.out 2>&1 &"
@@ -187,10 +189,72 @@ if [ "${E2E_SHARE_ONLY:-0}" = 1 ]; then
   echo "SHARE_CODE=$CODE"
   exit 0
 fi
-log "restore on the target with the share code"
+else
+  # Off-site: a third server holds the backups (SFTP, through rclone). The
+  # source makes a recovery key, uploads two backups (one kept there, none
+  # here), refuses an unknown destination and runs a scheduled backup; the
+  # target restores the newest one with nothing but the recovery key.
+  log "off-site: a storage server reached over SFTP with rclone"
+  docker rm -f "$STORE" >/dev/null 2>&1 || true
+  docker run -d --name "$STORE" --hostname "$STORE" --network "$NET" --privileged --cgroupns=private \
+    --tmpfs /run --tmpfs /run/lock cm-e2e-host >/dev/null
+  for i in $(seq 1 60); do on "$STORE" 'systemctl is-active ssh' 2>/dev/null | grep -qx active && break; sleep 1; done
+  on "$SRC" 'mkdir -p /root/.ssh && rm -f /root/.ssh/store /root/.ssh/store.pub && ssh-keygen -q -t ed25519 -N "" -f /root/.ssh/store'
+  PUB=$(on "$SRC" 'cat /root/.ssh/store.pub')
+  on "$STORE" "mkdir -p /root/.ssh && chmod 700 /root/.ssh && echo '$PUB' >> /root/.ssh/authorized_keys && chmod 600 /root/.ssh/authorized_keys"
+  docker cp "$SRC:/root/.ssh/store" /tmp/cm-e2e-store-key
+  on "$DST" 'mkdir -p /root/.ssh && chmod 700 /root/.ssh'
+  docker cp /tmp/cm-e2e-store-key "$DST:/root/.ssh/store"
+  rm -f /tmp/cm-e2e-store-key
+  for c in "$SRC" "$DST"; do
+    on "$c" "chmod 600 /root/.ssh/store && rclone config create store sftp host $STORE user root key_file /root/.ssh/store >/dev/null"
+  done
+  on "$SRC" 'rclone mkdir store:backups'
+
+  log "recovery key, then two uploaded backups (keep 1 there, none here)"
+  KEY=$(on "$SRC" 'coolify-mirror recovery-key create' | grep -o 'AGE-SECRET-KEY-1[0-9A-Z]*' | head -1)
+  [ -n "$KEY" ] || { echo "BAD: no recovery key"; exit 1; }
+  echo "recovery key created (public half kept on the source)"
+  for n in 1 2; do
+    on "$SRC" "COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror backup --full --to store:backups --keep-remote 1 --keep-local 0" >/tmp/cm-e2e-off.log 2>&1 \
+      || { tail -30 /tmp/cm-e2e-off.log; echo "BAD: off-site backup $n failed"; exit 1; }
+    grep -E '^(Backup ready|Uploaded|Older|Removed)' /tmp/cm-e2e-off.log || true
+  done
+  got=$(on "$STORE" 'ls /root/backups')
+  [ "$(echo "$got" | grep -c '\.cmb$')" = 1 ] && echo "ok  one backup kept at the destination: $got" || { echo "BAD destination holds: $got"; exit 1; }
+  echo "$got" | grep -q "coolify$V-" && echo "ok  the file name carries Coolify $V" || { echo "BAD name without the Coolify version: $got"; exit 1; }
+  left=$(on "$SRC" 'ls /data/coolify-mirror/backups/ | grep -c "\.cmb$" || true')
+  [ "$left" = 0 ] && echo "ok  nothing left on the source after the checked upload" || { echo "BAD $left backup(s) left on the source"; exit 1; }
+
+  log "an unknown destination is refused before anything is backed up"
+  set +e
+  out=$(on "$SRC" 'COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror backup --full --to nosuch:x' 2>&1)
+  rc=$?
+  set -e
+  if [ "$rc" != 0 ] && echo "$out" | grep -q 'rclone has no remote'; then echo "ok  unknown destination refused"; else echo "$out" | tail -5; echo "BAD: unknown destination (exit $rc)"; exit 1; fi
+
+  log "scheduled backup (systemd timer), run now"
+  on "$SRC" 'coolify-mirror schedule add --name e2e --at 04:00 --full --to store:backups --keep-remote 1'
+  on "$SRC" 'coolify-mirror schedule run e2e'
+  st=""
+  for i in $(seq 1 120); do
+    st=$(on "$SRC" 'cat /data/coolify-mirror/schedules/e2e.json 2>/dev/null' || true)
+    echo "$st" | grep -q '"ok": true' && break
+    echo "$st" | grep -q '"ok": false' && break
+    sleep 5
+  done
+  if echo "$st" | grep -q '"ok": true'; then echo "ok  scheduled backup ran, uploaded and checked"; else
+    echo "$st"; on "$SRC" 'journalctl -u coolify-mirror-e2e --no-pager | tail -25' || true
+    echo "BAD: the scheduled backup did not finish"; exit 1
+  fi
+  on "$SRC" 'coolify-mirror schedule list'
+  CODE="store:backups"
+  RESTORE_EXTRA="--recovery-key $KEY"
+fi
+log "restore on the target"
 cgroup_ok "$DST"
 set +e
-on "$DST" "COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror restore $CODE --yes" | tee /tmp/cm-e2e-restore.log
+on "$DST" "COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror restore $CODE --yes ${RESTORE_EXTRA:-}" | tee /tmp/cm-e2e-restore.log
 rc=${PIPESTATUS[0]}
 set -e
 if [ "$rc" != 0 ]; then
@@ -215,7 +279,7 @@ got=$(on "$DST" "docker exec \$(docker ps -q --filter name=^web-$COMPOSE) printe
 [ "$got" = e2e-secret-token-42 ] && echo "ok  compose app secret" || { echo "BAD compose secret: $got"; fail=1; }
 got=$(on "$DST" "curl -fsS --resolve web.e2e.test:80:127.0.0.1 http://web.e2e.test/" || true)
 echo "$got" | grep -q "marker=$CMARK" && echo "ok  compose app volume data through the proxy" || { echo "BAD compose app: '$got'"; fail=1; }
-if [ "$MODE" = full ]; then
+if [ "$MODE" != selective ]; then
   got=$(on "$DST" "curl -fsS -m 10 http://127.0.0.1:8000/api/health" || true)
   [ "$got" = OK ] && echo "ok  panel on port 8000" || { echo "BAD panel on port 8000: '$got'"; fail=1; }
   got=$(on "$DST" "curl -fsSk -m 10 --resolve panel-dst.e2e.test:443:127.0.0.1 https://panel-dst.e2e.test/api/health" || true)
@@ -226,4 +290,5 @@ fi
 [ "$fail" = 0 ] || exit 1
 echo
 [ "$MODE" = full ] && echo "FULL RESTORE OK"
+[ "$MODE" = offsite ] && echo "OFF-SITE BACKUP AND RESTORE OK"
 echo "COMPATIBLE: coolify-mirror $("$BIN" version 2>/dev/null | awk '{print $2}') with Coolify $V"

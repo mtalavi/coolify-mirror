@@ -2,7 +2,7 @@
 
 > Coolify Mirror (coolify-mirror) is a free, open-source (MIT) command-line tool that migrates Coolify apps between servers. It backs up one app, one or more projects, or a whole Coolify server, and restores it on another Coolify with one pasted command. Apps, databases, volumes, environment variables, secrets, domains, images and proxy settings arrive running and verified. Works with Coolify v4.3, v4.4 and v4.5 (both servers on the same version), on Linux amd64 and arm64. Not affiliated with Coolify or coolLabs.
 
-Current version: 1.9.7. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0; every new Coolify release is tested automatically every day.
+Current version: 1.10.0. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 and 4.5.0; every new Coolify release is tested automatically every day.
 
 ## How to migrate Coolify to a new server
 
@@ -12,6 +12,13 @@ Current version: 1.9.7. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7 
 4. Paste that command on the new server, for example: `curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore 203.0.113.10/hi4i-2dzx-hmeg-42qp-palx-52s7-zq`
 5. Answer Yes after reading the list, keep or change each domain. The tool restores everything, starts it through Coolify and reports "Restore complete · everything verified".
 6. Point DNS to the new server, move GitHub webhooks and scheduled tasks, and free the disk space on both servers (Saved files & disk space → All backups → ALL).
+
+## Automatic off-site backups (disaster recovery)
+
+1. Once: `sudo coolify-mirror recovery-key create --email you@example.com --telegram CHAT_ID` - the key that opens every backup on any server; shown once, sent to you, never stored on the server.
+2. Once: install rclone and add a destination (`rclone config`: Google Drive, S3, SFTP, Dropbox, 70+); a plain folder also works.
+3. Every night: `sudo coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify-backups --keep-remote 7 --keep-local 0` (systemd timer). One-off or from your own script: `sudo coolify-mirror backup --full --to gdrive:coolify-backups --keep-remote 7 --keep-local 0`. The copy is checked (size + checksum), then deleted from the server. Failures are reported by email/Telegram (`notify set`).
+4. Server lost: on a new server install the Coolify version in the backup file name (coolify-HOST-full-coolify4.5.0-DATE.cmb), set up the same rclone remote, then `curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore gdrive:coolify-backups --recovery-key AGE-SECRET-KEY-1...` (the newest backup of the folder).
 
 ## What moves
 

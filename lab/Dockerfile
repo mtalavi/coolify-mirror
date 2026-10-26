@@ -10,7 +10,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       systemd systemd-sysv dbus openssh-server curl wget ca-certificates git jq \
       openssl iproute2 iputils-ping sudo gnupg lsb-release cron less nano \
-      iptables kmod procps \
+      iptables kmod procps rclone \
  && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Strip units that make no sense inside a container.
