@@ -9,6 +9,7 @@
   <img alt="coolify" src="https://img.shields.io/badge/Coolify-v4.3%20%7C%20v4.4%20%7C%20v4.5-6366f1?style=flat-square">
   <img alt="platform" src="https://img.shields.io/badge/linux-amd64%20%7C%20arm64-22c55e?style=flat-square">
   <a href="LICENSE"><img alt="license" src="https://img.shields.io/badge/license-MIT-a1a1aa?style=flat-square"></a>
+  <a href="https://hub.xerj.org/contributors/mtalavi"><img alt="XERJ Corpus Hub contributor" src="https://hub.xerj.org/contributors/mtalavi/badge.svg"></a>
 </p>
 
 <p align="center">
