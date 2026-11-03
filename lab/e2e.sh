@@ -12,6 +12,8 @@
 # get their own domain first, and the target's panel must still answer on
 # its own IP and domain afterwards (the restored database carries the
 # source's panel address).
+# E2E_MODE=offsite exercises a full backup via rclone/SFTP, retention and a
+# systemd schedule, then restores using only the recovery key on a fresh target.
 #
 # Needs Docker on the host (privileged containers). KEEP=1 keeps the servers.
 set -euo pipefail
@@ -140,6 +142,18 @@ MARK="e2e-$(date +%s)-$RANDOM"
 on "$SRC" "docker exec \$(docker ps -q --filter name=^$WEB) sh -c 'echo $MARK > /usr/share/nginx/html/marker.txt'"
 on "$SRC" "docker exec $PG psql -U e2e -d e2e -v ON_ERROR_STOP=1 -c 'create table t(x int); insert into t select generate_series(1,1234)'" >/dev/null
 
+# Compare contents, not just the number of rows (equal counts can hide damage).
+data_digest() {
+  on "$1" "docker exec $PG psql -U e2e -d e2e -At -c \"select md5(string_agg(x::text, ',' order by x)) from t\""
+}
+PG_DIGEST=$(data_digest "$SRC")
+[ -n "$PG_DIGEST" ] || setup_fail "no source database checksum"
+for c in "$SRC" "$DST"; do
+  docker cp "$HERE/e2e_metadata.php" "$c:/root/e2e_metadata.php"
+  on "$c" 'docker cp /root/e2e_metadata.php coolify:/tmp/e2e_metadata.php'
+done
+on "$SRC" "docker exec -e ACTION=seed -e APP_UUID=$COMPOSE coolify php /tmp/e2e_metadata.php"
+
 # Full mode: give each panel its own domain, the way a real server has it,
 # and check that the proxy serves it before the move.
 panel() { # server host [scheme]
@@ -176,7 +190,7 @@ for i in $(seq 1 120); do
 done
 [ -n "$CODE" ] || { on "$SRC" 'cat /root/share.out'; echo "no share code"; exit 1; }
 on "$SRC" 'grep -E "^  ! " /root/share.out' || true
-echo "share code: $CODE"
+echo "share code ready (secret omitted)"
 
 # Every backup carries Coolify's own Server Transfer bundle; losing it means
 # Coolify changed its exporter (as 4.5.0 did) and the tool must follow.
@@ -275,6 +289,12 @@ got=$(on "$DST" "curl -fsS --resolve nginx.e2e.test:80:127.0.0.1 http://nginx.e2
 [ "$got" = "$MARK" ] && echo "ok  volume file through the proxy" || { echo "BAD volume file: '$got' != '$MARK'"; fail=1; }
 got=$(on "$DST" "docker exec $PG psql -U e2e -d e2e -At -c 'select count(*) from t'" || true)
 [ "$got" = 1234 ] && echo "ok  database rows" || { echo "BAD database rows: $got"; fail=1; }
+got=$(data_digest "$DST" || true)
+[ "$got" = "$PG_DIGEST" ] && echo "ok  database contents checksum" || { echo "BAD database contents checksum"; fail=1; }
+
+# A full restore may recreate the Coolify container, so copy the verifier again.
+on "$DST" 'docker cp /root/e2e_metadata.php coolify:/tmp/e2e_metadata.php'
+on "$DST" "docker exec -e ACTION=verify -e APP_UUID=$COMPOSE -e MODE=$MODE coolify php /tmp/e2e_metadata.php" || fail=1
 got=$(on "$DST" "docker exec \$(docker ps -q --filter name=^web-$COMPOSE) printenv SECRET_TOKEN" || true)
 [ "$got" = e2e-secret-token-42 ] && echo "ok  compose app secret" || { echo "BAD compose secret: $got"; fail=1; }
 got=$(on "$DST" "curl -fsS --resolve web.e2e.test:80:127.0.0.1 http://web.e2e.test/" || true)
