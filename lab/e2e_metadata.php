@@ -41,7 +41,7 @@ if (Schema::hasColumn('applications', 'git_https_password')) {
 if (Schema::hasColumn('personal_access_tokens', 'scopes')) {
     $scopes = [['scope' => 'resource', 'uuid' => $application->uuid]];
     if ($seed) {
-        $token = User::findOrFail(0)->createToken('e2e-scoped-paused', ['read'])->accessToken;
+        $token = User::findOrFail(0)->createToken('e2e-scoped-paused', ['read'], null, 0)->accessToken;
         $token->forceFill(['scopes' => $scopes, 'paused_at' => '2026-11-01 00:00:00'])->save();
     } else {
         $token = DB::table('personal_access_tokens')->where('name', 'e2e-scoped-paused')->first();

@@ -43,8 +43,12 @@ func TestHTTPSCredentialsReencrypted(t *testing.T) {
 					continue
 				}
 				found = true
-				value, ok := row.row["git_https_password"].(string)
-				if !ok || value == cipher || value == secret || row.row["git_https_username"] != "git-user" {
+				final, err := p.finalRow(row)
+				if err != nil {
+					t.Fatal(err)
+				}
+				value, ok := final["git_https_password"].(string)
+				if !ok || value == cipher || value == secret || final["git_https_username"] != "git-user" {
 					t.Fatal("credentials were lost or copied without re-encryption")
 				}
 				plain, err := dest.DecryptString(value)
