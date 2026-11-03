@@ -127,8 +127,9 @@ func pinnedConfig(pin, sni string) (*tls.Config, error) {
 }
 
 func decodePin(p string) ([]byte, error) {
-	// Query parsing turns an unescaped "+" into a space.
-	p = strings.ReplaceAll(strings.TrimSpace(p), " ", "+")
+	// Query parsing turns an unescaped "+" into a space, including at the
+	// beginning. Restore it before trimming or a valid leading byte is lost.
+	p = strings.TrimSpace(strings.ReplaceAll(p, " ", "+"))
 	for _, enc := range []*base64.Encoding{base64.StdEncoding, base64.URLEncoding, base64.RawURLEncoding, base64.RawStdEncoding} {
 		if b, err := enc.DecodeString(p); err == nil && len(b) == sha256.Size {
 			return b, nil

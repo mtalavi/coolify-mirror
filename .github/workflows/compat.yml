@@ -40,6 +40,9 @@ jobs:
       - uses: actions/setup-go@v7
         with:
           go-version-file: go.mod
+          # This persistent runner already has a module cache. Restoring the
+          # shared Actions cache over it produced thousands of tar collisions.
+          cache: false
       - name: Build coolify-mirror
         run: scripts/build.sh
       - name: Pick the Coolify version
