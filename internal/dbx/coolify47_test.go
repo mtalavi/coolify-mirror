@@ -32,8 +32,10 @@ func TestSFTPStorageKeyDependency(t *testing.T) {
 		if keyID == 0 || keyID == 23 || (reused && keyID != 999) {
 			t.Fatalf("missing/remapping key: %d", keyID)
 		}
+		storageSeen := false
 		for _, pr := range p.rows {
 			if pr.table == "s3_storages" {
+				storageSeen = true
 				r, err := p.finalRow(pr)
 				if err != nil {
 					t.Fatal(err)
@@ -44,12 +46,20 @@ func TestSFTPStorageKeyDependency(t *testing.T) {
 				}
 			}
 		}
+		if !storageSeen {
+			t.Fatal("referenced storage was not included")
+		}
 		sql, err := p.SQL()
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reused && strings.Index(sql, `INSERT INTO "private_keys"`) > strings.Index(sql, `INSERT INTO "s3_storages"`) {
-			t.Fatal("storage inserted before its key")
+		keyInsert := strings.Index(sql, `INSERT INTO "private_keys"`)
+		storageInsert := strings.Index(sql, `INSERT INTO "s3_storages"`)
+		if storageInsert < 0 || (!reused && (keyInsert < 0 || keyInsert > storageInsert)) {
+			t.Fatal("key or storage insert missing, or storage inserted before its key")
+		}
+		if reused && keyInsert >= 0 {
+			t.Fatal("existing target key was inserted again")
 		}
 	}
 }

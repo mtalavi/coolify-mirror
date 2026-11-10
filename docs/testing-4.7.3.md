@@ -31,7 +31,12 @@ Each mode installs two real Coolify instances on fresh Ubuntu/systemd containers
 
 ## Evidence
 
-Final run results are recorded here after completion.
+- [Coolify 4.7.3 real restore run](https://github.com/mtalavi/coolify-mirror/actions/runs/42801124062): passed both selective and off-site full recovery on 2026-11-10. Both modes verified the database content digest, SFTP/key/schedule links, multiline bytes and resource scan settings. Full recovery also verified the scheduled upload, retention and target panel identity.
+
+- [Coolify 4.6.0 regression run](https://github.com/mtalavi/coolify-mirror/actions/runs/42801171452): passed selective and off-site full recovery on 2026-11-10, including database content checks, volumes, runtime secrets, Git credentials, scoped/paused token handling, scheduled uploads and panel identity. The 4.7-only fixtures are gated by schema availability.
+- Local formatting, vet, the full Go suite, PHP/Bash syntax, Linux amd64/arm64 builds and website checks passed. PR CI and CodeQL validate the release changes as well.
+
+Both real runs built commit `feeeaef3ac099ad6cdda428a0b94806f4ddc44f3`. Later changes update documentation, the built-in tested-version list and stricter unit-test assertions; they do not change the backup/restore implementation or lab fixture. Final release CI also runs the full Go suite.
 
 ## Boundaries
 
