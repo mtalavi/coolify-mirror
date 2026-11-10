@@ -42,6 +42,7 @@ var DatabaseKinds = []DatabaseKind{
 // still supports versions without them).
 var OptionalTables = map[string]bool{
 	"standalone_sqlites": true, "integration_tokens": true, "secret_manager_links": true,
+	"image_scan_policies": true, "image_scan_ignores": true,
 }
 
 // MorphToTable maps a morph class to its table.
