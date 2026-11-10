@@ -1,8 +1,8 @@
 # Coolify Mirror
 
-> Coolify Mirror (coolify-mirror) is a free, open-source (MIT) command-line tool that migrates Coolify apps between servers. It backs up one app, one or more projects, or a whole Coolify server, and restores it on another Coolify with one pasted command. Apps, databases, volumes, environment variables, secrets, domains, images and proxy settings arrive running and verified. Works with Coolify v4.3, v4.4, v4.5 and v4.6 (both servers on the same version), on Linux amd64 and arm64. Not affiliated with Coolify or coolLabs.
+> Coolify Mirror (coolify-mirror) is a free, open-source (MIT) command-line tool that migrates Coolify apps between servers. It backs up one app, one or more projects, or a whole Coolify server, and restores it on another Coolify with one pasted command. Apps, databases, volumes, environment variables, secrets, domains, images and proxy settings arrive running and verified. Works with Coolify v4.3, v4.4, v4.5, v4.6 and v4.7 (both servers on the same version), on Linux amd64 and arm64. Not affiliated with Coolify or coolLabs.
 
-Current version: 1.10.1. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3 and 4.6.0; every new Coolify release is tested automatically every day.
+Current version: 1.10.2. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0 and 4.7.3; every new Coolify release is tested automatically every day.
 
 ## How to migrate Coolify to a new server
 
@@ -59,3 +59,7 @@ Current version: 1.10.1. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7
 ## Coolify 4.6 validation
 
 Selective and off-site full restore tests compare database contents, volumes and HTTP responses, encrypted HTTPS Git credentials, locked environment variables and scoped/paused API tokens. Selective restores do not carry source users or API tokens; configure access on the target team. Full restores carry these database records. Evidence and limitations: https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.6.0.md
+
+## Coolify 4.7 validation
+
+SFTP destination SSH-key dependencies and resource-specific vulnerability policies/ignores are preserved in selective restores. Inherited instance/team/server policies and team-wide ignores remain the target's; scan history is not carried selectively. Full restores carry the database. Real lab checks also cover host pins and multiline values including trailing newlines. Evidence and limitations: https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.7.3.md
