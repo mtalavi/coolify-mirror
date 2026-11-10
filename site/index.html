@@ -60,8 +60,8 @@
    "applicationCategory": "DeveloperApplication",
    "applicationSubCategory": "Server migration, backup and restore",
    "operatingSystem": "Linux (amd64, arm64)",
-   "softwareVersion": "1.10.1",
-   "softwareRequirements": "Coolify v4.3, v4.4, v4.5 or v4.6 (same version on both servers), Linux amd64 or arm64, SSH as root or a sudo user",
+   "softwareVersion": "1.10.2",
+   "softwareRequirements": "Coolify v4.3, v4.4, v4.5, v4.6 or v4.7 (same version on both servers), Linux amd64 or arm64, SSH as root or a sudo user",
    "featureList": [
     "Back up one app, several projects or a whole Coolify server",
     "Automatic off-site backups to Google Drive, S3, SFTP or a folder (rclone), restored on a new server with one recovery key",
@@ -70,7 +70,7 @@
     "Native PostgreSQL, MySQL and MariaDB dumps; Redis, SQLite, volumes and host files",
     "Env vars, secrets, domains, images, proxy settings and secret-manager links",
     "Preflight checks and rollback; SUCCESS only when every resource runs and answers",
-    "Coolify v4.3, v4.4, v4.5 and v4.6, tested daily against new Coolify releases"
+    "Coolify v4.3, v4.4, v4.5, v4.6 and v4.7, tested daily against new Coolify releases"
    ],
    "datePublished": "2026-10-01",
    "dateModified": "2026-10-27",
@@ -121,7 +121,7 @@
      "@type": "HowToStep",
      "position": 1,
      "name": "Install the same Coolify version on the new server",
-     "text": "Coolify v4.3, v4.4, v4.5 or v4.6; both servers must run exactly the same version."
+     "text": "Coolify v4.3, v4.4, v4.5, v4.6 or v4.7; both servers must run exactly the same version."
     },
     {
      "@type": "HowToStep",
@@ -199,7 +199,7 @@
      "name": "Which Coolify versions work?",
      "acceptedAnswer": {
       "@type": "Answer",
-      "text": "Coolify v4.3, v4.4, v4.5 and v4.6 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3 and 4.6.0), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade."
+      "text": "Coolify v4.3, v4.4, v4.5, v4.6 and v4.7 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0 and 4.7.3), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade."
      }
     },
     {
@@ -371,7 +371,7 @@
       <div class="facts">
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>SHA-256 checked on install</span>
         <span><i class="ph ph-check-circle" aria-hidden="true"></i>Linux amd64 and arm64</span>
-        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Coolify 4.3, 4.4, 4.5 or 4.6, same version on both</span>
+        <span><i class="ph ph-check-circle" aria-hidden="true"></i>Coolify 4.3, 4.4, 4.5, 4.6 or 4.7, same version on both</span>
       </div>
     </div>
   </div>
@@ -737,6 +737,7 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
+      <div class="rel"><div><span class="v">1.10.2</span><span class="d">2026-11-10</span></div><div><h3>Coolify 4.7.3</h3><p>SFTP destination SSH keys and resource vulnerability settings now travel in selective restores. The real backup and restore lab checks these dependencies, stored host pins and multiline values with trailing newlines. The same menus, backup format and exact-version checks remain. <a href="https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.7.3.md">Read the test report</a>.</p></div></div>
       <div class="rel"><div><span class="v">1.10.1</span><span class="d">2026-11-04</span></div><div><h3>Coolify 4.6.0 verified</h3><p>Selective migration and whole-server recovery from SFTP tested on fresh Coolify 4.6.0 servers. The lab now checks database-content checksums, encrypted HTTPS Git credentials, locked environment variables and scoped API token state. Fixes HTTPS links whose certificate pin starts with <code>+</code>, keeping exact certificate checks. <a href="https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.6.0.md">Read the test report</a>.</p></div></div>
       <div class="rel"><div><span class="v">1.10.0</span><span class="d">2026-10-27</span></div><div><h3>Automatic off-site backups</h3><p>Every night (or from your own script) a whole-server backup goes to Google Drive, S3, SFTP, Dropbox or a folder through rclone, is checked there and only then deleted here; the newest N are kept there and N here. Each backup is also encrypted to a recovery key that is shown once and can be sent to you by email or Telegram, so it opens on any new server: <code>restore gdrive:folder --recovery-key …</code> takes the newest backup and brings the whole server back. Backup file names now carry the Coolify version they need. Restore also takes a folder, an rclone path or an https:// address; failures are reported by email or Telegram.</p></div></div>
       <div class="rel"><div><span class="v">1.9.7</span><span class="d">2026-10-26</span></div><div><h3>Whole-server restore keeps its panel; copy with one key</h3><p>A whole-server restore carried the old server's panel address and IPs, so the new panel answered only on the old domain (&ldquo;not registered&rdquo; on its own). The panel now keeps this server's address (or the one you choose), Coolify rebuilds its proxy route, and the restore checks the panel answers. <code>sudo coolify-mirror repair-panel</code> fixes a server restored with an older version. Press <kbd>c</kbd> on the share screen to copy the command to your own clipboard (<kbd>s</kbd>: the short one); the last restore question now says plainly that No keeps everything running; <code>coolify-mirror help</code> starts with the everyday commands; an identical <code>docker-compose.custom.yml</code> no longer warns. The daily test now also moves a whole server.</p></div></div>
@@ -773,7 +774,7 @@
       <details><summary>Can it back up automatically to Google Drive or S3?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. <code>sudo coolify-mirror schedule add --at 03:30 --full --to gdrive:coolify-backups --keep-remote 7</code> backs up every night, uploads through rclone (Google Drive, S3, SFTP, Dropbox and 70+ more) or to a folder, checks the copy and then deletes it from the server. A failed run is reported by email or Telegram.</p></details>
       <details><summary>The server is gone. How do I get everything back?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>On a new server install the Coolify version written in the backup&rsquo;s name, set up the same rclone destination, and run <code>curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore gdrive:coolify-backups --recovery-key AGE-SECRET-KEY-1…</code>. It restores the newest backup, starts everything and checks every domain.</p></details>
       <details><summary>The panel does not open after a whole-server restore (&ldquo;not registered&rdquo;)<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Versions before 1.9.7 restored the old server&rsquo;s panel address too, so the proxy only knew the old domain. Since 1.9.7 the panel keeps this server&rsquo;s own address and IPs and the restore checks it answers. A server restored earlier: run <code>sudo coolify-mirror repair-panel</code> (add the panel address, or <code>-</code> for none).</p></details>
-      <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3, v4.4, v4.5 and v4.6 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3 and 4.6.0), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
+      <details><summary>Which Coolify versions work?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Coolify v4.3, v4.4, v4.5, v4.6 and v4.7 (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0 and 4.7.3), with exactly the same version on both servers. At start the tool says whether this version is tested; every new Coolify release is tested automatically. If the versions differ, it tells you which server to upgrade.</p></details>
       <details><summary>Does the old server go down during the backup?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>No. With Recommended settings, containers pause only for the seconds their volume copy takes, and databases are dumped while they run. Nothing is deleted on the old server.</p></details>
       <details><summary>Can the new server already have other projects?<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Yes. Backing up apps merges them into the new Coolify and keeps everything that is there. An app that already exists can be restored as a copy or skipped. A whole-server backup only goes onto a fresh, empty Coolify.</p></details>
       <details><summary>The new server cannot connect to the old one.<i class="ph ph-plus" aria-hidden="true"></i></summary><p>Port 443 of the old server is blocked. On the old server press q, choose Share a saved backup, the same backup, then Share a link on port 8123. Allow 8123 in your provider's firewall too, and run the new command it shows.</p></details>

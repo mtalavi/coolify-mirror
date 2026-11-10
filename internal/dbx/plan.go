@@ -610,6 +610,10 @@ func (o *ownerIndex) rootOf(table string, row coolify.Row) string {
 		return parent("services", row["service_id"])
 	case "environment_variables", "secret_manager_links":
 		return morph("resourceable_type", "resourceable_id")
+	case "image_scan_policies":
+		return morph("scope_type", "scope_id")
+	case "image_scan_ignores":
+		return morph("resource_type", "resource_id")
 	case "local_persistent_volumes", "local_file_volumes":
 		return morph("resource_type", "resource_id")
 	case "scheduled_database_backups":
@@ -677,6 +681,11 @@ func neededContext(ex *Export, included func(string, coolify.Row) bool) map[stri
 	for _, row := range ex.Tables["projects"] {
 		if id, _ := Int64(row["id"]); need["projects"][id] {
 			mark("s3_storages", row["icon_s3_storage_id"])
+		}
+	}
+	for _, row := range ex.Tables["s3_storages"] {
+		if id, _ := Int64(row["id"]); need["s3_storages"][id] {
+			mark("private_keys", row["private_key_id"])
 		}
 	}
 	return need

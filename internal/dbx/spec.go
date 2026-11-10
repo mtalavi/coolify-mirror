@@ -27,7 +27,7 @@ const (
 // foreignKeys lists every id-carrying column of the tables this tool moves.
 // Columns not listed here are copied verbatim.
 var foreignKeys = map[string][]fk{
-	"s3_storages":      {{Col: "team_id", Table: refTeam}},
+	"s3_storages":      {{Col: "team_id", Table: refTeam}, {Col: "private_key_id", Table: "private_keys", Optional: true}},
 	"private_keys":     {{Col: "team_id", Table: refTeam}},
 	"github_apps":      {{Col: "team_id", Table: refTeam}, {Col: "private_key_id", Table: "private_keys"}},
 	"gitlab_apps":      {{Col: "team_id", Table: refTeam}, {Col: "private_key_id", Table: "private_keys"}},
@@ -87,6 +87,10 @@ var foreignKeys = map[string][]fk{
 		{Col: "resourceable_id", MorphCol: "resourceable_type"},
 		{Col: "integration_token_id", Table: "integration_tokens"},
 	},
+	// Resource-specific scan settings (4.7+). Instance/team/server policy
+	// remains the target's; author users are not part of a selective restore.
+	"image_scan_policies": {{Col: "scope_id", MorphCol: "scope_type"}},
+	"image_scan_ignores":  {{Col: "resource_id", MorphCol: "resource_type"}, {Col: "team_id", Table: refTeam}, {Col: "created_by", Table: refNull}},
 }
 
 func init() {
@@ -101,7 +105,7 @@ func init() {
 // insertOrder is the order rows are inserted in (parents before children).
 var insertOrder = func() []string {
 	order := []string{
-		"s3_storages", "integration_tokens", "private_keys", "github_apps", "gitlab_apps",
+		"private_keys", "s3_storages", "integration_tokens", "github_apps", "gitlab_apps",
 		"projects", "project_settings", "environments", "shared_environment_variables",
 		"standalone_dockers", "tags",
 	}
@@ -113,7 +117,7 @@ var insertOrder = func() []string {
 		"applications", "application_settings", "application_deployment_queues",
 		"environment_variables", "secret_manager_links", "local_persistent_volumes", "local_file_volumes",
 		"scheduled_tasks", "scheduled_database_backups", "scheduled_volume_backups",
-		"taggables",
+		"taggables", "image_scan_policies", "image_scan_ignores",
 	)
 }()
 

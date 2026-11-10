@@ -24,6 +24,7 @@ var idColumnsNotReferences = map[string]bool{
 	"repository_project_id": true, "current_process_id": true, "horizon_job_id": true,
 	"pull_request_id": true, "app_id": true, "client_id": true, "installation_id": true,
 	"deploy_key_id": true, "oauth_id": true, "container_id": true, "runner_group_id": true,
+	"github_deployment_id": true, // GitHub's deployment ID, not a local row (4.7+).
 }
 
 // Tables that only log or track activity: they are not part of a resource.

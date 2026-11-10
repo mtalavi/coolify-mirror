@@ -59,3 +59,75 @@ if (Schema::hasColumn('personal_access_tokens', 'scopes')) {
     }
 }
 echo "ok  locked environment variable preserved\n";
+
+// 4.7 stores SFTP destinations in s3_storages. The key is deliberately used
+// only by that destination, so a missing transitive dependency cannot hide.
+if (Schema::hasColumn('s3_storages', 'private_key_id')) {
+    $multiline = "first line\nsecond line\n";
+    if ($seed) {
+        $key = App\Models\PrivateKey::create([
+            'name' => 'e2e-storage-key', 'team_id' => 0, 'is_git_related' => false,
+            'private_key' => phpseclib3\Crypt\EC::createKey('Ed25519')->toString('OpenSSH'),
+        ]);
+        $storage = App\Models\S3Storage::create([
+            'name' => 'e2e-sftp-settings', 'team_id' => 0, 'type' => 'sftp',
+            'endpoint' => 'sftp://storage.e2e.test/backups', 'bucket' => null,
+            'key' => 'e2e-storage-user', 'secret' => 'e2e-storage-password',
+            'private_key_id' => $key->id,
+        ]);
+        $storage->sftp_host_key = trim($key->public_key);
+        $storage->save();
+        $database = App\Models\StandalonePostgresql::where('name', 'e2e-db')->firstOrFail();
+        App\Models\ScheduledDatabaseBackup::create([
+            'team_id' => 0, 'enabled' => false, 'save_s3' => true, 'frequency' => '0 0 1 1 *',
+            'database_type' => $database->getMorphClass(), 'database_id' => $database->id,
+            's3_storage_id' => $storage->id,
+        ]);
+        $application->environment_variables()->create([
+            'key' => 'E2E_MULTILINE', 'value' => $multiline, 'is_multiline' => true,
+            'is_runtime' => false, 'is_buildtime' => false,
+        ]);
+        $application->git_ssh_known_hosts = 'git.e2e.test '.trim($key->public_key);
+        $application->save();
+    } else {
+        $storage = App\Models\S3Storage::where('name', 'e2e-sftp-settings')->firstOrFail();
+        $key = App\Models\PrivateKey::findOrFail($storage->private_key_id);
+        if ($key->name !== 'e2e-storage-key' || $key->team_id !== $storage->team_id ||
+            App\Models\PrivateKey::generateFingerprint($key->private_key) !== $key->fingerprint ||
+            $storage->secret !== 'e2e-storage-password' || $storage->key !== 'e2e-storage-user' ||
+            $storage->type->value !== 'sftp' || $storage->sftp_host_key !== trim($key->public_key)) {
+            throw new RuntimeException('SFTP settings, host pin or private key not preserved');
+        }
+        $backup = App\Models\ScheduledDatabaseBackup::where('s3_storage_id', $storage->id)->firstOrFail();
+        if ($backup->enabled || $backup->database->name !== 'e2e-db') {
+            throw new RuntimeException('storage schedule is enabled or points at the wrong database');
+        }
+        if ($application->git_ssh_known_hosts !== 'git.e2e.test '.trim($key->public_key)) {
+            throw new RuntimeException('Git SSH known hosts not preserved');
+        }
+        if ($application->environment_variables()->where('key', 'E2E_MULTILINE')->firstOrFail()->value !== $multiline) {
+            throw new RuntimeException('multiline value lost bytes or trailing newline');
+        }
+        echo "ok  SFTP destination, SSH key dependency, host pins and disabled schedule preserved\n";
+        echo "ok  multiline environment value including trailing newline preserved\n";
+    }
+}
+
+if (Schema::hasTable('image_scan_policies')) {
+    $policyQuery = App\Models\ImageScanPolicy::where('scope_type', $application->getMorphClass())->where('scope_id', $application->id);
+    $ignoreQuery = App\Models\ImageScanIgnore::where('resource_type', $application->getMorphClass())->where('resource_id', $application->id);
+    if ($seed) {
+        App\Models\ImageScanPolicy::create(['scope_type' => $application->getMorphClass(), 'scope_id' => $application->id,
+            'gate_mode' => 'off', 'on_scan_error' => 'deploy', 'count_medium' => true]);
+        App\Models\ImageScanIgnore::create(['team_id' => 0, 'resource_type' => $application->getMorphClass(),
+            'resource_id' => $application->id, 'package' => 'e2e-fixture-package', 'reason' => 'migration fixture', 'created_by' => 0]);
+    } else {
+        $policy = $policyQuery->firstOrFail();
+        $ignore = $ignoreQuery->where('package', 'e2e-fixture-package')->firstOrFail();
+        if ($policy->gate_mode->value !== 'off' || $policy->on_scan_error->value !== 'deploy' || ! $policy->count_medium ||
+            $ignore->reason !== 'migration fixture' || (getenv('MODE') === 'selective' && $ignore->created_by !== null)) {
+            throw new RuntimeException('resource scan policy or ignore not preserved');
+        }
+        echo "ok  resource vulnerability policy and ignore preserved\n";
+    }
+}

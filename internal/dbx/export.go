@@ -190,6 +190,19 @@ func (c *collector) collect(roots []coolify.Resource) error {
 	}
 
 	if len(envWhere) > 0 {
+		// Only resource-owned policies/ignores travel in a selective move.
+		// Never replace the target instance's, team's or server's policy.
+		for table, prefix := range map[string]string{"image_scan_policies": "scope", "image_scan_ignores": "resource"} {
+			if c.in.HasTable(c.ctx, table) {
+				if table == "image_scan_policies" {
+					c.ex.Warnings = append(c.ex.Warnings, "resource vulnerability policies are carried; inherited instance/team/server scan settings and team-wide ignores remain the target's - review them before deploying")
+				}
+				where := strings.ReplaceAll(strings.Join(envWhere, " OR "), "resourceable_", prefix+"_")
+				if _, err := c.fetch(table, where); err != nil {
+					return err
+				}
+			}
+		}
 		if _, err := c.fetch("environment_variables", strings.Join(envWhere, " OR ")); err != nil {
 			return err
 		}
@@ -272,12 +285,15 @@ func (c *collector) collect(roots []coolify.Resource) error {
 		return err
 	}
 	keyIDs := append(append(idsOf(apps, "private_key_id"), idsOf(gh, "private_key_id")...), idsOf(gl, "private_key_id")...)
-	if _, err := c.fetch("private_keys", "t.id IN "+coolify.SQLIntList(keyIDs)); err != nil {
-		return err
-	}
 	s3IDs := append(idsOf(c.ex.Tables["scheduled_database_backups"], "s3_storage_id"), idsOf(c.ex.Tables["scheduled_volume_backups"], "s3_storage_id")...)
 	s3IDs = append(s3IDs, idsOf(projects, "icon_s3_storage_id")...)
 	if _, err := c.fetch("s3_storages", "t.id IN "+coolify.SQLIntList(s3IDs)); err != nil {
+		return err
+	}
+	// Coolify 4.7 also stores SFTP destinations here. Carry their SSH key
+	// even when no application or Git source refers to it.
+	keyIDs = append(keyIDs, idsOf(c.ex.Tables["s3_storages"], "private_key_id")...)
+	if _, err := c.fetch("private_keys", "t.id IN "+coolify.SQLIntList(keyIDs)); err != nil {
 		return err
 	}
 	return nil
