@@ -6,12 +6,15 @@ require '/var/www/html/vendor/autoload.php';
 $app = require '/var/www/html/bootstrap/app.php';
 $app->make(Illuminate\Contracts\Console\Kernel::class)->bootstrap();
 
+use App\Livewire\Forms\ApiTokenForm;
 use App\Models\Application;
+use App\Models\PersonalAccessToken;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 $seed = getenv('ACTION') === 'seed';
+$hasScopeParserFix = version_compare(ltrim((string) getenv('LAB_COOLIFY_VERSION'), 'v'), '4.7.5', '>=');
 $application = Application::where('uuid', getenv('APP_UUID'))->firstOrFail();
 $variable = $application->environment_variables()->where('key', 'SECRET_TOKEN')->firstOrFail();
 if ($seed) {
@@ -58,12 +61,38 @@ if (Schema::hasColumn('personal_access_tokens', 'scopes')) {
         }
     }
 }
+
+// 4.7.5 can open the edit form when an older token contains unreadable
+// scope entries. Keep one valid grant beside an invalid entry to check both.
+if ($hasScopeParserFix && Schema::hasColumn('personal_access_tokens', 'scopes')) {
+    $name = 'e2e-legacy-scoped-paused';
+    $scopes = [['scope' => 'resource', 'uuid' => $application->uuid], 'legacy-entry'];
+    if ($seed) {
+        $token = User::findOrFail(0)->createToken($name, ['read'], null, 0)->accessToken;
+        $token->forceFill(['scopes' => $scopes, 'paused_at' => '2026-11-01 00:00:00'])->save();
+    } elseif (getenv('MODE') === 'selective') {
+        if (PersonalAccessToken::where('name', $name)->exists()) {
+            throw new RuntimeException('selective restore copied the legacy source token');
+        }
+        echo "ok  selective restore excluded the legacy scoped token\n";
+    } else {
+        $token = PersonalAccessToken::where('name', $name)->firstOrFail();
+        $values = ApiTokenForm::valuesOf($token);
+        if ($token->scopes !== $scopes || ! $token->isPaused() ||
+            $values['permissions'] !== ['read'] || $values['scopeMode'] !== 'selected' ||
+            $values['selectedScopes'] !== ['resource:'.$application->uuid]) {
+            throw new RuntimeException('legacy token state or valid grant did not survive full restore');
+        }
+        echo "ok  restored legacy token opens in the Coolify form with its valid grant and read permission\n";
+    }
+}
 echo "ok  locked environment variable preserved\n";
 
 // 4.7 stores SFTP destinations in s3_storages. The key is deliberately used
 // only by that destination, so a missing transitive dependency cannot hide.
 if (Schema::hasColumn('s3_storages', 'private_key_id')) {
     $multiline = "first line\nsecond line\n";
+    $endpoint = 'sftp://[2001:db8::25]:2222/team%20backups';
     if ($seed) {
         $key = App\Models\PrivateKey::create([
             'name' => 'e2e-storage-key', 'team_id' => 0, 'is_git_related' => false,
@@ -71,7 +100,7 @@ if (Schema::hasColumn('s3_storages', 'private_key_id')) {
         ]);
         $storage = App\Models\S3Storage::create([
             'name' => 'e2e-sftp-settings', 'team_id' => 0, 'type' => 'sftp',
-            'endpoint' => 'sftp://storage.e2e.test/backups', 'bucket' => null,
+            'endpoint' => $endpoint, 'bucket' => null,
             'key' => 'e2e-storage-user', 'secret' => 'e2e-storage-password',
             'private_key_id' => $key->id,
         ]);
@@ -98,6 +127,10 @@ if (Schema::hasColumn('s3_storages', 'private_key_id')) {
             $storage->type->value !== 'sftp' || $storage->sftp_host_key !== trim($key->public_key)) {
             throw new RuntimeException('SFTP settings, host pin or private key not preserved');
         }
+        if ($storage->endpoint !== $endpoint ||
+            App\Models\S3Storage::splitServerEndpoint($storage->endpoint) !== ['host' => '2001:db8::25', 'port' => '2222', 'path' => 'team backups']) {
+            throw new RuntimeException('SFTP IPv6 endpoint, port or directory did not survive');
+        }
         $backup = App\Models\ScheduledDatabaseBackup::where('s3_storage_id', $storage->id)->firstOrFail();
         if ($backup->enabled || $backup->database->name !== 'e2e-db') {
             throw new RuntimeException('storage schedule is enabled or points at the wrong database');
@@ -109,6 +142,7 @@ if (Schema::hasColumn('s3_storages', 'private_key_id')) {
             throw new RuntimeException('multiline value lost bytes or trailing newline');
         }
         echo "ok  SFTP destination, SSH key dependency, host pins and disabled schedule preserved\n";
+        echo "ok  SFTP IPv6 endpoint, custom port and encoded directory preserved\n";
         echo "ok  multiline environment value including trailing newline preserved\n";
     }
 }
