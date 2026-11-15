@@ -109,3 +109,99 @@ func TestResourceScanSettingsMoveCopySkip(t *testing.T) {
 		}
 	}
 }
+
+func TestBackupScheduleDestinationLinks(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		decision  Decision
+		wantLinks int
+	}{
+		{"move", KeepUUID, 4},
+		{"copy", NewCopy, 4},
+		{"skip", Skip, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ex := sampleExport()
+			ex.Tables["scheduled_database_backups"] = []coolify.Row{{
+				"id": num(21), "uuid": "db-schedule", "database_type": coolify.TableToMorph["standalone_postgresqls"], "database_id": num(3), "s3_storage_id": num(23),
+			}}
+			ex.Tables["scheduled_volume_backups"] = []coolify.Row{{
+				"id": num(22), "uuid": "volume-schedule", "backupable_type": coolify.MorphPersistentVolume, "backupable_id": num(12), "s3_storage_id": num(23),
+			}}
+			ex.Tables["s3_storages"] = []coolify.Row{
+				{"id": num(23), "uuid": "primary-storage"},
+				{"id": num(24), "uuid": "secondary-storage", "private_key_id": num(25)},
+			}
+			ex.Tables["private_keys"] = []coolify.Row{{"id": num(25), "uuid": "secondary-key"}}
+			ex.Tables["scheduled_database_backup_s3_storage"] = []coolify.Row{
+				{"id": num(31), "scheduled_database_backup_id": num(21), "s3_storage_id": num(23)},
+				{"id": num(32), "scheduled_database_backup_id": num(21), "s3_storage_id": num(24)},
+			}
+			ex.Tables["scheduled_volume_backup_s3_storage"] = []coolify.Row{
+				{"id": num(33), "scheduled_volume_backup_id": num(22), "s3_storage_id": num(23)},
+				{"id": num(34), "scheduled_volume_backup_id": num(22), "s3_storage_id": num(24)},
+			}
+			ts := target(map[string]map[string]int64{
+				"standalone_postgresqls": {ex.Roots[1].UUID: 88},
+				"s3_storages":            {"primary-storage": 999},
+			})
+			for table, rows := range ex.Tables {
+				for _, row := range rows {
+					for column := range row {
+						ts.Columns[table][column] = "text"
+					}
+				}
+			}
+			p, err := BuildPlan(ex, ts, func(coolify.Resource) Decision { return tc.decision }, allocator(), fakeEnc)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sql, err := p.SQL()
+			if err != nil {
+				t.Fatal(err)
+			}
+			linkCount := 0
+			for _, pr := range p.rows {
+				link, ok := backupStorageLinks[pr.table]
+				if !ok {
+					continue
+				}
+				linkCount++
+				r, err := p.finalRow(pr)
+				if err != nil {
+					t.Fatal(err)
+				}
+				oldSchedule, _ := Int64(pr.row[link.column])
+				oldStorage, _ := Int64(pr.row["s3_storage_id"])
+				schedule, _ := Int64(r[link.column])
+				storage, _ := Int64(r["s3_storage_id"])
+				if schedule == 0 || schedule == oldSchedule || schedule != p.idMap[link.schedule][oldSchedule] ||
+					storage == 0 || storage == oldStorage || storage != p.idMap["s3_storages"][oldStorage] {
+					t.Fatalf("unmapped schedule or destination in %s", pr.table)
+				}
+				if _, ok := r["uuid"]; ok {
+					t.Fatalf("unexpected UUID in %s", pr.table)
+				}
+			}
+			if linkCount != tc.wantLinks {
+				t.Fatalf("got %d destination links, want %d", linkCount, tc.wantLinks)
+			}
+			if tc.decision == Skip {
+				if len(p.idMap["s3_storages"]) != 0 || len(p.idMap["private_keys"]) != 0 {
+					t.Fatal("skipped schedules brought unused storage or key")
+				}
+				return
+			}
+			if p.idMap["s3_storages"][23] != 999 || p.idMap["private_keys"][25] == 0 {
+				t.Fatal("primary storage was not reused, or secondary key was not planned")
+			}
+			for table, link := range backupStorageLinks {
+				parent := strings.Index(sql, `INSERT INTO "`+link.schedule+`"`)
+				junction := strings.Index(sql, `INSERT INTO "`+table+`"`)
+				if parent < 0 || junction < 0 || parent > junction {
+					t.Fatalf("%s must be inserted after %s", table, link.schedule)
+				}
+			}
+		})
+	}
+}

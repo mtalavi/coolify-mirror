@@ -152,7 +152,7 @@ for c in "$SRC" "$DST"; do
   docker cp "$HERE/e2e_metadata.php" "$c:/root/e2e_metadata.php"
   on "$c" 'docker cp /root/e2e_metadata.php coolify:/tmp/e2e_metadata.php'
 done
-on "$SRC" "docker exec -e ACTION=seed -e APP_UUID=$COMPOSE -e LAB_COOLIFY_VERSION=$V coolify php /tmp/e2e_metadata.php"
+on "$SRC" "docker exec -e ACTION=seed -e APP_UUID=$COMPOSE -e WEB_UUID=$WEB -e LAB_COOLIFY_VERSION=$V coolify php /tmp/e2e_metadata.php"
 
 # Full mode: give each panel its own domain, the way a real server has it,
 # and check that the proxy serves it before the move.
@@ -294,7 +294,7 @@ got=$(data_digest "$DST" || true)
 
 # A full restore may recreate the Coolify container, so copy the verifier again.
 on "$DST" 'docker cp /root/e2e_metadata.php coolify:/tmp/e2e_metadata.php'
-on "$DST" "docker exec -e ACTION=verify -e APP_UUID=$COMPOSE -e MODE=$MODE -e LAB_COOLIFY_VERSION=$V coolify php /tmp/e2e_metadata.php" || fail=1
+on "$DST" "docker exec -e ACTION=verify -e APP_UUID=$COMPOSE -e WEB_UUID=$WEB -e MODE=$MODE -e LAB_COOLIFY_VERSION=$V coolify php /tmp/e2e_metadata.php" || fail=1
 got=$(on "$DST" "docker exec \$(docker ps -q --filter name=^web-$COMPOSE) printenv SECRET_TOKEN" || true)
 [ "$got" = e2e-secret-token-42 ] && echo "ok  compose app secret" || { echo "BAD compose secret: $got"; fail=1; }
 got=$(on "$DST" "curl -fsS --resolve web.e2e.test:80:127.0.0.1 http://web.e2e.test/" || true)
