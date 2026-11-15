@@ -555,6 +555,13 @@ func buildOwners(ex *Export) *ownerIndex {
 	for _, row := range ex.Tables["service_databases"] {
 		o.link("service_databases", row, "services", row["service_id"])
 	}
+	for _, link := range backupStorageLinks {
+		for _, row := range ex.Tables[link.schedule] {
+			if id, ok := Int64(row["id"]); ok {
+				o.root[key(link.schedule, id)] = o.rootOf(link.schedule, row)
+			}
+		}
+	}
 	return o
 }
 
@@ -598,6 +605,9 @@ func (o *ownerIndex) rootOf(table string, row coolify.Row) string {
 		}
 		return parent(pt, row[idCol])
 	}
+	if link, ok := backupStorageLinks[table]; ok {
+		return parent(link.schedule, row[link.column])
+	}
 	switch table {
 	case "application_settings":
 		return parent("applications", row["application_id"])
@@ -639,7 +649,8 @@ func neededContext(ex *Export, included func(string, coolify.Row) bool) map[stri
 		}
 	}
 	for table, rows := range ex.Tables {
-		if !isResourceTable(table) && table != "scheduled_database_backups" && table != "scheduled_volume_backups" && table != "taggables" {
+		_, isStorageLink := backupStorageLinks[table]
+		if !isResourceTable(table) && table != "scheduled_database_backups" && table != "scheduled_volume_backups" && table != "taggables" && !isStorageLink {
 			continue
 		}
 		for _, row := range rows {

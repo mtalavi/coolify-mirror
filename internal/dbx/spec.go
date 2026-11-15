@@ -24,6 +24,13 @@ const (
 	refNull   = "@null"   // always NULL on import
 )
 
+// Newer Coolify schemas store every destination in these junction tables.
+// The schedule's s3_storage_id still holds the primary destination.
+var backupStorageLinks = map[string]struct{ schedule, column string }{
+	"scheduled_database_backup_s3_storage": {"scheduled_database_backups", "scheduled_database_backup_id"},
+	"scheduled_volume_backup_s3_storage":   {"scheduled_volume_backups", "scheduled_volume_backup_id"},
+}
+
 // foreignKeys lists every id-carrying column of the tables this tool moves.
 // Columns not listed here are copied verbatim.
 var foreignKeys = map[string][]fk{
@@ -94,6 +101,9 @@ var foreignKeys = map[string][]fk{
 }
 
 func init() {
+	for table, link := range backupStorageLinks {
+		foreignKeys[table] = []fk{{Col: link.column, Table: link.schedule}, {Col: "s3_storage_id", Table: "s3_storages"}}
+	}
 	for _, d := range coolify.DatabaseKinds {
 		foreignKeys[d.Table] = []fk{
 			{Col: "environment_id", Table: "environments"},
@@ -117,12 +127,16 @@ var insertOrder = func() []string {
 		"applications", "application_settings", "application_deployment_queues",
 		"environment_variables", "secret_manager_links", "local_persistent_volumes", "local_file_volumes",
 		"scheduled_tasks", "scheduled_database_backups", "scheduled_volume_backups",
+		"scheduled_database_backup_s3_storage", "scheduled_volume_backup_s3_storage",
 		"taggables", "image_scan_policies", "image_scan_ignores",
 	)
 }()
 
 // uuidColumn names the unique public id column of a table ("" = none).
 func uuidColumn(table string) string {
+	if _, ok := backupStorageLinks[table]; ok {
+		return ""
+	}
 	switch table {
 	case "application_deployment_queues":
 		return "deployment_uuid"

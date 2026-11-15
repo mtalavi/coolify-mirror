@@ -287,6 +287,17 @@ func (c *collector) collect(roots []coolify.Resource) error {
 	keyIDs := append(append(idsOf(apps, "private_key_id"), idsOf(gh, "private_key_id")...), idsOf(gl, "private_key_id")...)
 	s3IDs := append(idsOf(c.ex.Tables["scheduled_database_backups"], "s3_storage_id"), idsOf(c.ex.Tables["scheduled_volume_backups"], "s3_storage_id")...)
 	s3IDs = append(s3IDs, idsOf(projects, "icon_s3_storage_id")...)
+	for table, link := range backupStorageLinks {
+		scheduleIDs := idsOf(c.ex.Tables[link.schedule], "id")
+		if len(scheduleIDs) == 0 || !c.in.HasTable(c.ctx, table) {
+			continue
+		}
+		rows, err := c.fetch(table, "t."+link.column+" IN "+coolify.SQLIntList(scheduleIDs))
+		if err != nil {
+			return err
+		}
+		s3IDs = append(s3IDs, idsOf(rows, "s3_storage_id")...)
+	}
 	if _, err := c.fetch("s3_storages", "t.id IN "+coolify.SQLIntList(s3IDs)); err != nil {
 		return err
 	}

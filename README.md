@@ -493,7 +493,7 @@ Coolify ships often, and the tool relies on parts of it (database tables, PHP cl
 
 ## ⚠️ Limitations
 
-- Coolify **v4.3, v4.4, v4.5, v4.6 and v4.7** (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0 and 4.7.3); both servers must run **exactly the same** version (upgrade the older one first).
+- Coolify **v4.3, v4.4, v4.5, v4.6 and v4.7** (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0, 4.7.3 and 4.7.5); both servers must run **exactly the same** version (upgrade the older one first).
 - MySQL/MariaDB dumps contain the user databases; extra database users created by hand (beyond the image's `MYSQL_USER`) are not recreated. PostgreSQL dumps include all roles.
 - Selective restores merge resources into the target team; they do not copy source users, team memberships or API tokens. Recreate any per-resource access grants on the target. Whole-server restores carry the database, including Coolify 4.6 token scopes and paused state.
 - Coolify 4.7 resource-specific vulnerability policies and ignores are carried. Inherited instance/team/server policies and team-wide ignores remain the target's in a selective restore; review those settings before deploying. Scan history is not carried selectively. Full restores carry the database.
@@ -508,6 +508,8 @@ Coolify ships often, and the tool relies on parts of it (database tables, PHP cl
 
 ## 🧪 Tested
 
+**Coolify 4.7.5 / Mirror 1.10.3:** selective and full off-site recovery are verified on fresh Coolify installs. Selective restores carry every destination linked to a database or volume backup schedule. The lab verifies the primary and secondary destinations, IPv6 SFTP settings and the full recovery of a legacy paused token. See the [4.7.5 validation report](docs/testing-4.7.5.md).
+
 **Coolify 4.7.3 / Mirror 1.10.2:** the existing real selective and off-site full-restore lab now also checks SFTP destination SSH-key dependencies, stored host pins, disabled database schedules, multiline values including their trailing newline, and resource vulnerability policies/ignores. See the [4.7.3 validation report](docs/testing-4.7.3.md) for results and boundaries.
 
 **Coolify 4.6.0 / Mirror 1.10.1:** selective migration and whole-server recovery from SFTP on fresh Coolify installs, using the existing daily lab. The added checks compare database contents as well as row counts, decrypt HTTPS Git credentials through Laravel on the target, preserve locked environment variables, and verify that full restores keep scoped API tokens paused while selective restores do not copy source tokens. See the [test report](docs/testing-4.6.0.md) for commands, evidence and limits.
@@ -520,6 +522,7 @@ The [walkthrough](#-walkthrough--every-screen) is a real run of the released 1.9
 
 Every release with its binaries and checksums: [Releases](https://github.com/mtalavi/coolify-mirror/releases).
 
+- **1.10.3** · 2026-11-15 — **Coolify 4.7.5 verified.** Selective restores now carry all destinations of scheduled database and volume backups, including secondary SFTP destinations and their SSH keys. Real restore tests cover those links, IPv6 SFTP settings and legacy API token scopes.
 - **1.10.2** · 2026-11-10 — **Coolify 4.7.3.** Selective restores carry SFTP destination SSH keys and remap their references, inserting keys before storages. Resource-specific vulnerability policies and ignores move with their resources; inherited instance/team/server policy remains the target's. Tests cover these settings and multiline secret preservation. The existing backup format and same-version requirement are unchanged.
 - **1.10.1** · 2026-11-04 — **Coolify 4.6.0 verified.** Adds the newer tested versions to the built-in compatibility list, expands the real backup/restore lab with encrypted Git credentials, hidden environment variables, scoped/paused API tokens and database-content checksums, and documents the results. Fixes a legacy HTTPS link whose certificate pin starts with `+` being rejected after URL parsing; exact certificate pinning stays enforced.
 - **1.10.0** · 2026-10-27 — **Automatic off-site backups.** Every night (or from your own script) a whole-server backup goes to Google Drive, S3, SFTP, Dropbox or a folder through rclone, is checked there and only then deleted here; the newest N are kept there and N here. Each backup is also encrypted to a recovery key that is shown once and can be sent to you by email or Telegram, so it opens on any new server: `restore gdrive:folder --recovery-key …` takes the newest backup and brings the whole server back. Backup file names now carry the Coolify version they need. Restore also takes a folder, an rclone path or an https:// address; failures are reported by email or Telegram.

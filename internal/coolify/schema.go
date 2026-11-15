@@ -43,6 +43,7 @@ var DatabaseKinds = []DatabaseKind{
 var OptionalTables = map[string]bool{
 	"standalone_sqlites": true, "integration_tokens": true, "secret_manager_links": true,
 	"image_scan_policies": true, "image_scan_ignores": true,
+	"scheduled_database_backup_s3_storage": true, "scheduled_volume_backup_s3_storage": true,
 }
 
 // MorphToTable maps a morph class to its table.
