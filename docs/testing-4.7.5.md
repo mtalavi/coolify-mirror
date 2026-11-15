@@ -4,7 +4,7 @@ Mirror 1.10.3 · 2026-11-15
 
 ## Upstream review
 
-The [4.7.3–4.7.5 source comparison](https://github.com/coollabsio/coolify/compare/v4.7.3...v4.7.5) has no database migrations or changes to the Server Transfer exporter. [4.7.5](https://github.com/coollabsio/coolify/releases/tag/v4.7.5) fixes IPv6 connections for native SFTP backup destinations and reads valid grants from older API token records that contain unreadable scope entries. The compatibility review also found that selective backups carried the legacy primary-storage column but missed the two junction tables that link every destination to its database or volume schedule. Mirror 1.10.3 collects those links and their storage and key dependencies, remaps both foreign keys, and inserts the links after their parent rows. Older schemas continue to use the primary-storage column.
+The [4.7.3–4.7.5 source comparison](https://github.com/coollabsio/coolify/compare/v4.7.3...v4.7.5) has no database migrations or changes to the Server Transfer exporter. [4.7.5](https://github.com/coollabsio/coolify/releases/tag/v4.7.5) fixes IPv6 connections for native SFTP backup destinations and reads valid grants from older API token records that contain unreadable scope entries. The compatibility review also found that selective backups carried the legacy primary-storage column but missed the two junction tables that link every destination to its database or volume schedule. Mirror 1.10.3 collects those links and their storage and key dependencies, remaps both foreign keys, and inserts the links after their parent rows. Older schemas continue to use the primary-storage column. To recover secondary destinations from a server previously backed up with an older Mirror release, create a new selective backup with 1.10.3.
 
 ## Reproduce
 
@@ -31,7 +31,10 @@ Each mode starts two isolated Ubuntu/systemd containers with their own Docker da
 ## Evidence
 
 - [Automatic baseline with Mirror 1.10.2](https://github.com/mtalavi/coolify-mirror/actions/runs/43009444626) passed both modes on Coolify 4.7.5 on November 11.
-- [Fresh run with the added checks](https://github.com/mtalavi/coolify-mirror/actions/runs/43699198826) uses Mirror 1.10.3 from commit `eb1631c663f3f3e0fc7d39a430a664d0c6f6123c`.
+- [Mirror 1.10.3 on Coolify 4.7.5](https://github.com/mtalavi/coolify-mirror/actions/runs/43699198826) passed both modes and every new assertion on November 15. The lab built `eb1631c663f3f3e0fc7d39a430a664d0c6f6123c`. Later commits refine the unit-test assertions and documentation.
+
+- [Mirror 1.10.3 regression on Coolify 4.6.0](https://github.com/mtalavi/coolify-mirror/actions/runs/43699351796) passed both modes on November 15 using commit `6bd71aa2a7ed3582787040a16b5fca89910b5521`. The lab verified the database digest, volumes, secrets, scheduled SFTP upload and panel identity.
+- The Go suite, vet, PHP and Bash syntax, and Linux amd64 and arm64 builds passed.
 
 ## Test scope
 
