@@ -4,7 +4,7 @@ Mirror 1.10.3 · 2026-11-15
 
 ## Upstream review
 
-The [4.7.3–4.7.5 source comparison](https://github.com/coollabsio/coolify/compare/v4.7.3...v4.7.5) has no database migrations or changes to the Server Transfer exporter. [4.7.5](https://github.com/coollabsio/coolify/releases/tag/v4.7.5) fixes IPv6 connections for native SFTP backup destinations and reads valid grants from older API token records that contain unreadable scope entries. The existing selective and full restore paths carry those fields. Mirror 1.10.3 adds 4.7.5 to the built-in compatibility list and tests the saved data through Coolify's own models.
+The [4.7.3–4.7.5 source comparison](https://github.com/coollabsio/coolify/compare/v4.7.3...v4.7.5) has no database migrations or changes to the Server Transfer exporter. [4.7.5](https://github.com/coollabsio/coolify/releases/tag/v4.7.5) fixes IPv6 connections for native SFTP backup destinations and reads valid grants from older API token records that contain unreadable scope entries. The compatibility review also found that selective backups carried the legacy primary-storage column but missed the two junction tables that link every destination to its database or volume schedule. Mirror 1.10.3 collects those links and their storage and key dependencies, remaps both foreign keys, and inserts the links after their parent rows. Older schemas continue to use the primary-storage column.
 
 ## Reproduce
 
@@ -24,13 +24,14 @@ Each mode starts two isolated Ubuntu/systemd containers with their own Docker da
 
 - Both modes compare 1,234 PostgreSQL rows and their ordered content checksum, volume files, runtime secrets, restored Compose images and HTTP responses through Traefik.
 - Both modes verify the SFTP destination's bracketed IPv6 address, custom port and encoded directory through the Coolify storage model, together with the SSH key, host pin and disabled database backup schedule.
+- Both modes verify that disabled database and volume schedules resolve the primary destination first and keep a secondary SFTP destination whose key is used only there. Unit tests verify move, copy, skip, reuse of an existing target destination and insert order.
 - The full restore preserves the legacy token's stored scopes and paused state. Coolify's edit-form data includes the valid resource grant and read permission while ignoring the invalid entry. Selective restore excludes this source token. The existing well-formed token and encrypted settings checks also run.
 - Off-site mode verifies retention, a scheduled upload, recovery with the recovery key and preservation of the target panel's address and IP.
 
 ## Evidence
 
 - [Automatic baseline with Mirror 1.10.2](https://github.com/mtalavi/coolify-mirror/actions/runs/43009444626) passed both modes on Coolify 4.7.5 on November 11.
-- [Fresh run with the added checks](https://github.com/mtalavi/coolify-mirror/actions/runs/43698606567) uses Mirror 1.10.3 from commit `72e087687a3077e005e0c7540f2e93e9a9b43cc8`.
+- [Fresh run with the added checks](https://github.com/mtalavi/coolify-mirror/actions/runs/43699198826) uses Mirror 1.10.3 from commit `eb1631c663f3f3e0fc7d39a430a664d0c6f6123c`.
 
 ## Test scope
 

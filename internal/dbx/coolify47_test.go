@@ -156,10 +156,6 @@ func TestBackupScheduleDestinationLinks(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			sql, err := p.SQL()
-			if err != nil {
-				t.Fatal(err)
-			}
 			linkCount := 0
 			for _, pr := range p.rows {
 				link, ok := backupStorageLinks[pr.table]
@@ -167,7 +163,10 @@ func TestBackupScheduleDestinationLinks(t *testing.T) {
 					continue
 				}
 				linkCount++
-				r, err := p.finalRow(pr)
+				// Rendering rewrites the row in place. Keep the plan for SQL below.
+				probe := *pr
+				probe.row = cloneRow(pr.row)
+				r, err := p.finalRow(&probe)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -194,6 +193,10 @@ func TestBackupScheduleDestinationLinks(t *testing.T) {
 			}
 			if p.idMap["s3_storages"][23] != 999 || p.idMap["private_keys"][25] == 0 {
 				t.Fatal("primary storage was not reused, or secondary key was not planned")
+			}
+			sql, err := p.SQL()
+			if err != nil {
+				t.Fatal(err)
 			}
 			for table, link := range backupStorageLinks {
 				parent := strings.Index(sql, `INSERT INTO "`+link.schedule+`"`)

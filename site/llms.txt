@@ -62,7 +62,7 @@ Selective and off-site full restore tests compare database contents, volumes and
 
 ## Coolify 4.7.5 validation
 
-Real selective and full off-site restores on Coolify 4.7.5 check saved IPv6 SFTP destination settings and legacy API token scopes. Full restore preserves the valid grant, read permission and paused state. Selective restore excludes the source token. Evidence and test scope: https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.7.5.md
+Selective restores preserve all destinations of scheduled database and volume backups, including SSH keys needed only by secondary SFTP destinations. Real selective and full off-site restores on Coolify 4.7.5 check those links, IPv6 SFTP settings and legacy API token scopes. Full restore preserves the valid grant, read permission and paused state. Selective restore excludes the source token. Evidence and test scope: https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.7.5.md
 
 ## Coolify 4.7 validation
 
