@@ -39,3 +39,13 @@ Each mode starts two isolated Ubuntu/systemd containers with their own Docker da
 ## Test scope
 
 The IPv6 fixture exercises stored destination settings. Actual off-site transfer uses the lab's rclone/SFTP server. The token check calls Coolify's form-data parser. The suite covers self-hosted production resources and fresh, same-version restores. Preview deployments, Coolify Cloud backup imports, the native IPv6 network connection and vulnerability scan execution are outside this run. End-to-end execution is Linux amd64. Linux arm64 is covered by the build.
+
+## Mirror 1.10.4 audit (2026-11-17)
+
+An audit of 1.10.3 against Coolify 4.7.5 (still the latest release) re-ran the lab on the released version ([run](https://github.com/mtalavi/coolify-mirror/actions/runs/44122322772), passed) and then fixed what the review found:
+
+- MySQL and MariaDB dumps now end with the accounts other than root (passwords, roles, grants). Data loads as strictly as before; the accounts load afterwards and a statement the server refuses becomes a warning. The MariaDB image's own `healthcheck` account is left to the target, which generates its password. Checked by hand on MySQL 8.0 and 8.4 and MariaDB 10.11 and 11.4 (extra user with a grant on a database whose name has a space, a role, a changed password, the image's healthcheck).
+- The lab now seeds a standalone MariaDB with an account created after its first start and logs in with it on the target in both modes. The first branch run caught the healthcheck account problem; the fix passed both modes: [run](https://github.com/mtalavi/coolify-mirror/actions/runs/44135772548).
+- Scheduled backups: `--to` may not be the folder the backup is written to, every failure is reported, options are checked when the schedule is added, a timer waits for a running backup or restore, the local copy is synced before the original is removed, and a backup that fails verification is removed.
+- A folder holding backups of several servers (or full and selective ones) asks for a file; cleaning by prefix no longer matches a server whose name starts the same way; rclone paths such as `gdrive:2026/backups` are accepted.
+- Built with Go 1.26.11 (govulncheck: no vulnerabilities; 1.26.5 had 17 reachable standard-library issues in net/http, crypto/tls and crypto/x509). CI runs govulncheck weekly. Compatibility runs on a branch no longer publish to compat.json.
