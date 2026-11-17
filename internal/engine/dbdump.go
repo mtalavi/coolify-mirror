@@ -136,6 +136,8 @@ const mysqlAccountsMarker = "-- coolify-mirror: accounts"
 // added with CREATE USER after the first start live only in the mysql
 // schema. Accounts that already exist on the target (the ones the image
 // creates from its environment) get the source's password and grants.
+// The MariaDB image's own healthcheck account is left alone: its password
+// is generated on each server and kept in the data folder.
 const mysqlDumpCmd = `set -e
 P="${MARIADB_ROOT_PASSWORD:-$MYSQL_ROOT_PASSWORD}"
 C=$(command -v mariadb || command -v mysql); D=$(command -v mariadb-dump || command -v mysqldump)
@@ -152,7 +154,7 @@ fi
 echo
 echo "` + mysqlAccountsMarker + `"
 q() { MYSQL_PWD="$P" $C -uroot -N -B -r -e "SET SESSION print_identified_with_as_hex=ON; $1" 2>/dev/null || MYSQL_PWD="$P" $C -uroot -N -B -r -e "$1" 2>/dev/null; }
-ACC=$(MYSQL_PWD="$P" $C -uroot -N -B -r -e "SELECT CONCAT(QUOTE(User),'@',QUOTE(Host)) FROM mysql.user WHERE User NOT IN ('root','','mysql.sys','mysql.session','mysql.infoschema','mariadb.sys','PUBLIC')" 2>/dev/null || true)
+ACC=$(MYSQL_PWD="$P" $C -uroot -N -B -r -e "SELECT CONCAT(QUOTE(User),'@',QUOTE(Host)) FROM mysql.user WHERE User NOT IN ('root','','mysql.sys','mysql.session','mysql.infoschema','mariadb.sys','PUBLIC','healthcheck')" 2>/dev/null || true)
 [ -n "$ACC" ] || exit 0
 # MariaDB keeps roles as rows of mysql.user that SHOW CREATE USER refuses.
 ROLES=$(MYSQL_PWD="$P" $C -uroot -N -B -r -e "SELECT QUOTE(User) FROM mysql.user WHERE is_role='Y' AND User<>'PUBLIC'" 2>/dev/null || true)
