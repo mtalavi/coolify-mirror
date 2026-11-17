@@ -125,14 +125,57 @@ func detectDump(ctx context.Context, id, owner string) (*DumpEntry, string) {
 
 const pgDumpCmd = `pg_dumpall -U "${POSTGRES_USER:-postgres}" --quote-all-identifiers`
 
+// mysqlAccountsMarker starts the part of a MySQL dump that re-creates the
+// accounts and their grants. mysqldump never writes a raw newline inside a
+// value, so this line cannot come from the data.
+const mysqlAccountsMarker = "-- coolify-mirror: accounts"
+
 // mysqlDumpCmd dumps every user database (not the system schemas, which the
-// image re-creates from the same environment on the target).
+// image re-creates from the same environment on the target), then the
+// accounts other than root with their password hashes and grants: users
+// added with CREATE USER after the first start live only in the mysql
+// schema. Accounts that already exist on the target (the ones the image
+// creates from its environment) get the source's password and grants.
+// The MariaDB image's own healthcheck account is left alone: its password
+// is generated on each server and kept in the data folder.
 const mysqlDumpCmd = `set -e
 P="${MARIADB_ROOT_PASSWORD:-$MYSQL_ROOT_PASSWORD}"
 C=$(command -v mariadb || command -v mysql); D=$(command -v mariadb-dump || command -v mysqldump)
-DBS=$(MYSQL_PWD="$P" $C -uroot -N -B -e "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('mysql','information_schema','performance_schema','sys')")
-[ -n "$DBS" ] || { echo "-- no user databases"; exit 0; }
-MYSQL_PWD="$P" $D -uroot --single-transaction --routines --events --triggers --hex-blob --databases $DBS`
+DBS=$(MYSQL_PWD="$P" $C -uroot -N -B -r -e "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT IN ('mysql','information_schema','performance_schema','sys')")
+if [ -n "$DBS" ]; then
+  set --
+  while IFS= read -r db; do [ -n "$db" ] && set -- "$@" "$db"; done <<EOF
+$DBS
+EOF
+  MYSQL_PWD="$P" $D -uroot --single-transaction --routines --events --triggers --hex-blob --databases "$@"
+else
+  echo "-- no user databases"
+fi
+echo
+echo "` + mysqlAccountsMarker + `"
+q() { MYSQL_PWD="$P" $C -uroot -N -B -r -e "SET SESSION print_identified_with_as_hex=ON; $1" 2>/dev/null || MYSQL_PWD="$P" $C -uroot -N -B -r -e "$1" 2>/dev/null; }
+ACC=$(MYSQL_PWD="$P" $C -uroot -N -B -r -e "SELECT CONCAT(QUOTE(User),'@',QUOTE(Host)) FROM mysql.user WHERE User NOT IN ('root','','mysql.sys','mysql.session','mysql.infoschema','mariadb.sys','PUBLIC','healthcheck')" 2>/dev/null || true)
+[ -n "$ACC" ] || exit 0
+# MariaDB keeps roles as rows of mysql.user that SHOW CREATE USER refuses.
+ROLES=$(MYSQL_PWD="$P" $C -uroot -N -B -r -e "SELECT QUOTE(User) FROM mysql.user WHERE is_role='Y' AND User<>'PUBLIC'" 2>/dev/null || true)
+while IFS= read -r r; do [ -n "$r" ] && printf 'CREATE ROLE IF NOT EXISTS %s;\n' "$r"; done <<EOF
+$ROLES
+EOF
+while IFS= read -r a; do
+  [ -n "$a" ] || continue
+  s=$(q "SHOW CREATE USER $a") || continue
+  case "$s" in "CREATE USER "*) ;; *) continue ;; esac
+  printf 'CREATE USER IF NOT EXISTS %s;\nALTER USER %s;\n' "${s#CREATE USER }" "${s#CREATE USER }"
+done <<EOF
+$ACC
+EOF
+while IFS= read -r a; do
+  [ -n "$a" ] || continue
+  q "SHOW GRANTS FOR $a" | while IFS= read -r g; do [ -n "$g" ] && printf '%s;\n' "$g"; done || true
+done <<EOF
+$ROLES
+$ACC
+EOF`
 
 // saveDump streams a native dump of the container into the archive.
 func saveDump(ctx context.Context, w *archive.Writer, d *DumpEntry, st *Step) error {
@@ -242,9 +285,35 @@ func loadDump(ctx context.Context, d pendingDump, rename func(string) string, st
 	st.SetDetail("loading the dump")
 	in := io.TeeReader(f, advanceWriter(st.Advance))
 	if d.Engine == EngineMySQL {
-		_, err = run.Do(ctx, run.Spec{Name: "docker", Args: []string{"exec", "-i", name, "sh", "-c",
-			`P="${MARIADB_ROOT_PASSWORD:-$MYSQL_ROOT_PASSWORD}"; C=$(command -v mariadb || command -v mysql); MYSQL_PWD="$P" exec $C -uroot`}, Stdin: in})
-		return err
+		const client = `P="${MARIADB_ROOT_PASSWORD:-$MYSQL_ROOT_PASSWORD}"; C=$(command -v mariadb || command -v mysql); MYSQL_PWD="$P" `
+		off, accounts := markerOffset(d.file, mysqlAccountsMarker)
+		data := in
+		if accounts {
+			data = io.TeeReader(io.LimitReader(f, off), advanceWriter(st.Advance))
+		}
+		if _, err = run.Do(ctx, run.Spec{Name: "docker", Args: []string{"exec", "-i", name, "sh", "-c", client + `exec $C -uroot`}, Stdin: data}); err != nil || !accounts {
+			return err
+		}
+		// Accounts: one that cannot be re-created (a role this server
+		// version does not know, say) must not undo the loaded data.
+		st.SetDetail("re-creating database accounts")
+		out, aerr := run.Do(ctx, run.Spec{Name: "docker", Args: []string{"exec", "-i", name, "sh", "-c", client + `$C -uroot --force 2>&1 >/dev/null`}, Stdin: in})
+		var bad []string
+		for _, line := range strings.Split(string(out), "\n") {
+			if strings.Contains(line, "ERROR") {
+				bad = append(bad, strings.TrimSpace(line))
+			}
+		}
+		if len(bad) == 0 && aerr != nil {
+			bad = append(bad, aerr.Error())
+		}
+		if len(bad) > 0 {
+			if len(bad) > 3 {
+				bad = append(bad[:3], fmt.Sprintf("… %d more", len(bad)-3))
+			}
+			st.p.Warn("%s: some database accounts or grants could not be re-created; check them: %s", d.Container, strings.Join(bad, "; "))
+		}
+		return nil
 	}
 	// pg_dumpall re-creates the roles and databases the image just created
 	// from the same environment: those "already exists" errors are expected,
@@ -320,4 +389,28 @@ func extractDump(man *Manifest, name string, r io.Reader) (*pendingDump, error) 
 		return &pendingDump{DumpEntry: d, file: f.Name()}, nil
 	}
 	return nil, fmt.Errorf("unexpected dump %s in backup", name)
+}
+
+// markerOffset finds the line that is exactly marker and returns where it
+// starts. It reads the file once; lines may be longer than the buffer.
+func markerOffset(file, marker string) (int64, bool) {
+	f, err := os.Open(file)
+	if err != nil {
+		return 0, false
+	}
+	defer f.Close()
+	r := bufio.NewReaderSize(f, 1<<20)
+	var pos int64
+	lineStart := true
+	for {
+		line, err := r.ReadSlice('\n')
+		if lineStart && err == nil && strings.TrimRight(string(line), "\r\n") == marker {
+			return pos, true
+		}
+		pos += int64(len(line))
+		lineStart = err == nil
+		if err != nil && err != bufio.ErrBufferFull {
+			return 0, false
+		}
+	}
 }

@@ -19,6 +19,7 @@ import (
 // keep keepRemote backups there and keepLocal here, record and report.
 type offsiteRun struct {
 	dest       string
+	localDir   string // where the backup is written first (--output)
 	keepRemote int
 	keepLocal  int
 	notifyOn   string
@@ -47,6 +48,13 @@ func (o *offsiteRun) precheck(ctx context.Context) error {
 	}
 	if !filepath.IsAbs(o.dest) {
 		return fmt.Errorf("--to %q: give a folder (/mnt/backups) or an rclone remote (name:folder)", o.dest)
+	}
+	local := o.localDir
+	if local == "" {
+		local = engine.BackupsDir
+	}
+	if engine.SameDir(o.dest, local) {
+		return fmt.Errorf("--to %s is the folder the backup is written to first; the copy there would be deleted after the upload - choose another folder, a mounted disk or an rclone remote", o.dest)
 	}
 	return os.MkdirAll(o.dest, 0o700)
 }
@@ -387,8 +395,15 @@ func cmdSchedule(ctx context.Context, args []string) error {
 		if !hasFlag(rest, "--full") && !hasFlag(rest, "--all") && !hasFlag(rest, "--project") && !hasFlag(rest, "--domain") && !hasFlag(rest, "--uuid") {
 			rest = append([]string{"--full"}, rest...)
 		}
-		to := flagValue(rest, "--to")
-		o := &offsiteRun{dest: to}
+		bf, err := parseBackupFlags(rest)
+		if err != nil {
+			return err
+		}
+		if bf.serve {
+			return errors.New("--serve does not go with a schedule")
+		}
+		to := bf.to
+		o := &offsiteRun{dest: to, localDir: bf.output}
 		if err := o.precheck(ctx); err != nil {
 			return err
 		}

@@ -2,7 +2,7 @@
 
 > Coolify Mirror (coolify-mirror) is a free, open-source (MIT) command-line tool that migrates Coolify apps between servers. It backs up one app, one or more projects, or a whole Coolify server, and restores it on another Coolify with one pasted command. Apps, databases, volumes, environment variables, secrets, domains, images and proxy settings arrive running and verified. Works with Coolify v4.3, v4.4, v4.5, v4.6 and v4.7 (both servers on the same version), on Linux amd64 and arm64. Not affiliated with Coolify or coolLabs.
 
-Current version: 1.10.3. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0, 4.7.3 and 4.7.5; every new Coolify release is tested automatically every day.
+Current version: 1.10.4. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0, 4.7.3 and 4.7.5; every new Coolify release is tested automatically every day.
 
 ## How to migrate Coolify to a new server
 
@@ -23,7 +23,7 @@ Current version: 1.10.3. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7
 ## What moves
 
 - Projects, environments, applications, services and databases, with their env vars, secrets, tags, storages, scheduled tasks and backup schedules
-- PostgreSQL, MySQL and MariaDB as native dumps taken while they run; Redis, MongoDB, ClickHouse and SQLite data copied as files; Docker volumes and host folders
+- PostgreSQL, MySQL and MariaDB as native dumps taken while they run (with every database account, its password and grants); Redis, MongoDB, ClickHouse and SQLite data copied as files; Docker volumes and host folders
 - The exact Docker images that run (no rebuild needed), domains, proxy settings, Git sources and keys, S3 storages, secret-manager links (Vault, Doppler, Infisical)
 - Whole-server mode: the Coolify database, users, settings, keys, proxy and certificates, every volume and image (onto an empty Coolify only)
 
@@ -61,6 +61,8 @@ Current version: 1.10.3. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7
 Selective and off-site full restore tests compare database contents, volumes and HTTP responses, encrypted HTTPS Git credentials, locked environment variables and scoped/paused API tokens. Selective restores do not carry source users or API tokens; configure access on the target team. Full restores carry these database records. Evidence and limitations: https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.6.0.md
 
 ## Coolify 4.7.5 validation
+
+Mirror 1.10.4 (2026-11-17) is an audit release: MySQL/MariaDB accounts added after the first start travel with their passwords, roles and grants; a scheduled backup refuses to upload into its own working folder, reports every failure, waits for a running backup or restore and checks its options when added; a folder shared by several servers asks which backup to restore; built with Go 1.26.11 (security fixes in HTTP/TLS). The real lab now also checks a MariaDB account added after the first start.
 
 Selective restores preserve all destinations of scheduled database and volume backups, including SSH keys needed only by secondary SFTP destinations. Real selective and full off-site restores on Coolify 4.7.5 check those links, IPv6 SFTP settings and legacy API token scopes. Full restore preserves the valid grant, read permission and paused state. Selective restore excludes the source token. Evidence and test scope: https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.7.5.md
 

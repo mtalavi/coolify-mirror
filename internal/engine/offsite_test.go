@@ -15,7 +15,7 @@ import (
 )
 
 func TestSourceKinds(t *testing.T) {
-	remote := []string{"gdrive:coolify", "gdrive:", "s3:bucket/backups/x.cmb", "my-store:a/b"}
+	remote := []string{"gdrive:coolify", "gdrive:", "s3:bucket/backups/x.cmb", "my-store:a/b", "gdrive:2026/backups", "b2:123/x"}
 	share := []string{"1.2.3.4/hi4i-2dzx-hmeg-42qp-palx-52s7-zq", "cm-e2e-src:8123/4jxt-tgzb-d4m3-3pe4-osyi-7trr-jm", "[2001:db8::1]:8123/abcd-efgh-ijkl-mnop"}
 	neither := []string{"/data/backups", "./x.cmb", "https://example.com/b.cmb"}
 	for _, s := range remote {
@@ -133,11 +133,43 @@ func TestLocalDestination(t *testing.T) {
 			t.Fatalf("left here: %v", names)
 		}
 	}
-	// a folder gives its newest backup
+	// a folder shared with another server is ambiguous: name both, pick none
+	if _, err := FetchOffsite(context.Background(), dst, nil); err == nil ||
+		!strings.Contains(err.Error(), filepath.Base(files[3])) || !strings.Contains(err.Error(), filepath.Base(other)) {
+		t.Fatalf("shared folder: %v", err)
+	}
+	// a folder of one server gives its newest backup
+	must(os.Remove(other))
 	got, err := FetchOffsite(context.Background(), dst, nil)
 	must(err)
 	if filepath.Base(got) != filepath.Base(files[3]) {
 		t.Fatalf("newest: %s", got)
+	}
+}
+
+func TestPrefixOfSimilarHosts(t *testing.T) {
+	stamp := time.Date(2026, 11, 17, 3, 0, 0, 0, time.Local)
+	web := BackupFileName("web", ModeFull, "4.7.5", stamp)
+	webFull := BackupFileName("web-full", ModeFull, "4.7.5", stamp)
+	if !strings.HasPrefix(web, BackupPrefix("web", ModeFull)) || strings.HasPrefix(webFull, BackupPrefix("web", ModeFull)) {
+		t.Fatalf("prefix %q vs %q / %q", BackupPrefix("web", ModeFull), web, webFull)
+	}
+	if backupGroup(web) == backupGroup(webFull) || backupGroup(web) == "" {
+		t.Fatalf("groups %q %q", backupGroup(web), backupGroup(webFull))
+	}
+	if backupGroup(BackupFileName("web", ModeFull, "4.0.0-beta.420", stamp)) != backupGroup(web) {
+		t.Fatal("a beta version changes the group")
+	}
+}
+
+func TestSameDir(t *testing.T) {
+	dir := t.TempDir()
+	if !SameDir(dir, dir+"/") || !SameDir(dir, filepath.Join(dir, "x", "..")) || SameDir(dir, filepath.Join(dir, "sub")) {
+		t.Fatal("SameDir")
+	}
+	link := filepath.Join(t.TempDir(), "link")
+	if err := os.Symlink(dir, link); err == nil && !SameDir(link, dir) {
+		t.Fatal("SameDir through a symlink")
 	}
 }
 

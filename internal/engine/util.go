@@ -168,6 +168,10 @@ func clearPaused() { _ = os.Remove(stateFile) }
 
 const lockFile = "/data/coolify-mirror/.lock"
 
+// LockWait is how long Lock waits for another run to finish (0: fail at
+// once). Scheduled backups wait, so two timers that fire together both run.
+var LockWait time.Duration
+
 // Lock takes the global lock: only one backup or restore runs at a time on a
 // server. It returns the unlock function.
 func Lock() (func(), error) {
@@ -178,7 +182,16 @@ func Lock() (func(), error) {
 	if err != nil {
 		return nil, err
 	}
-	if err := unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB); err != nil {
+	deadline := time.Now().Add(LockWait)
+	for {
+		err := unix.Flock(int(f.Fd()), unix.LOCK_EX|unix.LOCK_NB)
+		if err == nil {
+			break
+		}
+		if time.Now().Before(deadline) {
+			time.Sleep(10 * time.Second)
+			continue
+		}
 		b, _ := os.ReadFile(lockFile)
 		f.Close()
 		return nil, fmt.Errorf("another coolify-mirror backup/restore is running on this server (pid %s); wait for it to finish", strings.TrimSpace(string(b)))

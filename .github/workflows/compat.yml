@@ -98,6 +98,14 @@ jobs:
             echo "::error::the test could not run: $(grep 'SETUP FAILED' e2e.log | tail -1)"
             exit 1
           fi
+          # Only main is released: a run on another branch tests unreleased
+          # code, so it never changes compat.json (which released versions
+          # read to allow restores) and never opens an issue.
+          if [ "$GITHUB_REF" != refs/heads/main ]; then
+            if [ "$RC" = 0 ]; then echo "passed on $GITHUB_REF (not published)"; exit 0; fi
+            echo "::error::failed on $GITHUB_REF (not published)"
+            exit 1
+          fi
           status=ok; detail=""
           if [ "$RC" != 0 ]; then
             status=fail

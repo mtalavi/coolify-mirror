@@ -60,7 +60,7 @@
    "applicationCategory": "DeveloperApplication",
    "applicationSubCategory": "Server migration, backup and restore",
    "operatingSystem": "Linux (amd64, arm64)",
-   "softwareVersion": "1.10.3",
+   "softwareVersion": "1.10.4",
    "softwareRequirements": "Coolify v4.3, v4.4, v4.5, v4.6 or v4.7 (same version on both servers), Linux amd64 or arm64, SSH as root or a sudo user",
    "featureList": [
     "Back up one app, several projects or a whole Coolify server",
@@ -73,7 +73,7 @@
     "Coolify v4.3, v4.4, v4.5, v4.6 and v4.7, tested daily against new Coolify releases"
    ],
    "datePublished": "2026-10-01",
-   "dateModified": "2026-10-27",
+   "dateModified": "2026-11-17",
    "license": "https://opensource.org/licenses/MIT",
    "isAccessibleForFree": true,
    "offers": {
@@ -737,6 +737,7 @@
       <p>Every release is on <a href="https://github.com/mtalavi/coolify-mirror/releases">GitHub Releases</a> with its binaries and checksums.</p>
     </div>
     <div class="timeline">
+      <div class="rel"><div><span class="v">1.10.4</span><span class="d">2026-11-17</span></div><div><h3>Audit release: database accounts and safer schedules</h3><p>MySQL and MariaDB dumps now carry the accounts added after the database's first start, with their passwords, roles and grants (before, only the users from the image's environment came back). A scheduled backup can no longer upload into the folder it is written to (which deleted every copy), reports every failure by email or Telegram, waits for a backup or restore that is still running, and refuses invalid options when the schedule is added. Restoring from a folder shared by several servers or by full and app backups asks for the file instead of taking another server's backup. rclone paths such as <code>gdrive:2026/backups</code> work. Built with Go 1.26.11, which fixes 17 security issues in Go's HTTP and TLS code used by the share server; a weekly vulnerability check now runs in CI. <a href="https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.7.5.md">Read the test report</a>.</p></div></div>
       <div class="rel"><div><span class="v">1.10.3</span><span class="d">2026-11-15</span></div><div><h3>Coolify 4.7.5 verified</h3><p>Selective restores now carry every destination of scheduled database and volume backups. Real selective and full off-site restores verify those links, saved IPv6 SFTP settings and legacy API token scopes. <a href="https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.7.5.md">Read the test report</a>.</p></div></div>
       <div class="rel"><div><span class="v">1.10.2</span><span class="d">2026-11-10</span></div><div><h3>Coolify 4.7.3</h3><p>SFTP destination SSH keys and resource vulnerability settings now travel in selective restores. The real backup and restore lab checks these dependencies, stored host pins and multiline values with trailing newlines. The same menus, backup format and exact-version checks remain. <a href="https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.7.3.md">Read the test report</a>.</p></div></div>
       <div class="rel"><div><span class="v">1.10.1</span><span class="d">2026-11-04</span></div><div><h3>Coolify 4.6.0 verified</h3><p>Selective migration and whole-server recovery from SFTP tested on fresh Coolify 4.6.0 servers. The lab now checks database-content checksums, encrypted HTTPS Git credentials, locked environment variables and scoped API token state. Fixes HTTPS links whose certificate pin starts with <code>+</code>, keeping exact certificate checks. <a href="https://github.com/mtalavi/coolify-mirror/blob/main/docs/testing-4.6.0.md">Read the test report</a>.</p></div></div>

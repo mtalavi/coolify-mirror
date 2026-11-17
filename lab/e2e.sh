@@ -122,8 +122,8 @@ done
 [ -n "$TOKEN" ] || { echo "$out" | tail -20; setup_fail "no API token"; }
 docker cp "$HERE/e2e_seed.sh" "$SRC:/root/e2e_seed.sh"
 seed=$(on "$SRC" "bash /root/e2e_seed.sh '$TOKEN' '$REPO' '$BRANCH'") || setup_fail "the source could not be seeded"
-eval "$(echo "$seed" | grep -E '^(COMPOSE|PG|WEB)=')"
-echo "compose=$COMPOSE pg=$PG web=$WEB"
+eval "$(echo "$seed" | grep -E '^(COMPOSE|PG|MY|WEB)=')"
+echo "compose=$COMPOSE pg=$PG mariadb=$MY web=$WEB"
 
 log "wait until everything runs on the source"
 # The compose test app refuses to start without data in its volume.
@@ -141,6 +141,8 @@ done
 MARK="e2e-$(date +%s)-$RANDOM"
 on "$SRC" "docker exec \$(docker ps -q --filter name=^$WEB) sh -c 'echo $MARK > /usr/share/nginx/html/marker.txt'"
 on "$SRC" "docker exec $PG psql -U e2e -d e2e -v ON_ERROR_STOP=1 -c 'create table t(x int); insert into t select generate_series(1,1234)'" >/dev/null
+for c in "$SRC" "$DST"; do docker cp "$HERE/e2e_mariadb.sh" "$c:/root/e2e_mariadb.sh"; done
+on "$SRC" "bash /root/e2e_mariadb.sh $MY seed" || setup_fail "the source MariaDB could not be seeded"
 
 # Compare contents, not just the number of rows (equal counts can hide damage).
 data_digest() {
@@ -289,6 +291,7 @@ got=$(on "$DST" "curl -fsS --resolve nginx.e2e.test:80:127.0.0.1 http://nginx.e2
 [ "$got" = "$MARK" ] && echo "ok  volume file through the proxy" || { echo "BAD volume file: '$got' != '$MARK'"; fail=1; }
 got=$(on "$DST" "docker exec $PG psql -U e2e -d e2e -At -c 'select count(*) from t'" || true)
 [ "$got" = 1234 ] && echo "ok  database rows" || { echo "BAD database rows: $got"; fail=1; }
+on "$DST" "bash /root/e2e_mariadb.sh $MY verify" && echo "ok  MariaDB rows and an account added after the first start" || { echo "BAD MariaDB account or rows"; fail=1; }
 got=$(data_digest "$DST" || true)
 [ "$got" = "$PG_DIGEST" ] && echo "ok  database contents checksum" || { echo "BAD database contents checksum"; fail=1; }
 

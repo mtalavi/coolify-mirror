@@ -152,7 +152,7 @@ The same as one command for your own scripts or cron: `sudo coolify-mirror backu
 curl -fsSL https://raw.githubusercontent.com/mtalavi/coolify-mirror/main/install.sh | sudo sh -s restore gdrive:coolify-backups --recovery-key AGE-SECRET-KEY-1…
 ```
 
-It takes the newest backup of that folder (or a file, or an `https://` address), sees whether it is a whole server or apps, restores it, starts everything through Coolify, checks every domain — and the panel answers on the new server's own address. Point your DNS to the new IP and you are back.
+It takes the newest backup of that folder (or a file, or an `https://` address; a folder shared by several servers asks which file), sees whether it is a whole server or apps, restores it, starts everything through Coolify, checks every domain — and the panel answers on the new server's own address. Point your DNS to the new IP and you are back.
 
 | | |
 |---|---|
@@ -508,7 +508,7 @@ Coolify ships often, and the tool relies on parts of it (database tables, PHP cl
 
 ## 🧪 Tested
 
-**Coolify 4.7.5 / Mirror 1.10.3:** selective and full off-site recovery are verified on fresh Coolify installs. Selective restores carry every destination linked to a database or volume backup schedule. The lab verifies the primary and secondary destinations, IPv6 SFTP settings and the full recovery of a legacy paused token. See the [4.7.5 validation report](docs/testing-4.7.5.md).
+**Coolify 4.7.5 / Mirror 1.10.4:** selective and full off-site recovery are verified on fresh Coolify installs, now including a MariaDB account added after the database's first start. Selective restores carry every destination linked to a database or volume backup schedule. The lab verifies the primary and secondary destinations, IPv6 SFTP settings and the full recovery of a legacy paused token. See the [4.7.5 validation report](docs/testing-4.7.5.md).
 
 **Coolify 4.7.3 / Mirror 1.10.2:** the existing real selective and off-site full-restore lab now also checks SFTP destination SSH-key dependencies, stored host pins, disabled database schedules, multiline values including their trailing newline, and resource vulnerability policies/ignores. See the [4.7.3 validation report](docs/testing-4.7.3.md) for results and boundaries.
 
@@ -522,6 +522,7 @@ The [walkthrough](#-walkthrough--every-screen) is a real run of the released 1.9
 
 Every release with its binaries and checksums: [Releases](https://github.com/mtalavi/coolify-mirror/releases).
 
+- **1.10.4** · 2026-11-17 — **Audit release for Coolify 4.7.5.** MySQL and MariaDB dumps now carry the accounts added after the database's first start, with their passwords, roles and grants (before, only the users from the image's environment came back). A scheduled backup can no longer upload into the folder it is written to (which deleted every copy), reports every failure by email or Telegram, waits for a backup or restore that is still running, and refuses invalid options when the schedule is added. Restoring from a folder shared by several servers or by full and app backups asks for the file instead of taking another server's backup. rclone paths such as `gdrive:2026/backups` work. Built with Go 1.26.11, which fixes 17 security issues in Go's HTTP and TLS code used by the share server; a weekly vulnerability check now runs in CI.
 - **1.10.3** · 2026-11-15 — **Coolify 4.7.5 verified.** Selective restores now carry all destinations of scheduled database and volume backups, including secondary SFTP destinations and their SSH keys. Real restore tests cover those links, IPv6 SFTP settings and legacy API token scopes.
 - **1.10.2** · 2026-11-10 — **Coolify 4.7.3.** Selective restores carry SFTP destination SSH keys and remap their references, inserting keys before storages. Resource-specific vulnerability policies and ignores move with their resources; inherited instance/team/server policy remains the target's. Tests cover these settings and multiline secret preservation. The existing backup format and same-version requirement are unchanged.
 - **1.10.1** · 2026-11-04 — **Coolify 4.6.0 verified.** Adds the newer tested versions to the built-in compatibility list, expands the real backup/restore lab with encrypted Git credentials, hidden environment variables, scoped/paused API tokens and database-content checksums, and documents the results. Fixes a legacy HTTPS link whose certificate pin starts with `+` being rejected after URL parsing; exact certificate pinning stays enforced.

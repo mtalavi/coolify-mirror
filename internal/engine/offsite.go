@@ -134,8 +134,33 @@ func BackupFileName(host, mode, coolifyVersion string, t time.Time) string {
 
 // BackupPrefix is what the file names of one server's backups of one mode
 // start with, so cleaning a shared folder never touches other servers'.
+// It ends with "coolify" (the version follows), so server "web" never
+// matches the files of a server named "web-full".
 func BackupPrefix(host, mode string) string {
-	return fmt.Sprintf("coolify-%s-%s-", safeName(host), mode)
+	return fmt.Sprintf("coolify-%s-%s-coolify", safeName(host), mode)
+}
+
+// backupGroup is the server and mode part of a backup file name ("" when the
+// name is not one of ours).
+func backupGroup(name string) string {
+	if m := backupName.FindStringSubmatch(name); m != nil {
+		return m[1]
+	}
+	return ""
+}
+
+var backupName = regexp.MustCompile(`^(coolify-.+-(?:full|selective)-)coolify.+?-[0-9]{8}-[0-9]{6}\.cmb$`)
+
+// SameDir reports whether a and b are the same folder (after symlinks).
+func SameDir(a, b string) bool {
+	clean := func(p string) string {
+		p = filepath.Clean(p)
+		if r, err := filepath.EvalSymlinks(p); err == nil {
+			return r
+		}
+		return p
+	}
+	return clean(a) == clean(b)
 }
 
 // ---------------------------------------------------------------------------
@@ -153,13 +178,12 @@ func IsRemote(dest string) bool {
 	if i <= 0 || strings.Contains(dest[:i], "/") {
 		return false
 	}
-	// HOST:PORT/code is a share code, not a remote.
-	return !hostPortCode.MatchString(dest[i+1:])
+	// HOST:PORT/code is a share code, not a remote ("gdrive:2026/x" is).
+	return !shareCode.MatchString(dest)
 }
 
 var (
-	hostPortCode = regexp.MustCompile(`^[0-9]+/`)
-	shareCode    = regexp.MustCompile(`^(\[[0-9a-fA-F:]+\]|[^/\s:]+)(:[0-9]+)?/[a-z0-9]{4}(-[a-z0-9]{2,4}){3,}$`)
+	shareCode = regexp.MustCompile(`^(\[[0-9a-fA-F:]+\]|[^/\s:]+)(:[0-9]+)?/[a-z0-9]{4}(-[a-z0-9]{2,4}){3,}$`)
 )
 
 // RcloneInstalled reports whether rclone is on this server.
@@ -315,6 +339,10 @@ func copyLocalChecked(src, dst string, progress func(done, total int64)) error {
 			progress(n, fi.Size())
 		}
 	}})
+	if err == nil {
+		// on the disk before the original is deleted after the upload
+		err = out.Sync()
+	}
 	if cerr := out.Close(); err == nil {
 		err = cerr
 	}
@@ -324,6 +352,10 @@ func copyLocalChecked(src, dst string, progress func(done, total int64)) error {
 	}
 	if err := os.Rename(tmp, dst); err != nil {
 		return err
+	}
+	if d, err := os.Open(filepath.Dir(dst)); err == nil {
+		_ = d.Sync()
+		d.Close()
 	}
 	want := hex.EncodeToString(h.Sum(nil))
 	got, err := fileSHA256(dst)
@@ -483,10 +515,11 @@ func FetchOffsite(ctx context.Context, src string, progress func(done, total int
 		if err != nil {
 			return "", err
 		}
-		if len(list) == 0 {
-			return "", fmt.Errorf("no backup (.cmb) in %s", src)
+		b, err := newestBackup(list, src)
+		if err != nil {
+			return "", err
 		}
-		return list[0].Path, nil
+		return b.Path, nil
 	}
 	if err := checkRemote(ctx, src); err != nil {
 		return "", err
@@ -501,10 +534,11 @@ func FetchOffsite(ctx context.Context, src string, progress func(done, total int
 		if err != nil {
 			return "", err
 		}
-		if len(list) == 0 {
-			return "", fmt.Errorf("no backup (.cmb) in %s", src)
+		b, err := newestBackup(list, src)
+		if err != nil {
+			return "", err
 		}
-		file, size = list[0].Path, list[0].Size
+		file, size = b.Path, b.Size
 	}
 	if size < 0 {
 		size = remoteSize(ctx, file)
@@ -684,4 +718,35 @@ func RcloneVersion(ctx context.Context) string {
 		return ""
 	}
 	return strings.SplitN(strings.TrimSpace(string(out)), "\n", 2)[0]
+}
+
+// newestBackup picks the newest backup of a folder (list is newest first).
+// A folder shared by several servers, or by full and selective schedules,
+// is ambiguous: restoring the wrong one would replace this server with
+// another, so it names the newest of each and asks for one.
+func newestBackup(list []StoredBackupAt, where string) (StoredBackupAt, error) {
+	if len(list) == 0 {
+		return StoredBackupAt{}, fmt.Errorf("no backup (.cmb) in %s", where)
+	}
+	var groups []string
+	newest := map[string]StoredBackupAt{}
+	for _, b := range list {
+		g := backupGroup(b.Name)
+		if g == "" {
+			g = b.Name
+		}
+		if _, ok := newest[g]; !ok {
+			newest[g] = b
+			groups = append(groups, g)
+		}
+	}
+	if len(groups) == 1 {
+		return list[0], nil
+	}
+	var lines []string
+	for _, g := range groups {
+		b := newest[g]
+		lines = append(lines, fmt.Sprintf("  %s  (%s)", b.Path, b.ModTime.Local().Format("2006-01-02 15:04")))
+	}
+	return StoredBackupAt{}, fmt.Errorf("%s holds backups of more than one server or kind; restore one file by its path - the newest of each:\n%s", where, strings.Join(lines, "\n"))
 }
