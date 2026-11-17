@@ -3,6 +3,7 @@
 #   - a Docker Compose app built from git (this repository, lab/compose-app),
 #     with a database, a one-shot migration, secrets and a domain;
 #   - a standalone Postgres with rows;
+#   - a standalone MariaDB with an account added after its first start;
 #   - a Docker image app (nginx) with a volume and a domain.
 # Prints the uuids as KEY=VALUE lines.
 set -euo pipefail
@@ -35,6 +36,7 @@ docker exec -e U="$compose" -e DOMAIN=http://web.e2e.test:8080 coolify php /tmp/
 api PATCH "/applications/$compose/envs/bulk" '{"data":[{"key":"DB_PASSWORD","value":"E2e-db-Pa55"},{"key":"SECRET_TOKEN","value":"e2e-secret-token-42"}]}' >/dev/null
 
 pg=$(api POST /databases/postgresql "{$common,\"name\":\"e2e-db\",\"postgres_user\":\"e2e\",\"postgres_password\":\"E2e-pg-Pa55\",\"postgres_db\":\"e2e\",\"instant_deploy\":true}" | jq -r .uuid)
+my=$(api POST /databases/mariadb "{$common,\"name\":\"e2e-mariadb\",\"mariadb_root_password\":\"E2e-root-Pa55\",\"mariadb_user\":\"e2e\",\"mariadb_password\":\"E2e-my-Pa55\",\"mariadb_database\":\"e2e\",\"instant_deploy\":true}" | jq -r .uuid)
 
 web=$(api POST /applications/dockerimage "{$common,\"name\":\"e2e-web\",\"docker_registry_image_name\":\"nginx\",\"docker_registry_image_tag\":\"alpine\",
   \"ports_exposes\":\"80\",\"domains\":\"http://nginx.e2e.test\",\"instant_deploy\":false}" | jq -r .uuid)
@@ -44,4 +46,5 @@ api POST "/applications/$compose/start" >/dev/null
 api POST "/applications/$web/start" >/dev/null
 echo "COMPOSE=$compose"
 echo "PG=$pg"
+echo "MY=$my"
 echo "WEB=$web"

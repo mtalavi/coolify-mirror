@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -256,8 +257,16 @@ func addSchedule(ctx context.Context, in *coolify.Instance) error {
 			if _, err := engine.ListBackupsAt(ctx, target); err != nil && !strings.Contains(err.Error(), "directory not found") {
 				return "", fmt.Errorf("the destination %s does not work: %w", target, err)
 			}
-		} else if err := os.MkdirAll(target, 0o700); err != nil {
-			return "", err
+		} else {
+			if !filepath.IsAbs(target) {
+				return "", fmt.Errorf("%q: give the full path of the folder, like /mnt/backups/coolify", target)
+			}
+			if engine.SameDir(target, engine.BackupsDir) {
+				return "", fmt.Errorf("%s is where each backup is written first and deleted after its upload - choose another folder or disk", target)
+			}
+			if err := os.MkdirAll(target, 0o700); err != nil {
+				return "", err
+			}
 		}
 		return engine.AddSchedule(ctx, strings.TrimSpace(name), at, args)
 	})

@@ -466,44 +466,92 @@ func cmdList(ctx context.Context, args []string) error {
 
 // --- backup ----------------------------------------------------------------------
 
-func cmdBackup(ctx context.Context, args []string) error {
+// backupFlags are the options of `backup`; `schedule add` checks them with
+// the same parser so a timer never starts with options that fail every night.
+type backupFlags struct {
+	full, all, noDeps, includeBackups, serve, openFW bool
+	projects, domains, uuids, consistency, images    string
+	output, mode, host, to, notifyOn, schedName      string
+	port, keepRemote, keepLocal                      int
+}
+
+func parseBackupFlags(args []string) (*backupFlags, error) {
+	o := &backupFlags{}
 	fs := flag.NewFlagSet("backup", flag.ContinueOnError)
-	full := fs.Bool("full", false, "")
-	projects := fs.String("project", "", "")
-	domains := fs.String("domain", "", "")
-	uuids := fs.String("uuid", "", "")
-	all := fs.Bool("all", false, "")
-	noDeps := fs.Bool("no-deps", false, "")
-	consistency := fs.String("consistency", engine.ConsistencyPause, "")
-	images := fs.String("images", engine.ImagesApps, "")
-	includeBackups := fs.Bool("include-backups", false, "")
-	output := fs.String("output", engine.BackupsDir, "")
-	serve := fs.Bool("serve", false, "")
-	mode := fs.String("mode", engine.ShareDirect, "")
-	port := fs.Int("port", engine.DefaultPort, "")
-	host := fs.String("host", "", "")
-	openFW := fs.Bool("open-firewall", false, "")
-	to := fs.String("to", "", "")
-	keepRemote := fs.Int("keep-remote", 7, "")
-	keepLocal := fs.Int("keep-local", 0, "")
-	notifyOn := fs.String("notify", "", "")
-	schedName := fs.String("schedule-name", "", "")
+	fs.BoolVar(&o.full, "full", false, "")
+	fs.StringVar(&o.projects, "project", "", "")
+	fs.StringVar(&o.domains, "domain", "", "")
+	fs.StringVar(&o.uuids, "uuid", "", "")
+	fs.BoolVar(&o.all, "all", false, "")
+	fs.BoolVar(&o.noDeps, "no-deps", false, "")
+	fs.StringVar(&o.consistency, "consistency", engine.ConsistencyPause, "")
+	fs.StringVar(&o.images, "images", engine.ImagesApps, "")
+	fs.BoolVar(&o.includeBackups, "include-backups", false, "")
+	fs.StringVar(&o.output, "output", engine.BackupsDir, "")
+	fs.BoolVar(&o.serve, "serve", false, "")
+	fs.StringVar(&o.mode, "mode", engine.ShareDirect, "")
+	fs.IntVar(&o.port, "port", engine.DefaultPort, "")
+	fs.StringVar(&o.host, "host", "", "")
+	fs.BoolVar(&o.openFW, "open-firewall", false, "")
+	fs.StringVar(&o.to, "to", "", "")
+	fs.IntVar(&o.keepRemote, "keep-remote", 7, "")
+	fs.IntVar(&o.keepLocal, "keep-local", 0, "")
+	fs.StringVar(&o.notifyOn, "notify", "", "")
+	fs.StringVar(&o.schedName, "schedule-name", "", "")
 	if err := fs.Parse(args); err != nil {
+		return nil, err
+	}
+	if fs.NArg() > 0 {
+		return nil, fmt.Errorf("unexpected %q (options start with --)", fs.Arg(0))
+	}
+	switch o.consistency {
+	case engine.ConsistencyPause, engine.ConsistencyStop, engine.ConsistencyLive:
+	default:
+		return nil, fmt.Errorf("--consistency %q: use pause, stop or live", o.consistency)
+	}
+	switch o.images {
+	case engine.ImagesApps, engine.ImagesAll, engine.ImagesNone:
+	default:
+		return nil, fmt.Errorf("--images %q: use apps, all or none", o.images)
+	}
+	if o.keepRemote < 0 || o.keepLocal < 0 {
+		return nil, errors.New("--keep-remote and --keep-local take 0 or more")
+	}
+	switch o.notifyOn {
+	case "", "always", "failure", "never":
+	default:
+		return nil, fmt.Errorf("--notify %q: use always, failure or never", o.notifyOn)
+	}
+	return o, nil
+}
+
+func cmdBackup(ctx context.Context, args []string) error {
+	o, err := parseBackupFlags(args)
+	if err != nil {
 		return err
 	}
+	full, projects, domains, uuids, all, noDeps := &o.full, &o.projects, &o.domains, &o.uuids, &o.all, &o.noDeps
+	consistency, images, includeBackups, output, serve := &o.consistency, &o.images, &o.includeBackups, &o.output, &o.serve
+	mode, port, host, openFW := &o.mode, &o.port, &o.host, &o.openFW
 	var off *offsiteRun // --to: upload, check, then free the disk here
-	if *to != "" {
+	if o.to != "" {
 		if *serve {
 			return errors.New("--to and --serve do not go together")
 		}
-		off = &offsiteRun{dest: *to, keepRemote: *keepRemote, keepLocal: *keepLocal, notifyOn: *notifyOn, name: *schedName, started: time.Now()}
-		if err := off.precheck(ctx); err != nil {
-			return off.fail(ctx, nil, err)
+		off = &offsiteRun{dest: o.to, localDir: o.output, keepRemote: o.keepRemote, keepLocal: o.keepLocal, notifyOn: o.notifyOn, name: o.schedName, started: time.Now()}
+		if o.schedName != "" {
+			engine.LockWait = 6 * time.Hour // a timer waits for a backup or restore that is still running
 		}
 	}
+	// Coolify first: its mail and Telegram settings report a failing destination.
 	in, err := detect(ctx)
+	if off != nil {
+		if perr := off.precheck(ctx); perr != nil {
+			return off.fail(ctx, in, perr)
+		}
+	}
 	if err != nil {
-		return off.fail(ctx, nil, err)
+		return off.fail(ctx, in, err)
 	}
 	req := engine.BackupRequest{Mode: engine.ModeSelective, OutputDir: *output, Consistency: *consistency,
 		Images: *images, IncludeBackups: *includeBackups}
@@ -512,7 +560,7 @@ func cmdBackup(ctx context.Context, args []string) error {
 	} else {
 		rs, err := in.ListResources(ctx)
 		if err != nil {
-			return err
+			return off.fail(ctx, in, err)
 		}
 		sel, err := selectResources(rs, *all, splitList(*projects), splitList(*domains), splitList(*uuids))
 		if err != nil {
@@ -521,7 +569,7 @@ func cmdBackup(ctx context.Context, args []string) error {
 		if !*noDeps {
 			deps, err := engine.ResolveDependencies(ctx, in, sel, rs)
 			if err != nil {
-				return err
+				return off.fail(ctx, in, err)
 			}
 			for _, d := range deps {
 				fmt.Printf("+ adding %s %q - %s\n", d.Resource.Label(), d.Resource.Name, d.Reason)

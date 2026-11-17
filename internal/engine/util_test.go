@@ -1,6 +1,11 @@
 package engine
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 func TestDeniedHostPath(t *testing.T) {
 	denied := []string{"/", "/etc", "/etc/nginx", "/data", "/data/coolify", "/data/coolify/source/.env",
@@ -42,5 +47,26 @@ func TestImageTitle(t *testing.T) {
 		if got := imageTitle(c.refs); got != c.want {
 			t.Errorf("%v: %q, want %q", c.refs, got, c.want)
 		}
+	}
+}
+
+func TestMarkerOffset(t *testing.T) {
+	dir := t.TempDir()
+	long := strings.Repeat("x", 3<<20)
+	body := "-- dump\nINSERT '" + long + "-- coolify-mirror: accounts';\n"
+	p := filepath.Join(dir, "d.sql")
+	content := body + "\n" + mysqlAccountsMarker + "\nCREATE USER IF NOT EXISTS 'a'@'%';\n"
+	if err := os.WriteFile(p, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	off, ok := markerOffset(p, mysqlAccountsMarker)
+	if !ok || off != int64(len(body)+1) {
+		t.Fatalf("markerOffset = %d %v, want %d", off, ok, len(body)+1)
+	}
+	if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := markerOffset(p, mysqlAccountsMarker); ok {
+		t.Fatal("found a marker in a dump without accounts")
 	}
 }

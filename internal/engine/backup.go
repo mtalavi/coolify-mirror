@@ -247,7 +247,10 @@ func Backup(ctx context.Context, in *coolify.Instance, req BackupRequest, pr *Pr
 	stFinal.SetDetail("verifying")
 	if err = VerifyFile(ctx, final, key, nil); err != nil {
 		stFinal.Fail(err)
-		return nil, fmt.Errorf("the backup file failed verification: %w", err)
+		// an unreadable file must not be listed (or restored) as a backup
+		_ = os.Remove(final)
+		_ = os.Remove(final + ".key")
+		return nil, fmt.Errorf("the backup file failed verification and was removed: %w", err)
 	}
 	stFinal.Finish(HumanBytes(st.Size()))
 	return &BackupResult{Path: final, Key: key, Size: st.Size(), RawBytes: w.RawWritten(),
