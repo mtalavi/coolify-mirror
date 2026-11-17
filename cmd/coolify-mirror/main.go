@@ -171,6 +171,7 @@ Restore
         --recovery-key KEY              the recovery key (AGE-SECRET-KEY-1…); --recovery-key-file FILE
                                         CODE can also be an rclone path (gdrive:folder[/file.cmb]), a folder
                                         or an https:// address: a folder gives its newest backup
+                                        (a folder shared by several servers asks for the file)
         --yes                           do not ask for confirmation
         --on-conflict copy|skip         selective restore: resource already exists here
         --team ID                       selective restore: target team (default 0)
