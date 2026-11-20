@@ -493,7 +493,7 @@ Coolify ships often, and the tool relies on parts of it (database tables, PHP cl
 
 ## ⚠️ Limitations
 
-- Coolify **v4.3, v4.4, v4.5, v4.6 and v4.7** (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0, 4.7.3 and 4.7.5); both servers must run **exactly the same** version (upgrade the older one first).
+- Coolify **v4.3, v4.4, v4.5, v4.6 and v4.7** (tested with 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0, 4.7.3, 4.7.5 and 4.7.6); both servers must run **exactly the same** version (upgrade the older one first).
 - MySQL/MariaDB dumps contain the user databases; extra database users created by hand (beyond the image's `MYSQL_USER`) are not recreated. PostgreSQL dumps include all roles.
 - Selective restores merge resources into the target team; they do not copy source users, team memberships or API tokens. Recreate any per-resource access grants on the target. Whole-server restores carry the database, including Coolify 4.6 token scopes and paused state.
 - Coolify 4.7 resource-specific vulnerability policies and ignores are carried. Inherited instance/team/server policies and team-wide ignores remain the target's in a selective restore; review those settings before deploying. Scan history is not carried selectively. Full restores carry the database.
@@ -507,6 +507,8 @@ Coolify ships often, and the tool relies on parts of it (database tables, PHP cl
 ---
 
 ## 🧪 Tested
+
+**Coolify 4.7.6 / Mirror 1.10.4:** Coolify 4.7.6 updates the panel image (PHP, nginx, PHP-FPM bound to loopback) and changes neither the database nor the application code. The same selective and full off-site recovery lab passed on fresh 4.7.6 installs with the unchanged 1.10.4 binary, so no new release was needed.
 
 **Coolify 4.7.5 / Mirror 1.10.4:** selective and full off-site recovery are verified on fresh Coolify installs, now including a MariaDB account added after the database's first start. Selective restores carry every destination linked to a database or volume backup schedule. The lab verifies the primary and secondary destinations, IPv6 SFTP settings and the full recovery of a legacy paused token. See the [4.7.5 validation report](docs/testing-4.7.5.md).
 
