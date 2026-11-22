@@ -36,6 +36,78 @@ function cm_database_models(): array
     ];
 }
 
+// Host names of two comma separated domain lists, paired by position
+// ("https://a.example:3000" -> a.example), without unchanged ones.
+function cm_host_pairs(string $old, string $new): array
+{
+    $host = function (string $u): string {
+        $u = trim($u);
+        if ($u === '') {
+            return '';
+        }
+        if (! str_contains($u, '://')) {
+            $u = 'http://'.$u;
+        }
+
+        return strtolower((string) parse_url($u, PHP_URL_HOST));
+    };
+    $o = array_values(array_filter(array_map($host, explode(',', $old))));
+    $n = array_values(array_filter(array_map($host, explode(',', $new))));
+    $pairs = [];
+    foreach ($o as $i => $h) {
+        if (isset($n[$i]) && $n[$i] !== $h) {
+            $pairs[$h] = $n[$i];
+        }
+    }
+
+    return $pairs;
+}
+
+// Replaces host names in a text: a whole host (not part of a longer name, not
+// an e-mail address) and a domain written with a leading dot (cookie domain,
+// *.wildcard). The same rules as engine.Rehost.
+function cm_rehost(string $text, array $pairs): string
+{
+    if ($pairs === []) {
+        return $text;
+    }
+    $olds = array_keys($pairs);
+    usort($olds, fn ($a, $b) => strlen($b) <=> strlen($a));
+    $alt = implode('|', array_map(fn ($h) => preg_quote($h, '/'), $olds));
+    $text = preg_replace_callback('/(?<![A-Za-z0-9_.@-])('.$alt.')(?![A-Za-z0-9_-])/i', fn ($m) => $pairs[strtolower($m[1])], $text);
+
+    return preg_replace_callback('/(?<=[=*\s,"\'])\.('.$alt.')(?![A-Za-z0-9_-])/i', fn ($m) => '.'.$pairs[strtolower($m[1])], $text);
+}
+
+// The env files a raw compose file loads from the application's folder.
+function cm_raw_env_files(Application $application): array
+{
+    $workdir = rtrim($application->workdir(), '/');
+    $files = [];
+    try {
+        $yaml = Symfony\Component\Yaml\Yaml::parse((string) $application->docker_compose_raw);
+    } catch (Throwable) {
+        return [];
+    }
+    foreach ((array) data_get($yaml, 'services', []) as $svc) {
+        $list = data_get($svc, 'env_file', []);
+        foreach (is_array($list) ? $list : [$list] as $f) {
+            $p = is_array($f) ? (string) ($f['path'] ?? '') : (string) $f;
+            if ($p === '') {
+                continue;
+            }
+            if (! str_starts_with($p, '/')) {
+                $p = $workdir.'/'.ltrim($p, './');
+            }
+            if (str_starts_with($p, $workdir.'/') && ! str_contains($p, '..')) {
+                $files[$p] = true;
+            }
+        }
+    }
+
+    return array_keys($files);
+}
+
 // Database types that only newer Coolify versions have.
 function cm_optional_database_tables(): array
 {
@@ -227,7 +299,15 @@ try {
                 throw new RuntimeException('not a Docker Compose application');
             }
             $commit = (string) ($input['commit'] ?? '');
-            $compose = $application->parse(pull_request_id: 0, preview_id: null, commit: $commit);
+            $raw = (bool) $application->settings?->is_raw_compose_deployment_enabled;
+            if ($raw) {
+                // Raw deployment: Coolify uses the compose file as it is, only
+                // adding its own labels (and creating bind-mount folders).
+                $application->oldRawParser();
+                $compose = Symfony\Component\Yaml\Yaml::parse((string) $application->docker_compose_raw);
+            } else {
+                $compose = $application->parse(pull_request_id: 0, preview_id: null, commit: $commit);
+            }
             if (empty($compose)) {
                 throw new RuntimeException('Coolify could not parse the compose file');
             }
@@ -249,12 +329,16 @@ try {
                 return $this->generate_runtime_environment_variables();
             }, $job, $jobClass)();
             $compose = convertToArray($compose);
-            $result['compose'] = Symfony\Component\Yaml\Yaml::dump($compose, 10);
+            $result['compose'] = $raw ? (string) $application->docker_compose_raw : Symfony\Component\Yaml\Yaml::dump($compose, 10);
             $result['env'] = $env->implode("\n");
             $result['workdir'] = $application->workdir();
             $result['location'] = $application->docker_compose_location ?: '/docker-compose.yaml';
             $result['start_command'] = (string) $application->docker_compose_custom_start_command;
-            $result['raw'] = (bool) $application->settings?->is_raw_compose_deployment_enabled;
+            if ($raw && $result['start_command'] === '') {
+                // Coolify's default raw start always uses docker-compose.yaml.
+                $result['location'] = '/docker-compose.yaml';
+            }
+            $result['raw'] = $raw;
             $images = [];
             foreach ((array) data_get($compose, 'services', []) as $name => $svc) {
                 $images[$name] = (string) data_get($svc, 'image', '');
@@ -392,7 +476,8 @@ try {
 
         case 'set_domains':
             // Same effect as editing the domain field in Coolify's UI.
-            Illuminate\Support\Facades\DB::transaction(function () use ($input) {
+            $rehosted = [];
+            Illuminate\Support\Facades\DB::transaction(function () use ($input, &$rehosted) {
                 foreach ($input as $item) {
                     $fqdn = ($item['fqdn'] ?? '') === '' ? null : $item['fqdn'];
                     if ($fqdn !== null && class_exists(App\Support\ValidationPatterns::class) && method_exists(App\Support\ValidationPatterns::class, 'normalizeApplicationDomains')) {
@@ -418,6 +503,24 @@ try {
                         $domains = json_decode($application->docker_compose_domains ?: '{}', true) ?: [];
                         $domains[$item['service']] = ['domain' => $fqdn ?? ''];
                         $application->docker_compose_domains = json_encode($domains);
+                        // A raw compose file routes by its own labels and
+                        // variables, not by these domain fields: the host
+                        // names are replaced there too.
+                        $pairs = $application->settings?->is_raw_compose_deployment_enabled
+                            ? cm_host_pairs((string) ($item['original'] ?? ''), (string) ($fqdn ?? ''))
+                            : [];
+                        if ($pairs !== []) {
+                            $application->docker_compose_raw = cm_rehost((string) $application->docker_compose_raw, $pairs);
+                            foreach ($application->environment_variables()->get() as $ev) {
+                                $v = (string) $ev->value;
+                                $nv = cm_rehost($v, $pairs);
+                                if ($nv !== $v) {
+                                    $ev->value = $nv;
+                                    $ev->save();
+                                }
+                            }
+                            $rehosted[] = ['uuid' => $application->uuid, 'pairs' => (object) $pairs, 'env_files' => cm_raw_env_files($application)];
+                        }
                     } else {
                         $application->fqdn = $fqdn;
                     }
@@ -432,6 +535,7 @@ try {
                     }
                 }
             });
+            $result['rehost'] = $rehosted;
             break;
 
         default:

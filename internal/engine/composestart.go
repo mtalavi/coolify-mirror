@@ -48,7 +48,13 @@ func directComposeStart(ctx context.Context, in *coolify.Instance, uuid, commit 
 		return "", "Coolify could not generate the compose files: " + firstLine(err.Error())
 	}
 	if f.Raw {
-		return "", "raw compose deployment"
+		// A raw compose file is used as it is: its image names may still
+		// hold variables (e.g. ${SOURCE_COMMIT}), resolved from the .env
+		// like Docker Compose does when Coolify starts it.
+		vars := parseDotEnv(f.Env)
+		for s, img := range f.Images {
+			f.Images[s] = interpolate(img, vars)
+		}
 	}
 	if !strings.HasPrefix(f.Workdir, "/data/coolify/") || strings.Contains(f.Workdir, "..") {
 		return "", "unexpected configuration directory " + f.Workdir
