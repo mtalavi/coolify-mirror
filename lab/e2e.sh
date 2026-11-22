@@ -322,7 +322,7 @@ got=$(on "$DST" "docker exec \$(docker ps -q --filter name=^web-$COMPOSE) printe
 [ "$got" = e2e-secret-token-42 ] && echo "ok  compose app secret" || { echo "BAD compose secret: $got"; fail=1; }
 got=$(on "$DST" "curl -fsS --resolve web.e2e.test:80:127.0.0.1 http://web.e2e.test/" || true)
 echo "$got" | grep -q "marker=$CMARK" && echo "ok  compose app volume data through the proxy" || { echo "BAD compose app: '$got'"; fail=1; }
-got=$(on "$DST" "docker exec coolify-db psql -U coolify -d coolify -Atc \"select q.logs from application_deployment_queues q join applications a on a.id = q.application_id where a.uuid = '$RAW' order by q.id desc limit 1\"" || true)
+got=$(on "$DST" "docker exec coolify-db psql -U coolify -d coolify -Atc \"select q.logs from application_deployment_queues q join applications a on a.id::text = q.application_id::text where a.uuid = '$RAW' order by q.id desc limit 1\"" || true)
 echo "$got" | grep -q 'Started by coolify-mirror from the restored images' && echo "ok  raw compose app started from the restored images (its build would fail here)" ||
   { echo "BAD raw compose app was not started from the restored images: $(echo "$got" | tail -c 400)"; fail=1; }
 got=$(on "$DST" "curl -fsS --resolve $RAW_HOST:80:127.0.0.1 http://$RAW_HOST/" || true)
