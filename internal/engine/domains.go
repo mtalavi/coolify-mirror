@@ -9,6 +9,7 @@ import (
 
 	"github.com/mtalavi/coolify-mirror/internal/coolify"
 	"github.com/mtalavi/coolify-mirror/internal/dbx"
+	"github.com/mtalavi/coolify-mirror/internal/run"
 )
 
 // DomainField is one editable domain setting of a restored resource: an
@@ -202,18 +203,34 @@ func ApplyDomains(ctx context.Context, in *coolify.Instance, res []dbx.PlannedRe
 		if f.Value == f.Original {
 			continue
 		}
-		items = append(items, map[string]any{"kind": f.Kind, "uuid": f.Resource, "service": f.Service, "id": f.ID, "fqdn": f.Value})
+		items = append(items, map[string]any{"kind": f.Kind, "uuid": f.Resource, "service": f.Service, "id": f.ID, "fqdn": f.Value, "original": f.Original})
 	}
 	if len(items) > 0 {
 		var out struct {
-			OK    bool   `json:"ok"`
-			Error string `json:"error"`
+			OK     bool   `json:"ok"`
+			Error  string `json:"error"`
+			Rehost []struct {
+				UUID     string            `json:"uuid"`
+				Pairs    map[string]string `json:"pairs"`
+				EnvFiles []string          `json:"env_files"`
+			} `json:"rehost"`
 		}
 		if err := in.PHP(ctx, "set_domains", items, &out); err != nil {
 			return err
 		}
 		if !out.OK {
 			return fmt.Errorf("could not save the domains: %s", out.Error)
+		}
+		// A raw compose file loads env files from the application's folder;
+		// the old host names in them are replaced like in Coolify's data.
+		for _, r := range out.Rehost {
+			changed, err := rehostFiles(r.UUID, r.EnvFiles, r.Pairs)
+			if err != nil {
+				return fmt.Errorf("could not change the domains in the env files: %w", err)
+			}
+			for _, f := range changed {
+				run.Logf("domains changed in %s", f)
+			}
 		}
 	}
 	return refreshHolds(ctx, in, res)

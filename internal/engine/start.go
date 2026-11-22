@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/url"
 	"regexp"
@@ -454,6 +455,9 @@ func check(ctx context.Context, env *startEnv, it *startItem) {
 		case "failed", "cancelled-by-user":
 			it.done, it.ok = true, false
 			it.msg = "deployment " + st + " - open the deployment log in Coolify"
+			if why := deploymentError(ctx, env.in, it.deployUUID); why != "" {
+				it.msg = "deployment " + st + ": " + why
+			}
 			if it.note != "" {
 				it.msg += " (" + it.note + ")"
 			}
@@ -699,4 +703,52 @@ func DashboardLink(base string, r dbx.PlannedResource) string {
 		kind = "database"
 	}
 	return fmt.Sprintf("%s/project/%s/environment/%s/%s/%s", base, r.ProjectUUID, r.EnvironmentUUID, kind, r.UUID)
+}
+
+// deploymentError is the cause of a failed deployment, as Coolify logged it:
+// the last meaningful error line (e.g. the last line of a build script's
+// traceback), so the summary says why without opening Coolify.
+func deploymentError(ctx context.Context, in *coolify.Instance, uuid string) string {
+	logs, err := in.Scalar(ctx, "SELECT COALESCE(logs, '') FROM application_deployment_queues WHERE deployment_uuid = "+coolify.SQLString(uuid))
+	if err != nil || logs == "" {
+		return ""
+	}
+	return lastDeployError(logs)
+}
+
+func lastDeployError(logs string) string {
+	var entries []struct {
+		Type   string `json:"type"`
+		Output string `json:"output"`
+	}
+	if json.Unmarshal([]byte(logs), &entries) != nil {
+		return ""
+	}
+	skip := []string{"Error type:", "Error code:", "Location:", "Gracefully shutting down", "Deployment failed:", "Command execution failed"}
+	last := ""
+	for _, e := range entries {
+		if e.Type != "stderr" {
+			continue
+		}
+		for _, line := range strings.Split(e.Output, "\n") {
+			line = strings.TrimSpace(line)
+			if line == "" || strings.Trim(line, "=-") == "" || strings.HasPrefix(line, "~") || strings.HasPrefix(line, "^") {
+				continue
+			}
+			ignored := false
+			for _, p := range skip {
+				if strings.HasPrefix(line, p) {
+					ignored = true
+					break
+				}
+			}
+			if !ignored {
+				last = line
+			}
+		}
+	}
+	if len(last) > 240 {
+		last = last[:240] + "…"
+	}
+	return last
 }

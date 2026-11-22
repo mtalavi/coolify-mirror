@@ -2,6 +2,8 @@
 # Runs inside the e2e source server: creates the resources that are migrated.
 #   - a Docker Compose app built from git (this repository, lab/compose-app),
 #     with a database, a one-shot migration, secrets and a domain;
+#   - a raw compose app (lab/raw-app): images named after the commit, an env
+#     file kept on the server, its own Traefik labels with the domain;
 #   - a standalone Postgres with rows;
 #   - a standalone MariaDB with an account added after its first start;
 #   - a Docker image app (nginx) with a volume and a domain.
@@ -35,6 +37,15 @@ docker exec -e U="$compose" -e DOMAIN=http://web.e2e.test:8080 coolify php /tmp/
 # Loading the compose file already created these variables (empty): set them.
 api PATCH "/applications/$compose/envs/bulk" '{"data":[{"key":"DB_PASSWORD","value":"E2e-db-Pa55"},{"key":"SECRET_TOKEN","value":"e2e-secret-token-42"}]}' >/dev/null
 
+raw=$(api POST /applications/public "{$common,\"name\":\"e2e-raw\",\"git_repository\":\"$REPO\",\"git_branch\":\"$BRANCH\",
+  \"build_pack\":\"dockercompose\",\"base_directory\":\"/lab/raw-app\",\"docker_compose_location\":\"/docker-compose.yaml\",
+  \"ports_exposes\":\"8080\",\"instant_deploy\":false}" | jq -r .uuid)
+docker exec -e U="$raw" -e RAW=1 -e DOMAIN=http://raw-old.e2e.test coolify php /tmp/e2e_compose.php >/dev/null
+# Settings kept on the server next to the compose file, outside git.
+mkdir -p "/data/coolify/applications/$raw/runtime"
+printf 'APP_URL=http://raw-old.e2e.test\nCOOKIE_DOMAIN=.raw-old.e2e.test\n' >"/data/coolify/applications/$raw/runtime/app.env"
+chmod 600 "/data/coolify/applications/$raw/runtime/app.env"
+
 pg=$(api POST /databases/postgresql "{$common,\"name\":\"e2e-db\",\"postgres_user\":\"e2e\",\"postgres_password\":\"E2e-pg-Pa55\",\"postgres_db\":\"e2e\",\"instant_deploy\":true}" | jq -r .uuid)
 my=$(api POST /databases/mariadb "{$common,\"name\":\"e2e-mariadb\",\"mariadb_root_password\":\"E2e-root-Pa55\",\"mariadb_user\":\"e2e\",\"mariadb_password\":\"E2e-my-Pa55\",\"mariadb_database\":\"e2e\",\"instant_deploy\":true}" | jq -r .uuid)
 
@@ -44,7 +55,9 @@ api POST "/applications/$web/storages" '{"type":"persistent","name":"e2e-html","
 
 api POST "/applications/$compose/start" >/dev/null
 api POST "/applications/$web/start" >/dev/null
+api POST "/applications/$raw/start" >/dev/null
 echo "COMPOSE=$compose"
+echo "RAW=$raw"
 echo "PG=$pg"
 echo "MY=$my"
 echo "WEB=$web"

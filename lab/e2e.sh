@@ -122,8 +122,8 @@ done
 [ -n "$TOKEN" ] || { echo "$out" | tail -20; setup_fail "no API token"; }
 docker cp "$HERE/e2e_seed.sh" "$SRC:/root/e2e_seed.sh"
 seed=$(on "$SRC" "bash /root/e2e_seed.sh '$TOKEN' '$REPO' '$BRANCH'") || setup_fail "the source could not be seeded"
-eval "$(echo "$seed" | grep -E '^(COMPOSE|PG|MY|WEB)=')"
-echo "compose=$COMPOSE pg=$PG mariadb=$MY web=$WEB"
+eval "$(echo "$seed" | grep -E '^(COMPOSE|RAW|PG|MY|WEB)=')"
+echo "compose=$COMPOSE raw=$RAW pg=$PG mariadb=$MY web=$WEB"
 
 log "wait until everything runs on the source"
 # The compose test app refuses to start without data in its volume.
@@ -134,10 +134,23 @@ for i in $(seq 1 180); do
 done
 for i in $(seq 1 180); do
   up=$(on "$SRC" "docker ps --format '{{.Names}} {{.Status}}'" || true)
-  if echo "$up" | grep -q "^web-$COMPOSE.*healthy" && echo "$up" | grep -q "^$PG .*healthy" && echo "$up" | grep -q "^$WEB"; then break; fi
+  if echo "$up" | grep -q "^web-$COMPOSE.*healthy" && echo "$up" | grep -q "^$PG .*healthy" && echo "$up" | grep -q "^$WEB" &&
+    echo "$up" | grep -qE "^($RAW-web-1|web-$RAW)[^ ]* .*healthy"; then break; fi
   [ "$i" = 180 ] && { echo "$up"; docker exec -i "$SRC" bash -s <"$HERE/e2e_diag.sh" 2>&1 | sed 's/^/diag| /' || true; setup_fail "source resources did not start"; }
   sleep 5
 done
+got=$(on "$SRC" "curl -fsS --resolve raw-old.e2e.test:80:127.0.0.1 http://raw-old.e2e.test/" || true)
+echo "$got" | grep -q 'app_url=http://raw-old.e2e.test' || setup_fail "the raw compose app does not answer on the source: '$got'"
+# From now on a build of the raw app fails, the way a build that needs the
+# source server (or a registry it cannot reach) fails on the target: the
+# restore must start it from the restored images, never through a build.
+cat >/tmp/cm-e2e-rawbuild.json <<'EOF'
+{"docker_compose_custom_build_command":"sh -c 'echo RuntimeError: lab build only works on the source >&2; exit 1'"}
+EOF
+docker cp /tmp/cm-e2e-rawbuild.json "$SRC:/root/rawbuild.json"
+rm -f /tmp/cm-e2e-rawbuild.json
+on "$SRC" "curl -fsS -X PATCH http://localhost:8000/api/v1/applications/$RAW -H 'Authorization: Bearer $TOKEN' -H 'Content-Type: application/json' -H 'Accept: application/json' -d @/root/rawbuild.json" >/dev/null ||
+  setup_fail "the build command of the raw compose app could not be changed"
 MARK="e2e-$(date +%s)-$RANDOM"
 on "$SRC" "docker exec \$(docker ps -q --filter name=^$WEB) sh -c 'echo $MARK > /usr/share/nginx/html/marker.txt'"
 on "$SRC" "docker exec $PG psql -U e2e -d e2e -v ON_ERROR_STOP=1 -c 'create table t(x int); insert into t select generate_series(1,1234)'" >/dev/null
@@ -269,6 +282,13 @@ else
 fi
 log "restore on the target"
 cgroup_ok "$DST"
+# Selective: the raw compose app moves to a new domain. Its domain is in its
+# own Traefik labels and in an env file on the server, not only in Coolify.
+RAW_HOST=raw-old.e2e.test
+if [ "$MODE" = selective ]; then
+  RAW_HOST=raw-new.e2e.test
+  RESTORE_EXTRA="${RESTORE_EXTRA:-} --set-domain raw-old.e2e.test=$RAW_HOST"
+fi
 set +e
 on "$DST" "COOLIFY_MIRROR_COMPAT_URL=off coolify-mirror restore $CODE --yes ${RESTORE_EXTRA:-}" | tee /tmp/cm-e2e-restore.log
 rc=${PIPESTATUS[0]}
@@ -302,6 +322,17 @@ got=$(on "$DST" "docker exec \$(docker ps -q --filter name=^web-$COMPOSE) printe
 [ "$got" = e2e-secret-token-42 ] && echo "ok  compose app secret" || { echo "BAD compose secret: $got"; fail=1; }
 got=$(on "$DST" "curl -fsS --resolve web.e2e.test:80:127.0.0.1 http://web.e2e.test/" || true)
 echo "$got" | grep -q "marker=$CMARK" && echo "ok  compose app volume data through the proxy" || { echo "BAD compose app: '$got'"; fail=1; }
+got=$(on "$DST" "docker exec coolify-db psql -U coolify -d coolify -Atc \"select q.logs from application_deployment_queues q join applications a on a.id::text = q.application_id::text where a.uuid = '$RAW' order by q.id desc limit 1\"" || true)
+echo "$got" | grep -q 'Started by coolify-mirror from the restored images' && echo "ok  raw compose app started from the restored images (its build would fail here)" ||
+  { echo "BAD raw compose app was not started from the restored images: $(echo "$got" | tail -c 400)"; fail=1; }
+got=$(on "$DST" "curl -fsS --resolve $RAW_HOST:80:127.0.0.1 http://$RAW_HOST/" || true)
+if echo "$got" | grep -qx "app_url=http://$RAW_HOST" && echo "$got" | grep -qx "cookie_domain=.$RAW_HOST"; then
+  echo "ok  raw compose app answers on $RAW_HOST with its env file from the server"
+else echo "BAD raw compose app on $RAW_HOST: '$got'"; fail=1; fi
+if [ "$MODE" = selective ]; then
+  left=$(on "$DST" "grep -rl raw-old /data/coolify/applications/$RAW/ 2>/dev/null; docker exec coolify-db psql -U coolify -d coolify -Atc \"select 'docker_compose_raw' from applications where uuid = '$RAW' and docker_compose_raw like '%raw-old%'\"" || true)
+  [ -z "$left" ] && echo "ok  raw compose labels and env file moved to the new domain" || { echo "BAD old domain left in: $left"; fail=1; }
+fi
 if [ "$MODE" != selective ]; then
   got=$(on "$DST" "curl -fsS -m 10 http://127.0.0.1:8000/api/health" || true)
   [ "$got" = OK ] && echo "ok  panel on port 8000" || { echo "BAD panel on port 8000: '$got'"; fail=1; }

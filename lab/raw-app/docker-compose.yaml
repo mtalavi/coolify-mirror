@@ -1,0 +1,27 @@
+# Lab: a raw compose deployment (Coolify uses this file as it is). Like real
+# setups it names its images after the commit, reads its settings from an env
+# file kept on the server (not in git) and routes its own domain with labels.
+services:
+  web:
+    build: .
+    image: 'e2e-raw-web:${SOURCE_COMMIT:-unknown}'
+    env_file:
+      - path: ./runtime/app.env
+        required: false
+    networks:
+      - coolify
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/health >/dev/null"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=coolify
+      - 'traefik.http.routers.e2e-raw.rule=Host(`raw-old.e2e.test`)'
+      - traefik.http.routers.e2e-raw.entrypoints=http
+      - traefik.http.services.e2e-raw.loadbalancer.server.port=8080
+networks:
+  coolify:
+    external: true
