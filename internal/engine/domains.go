@@ -196,8 +196,11 @@ func NormalizeDomains(s string) (string, error) {
 // ApplyDomains saves the changed fields through Coolify itself (so services
 // regenerate their compose file and SERVICE_URL_/SERVICE_FQDN_ variables),
 // then refreshes each resource's Domains and Hold: a resource whose domain is
-// still used by another resource on this server stays stopped.
-func ApplyDomains(ctx context.Context, in *coolify.Instance, res []dbx.PlannedResource, fields []DomainField) error {
+// still used by another resource on this server stays stopped. It returns the
+// new names that stand for every subdomain ("*.ir.example.com", from a raw
+// compose file's HostRegexp rule or *.wildcard): see DNSNotice.
+func ApplyDomains(ctx context.Context, in *coolify.Instance, res []dbx.PlannedResource, fields []DomainField) ([]string, error) {
+	wild := map[string]bool{}
 	var items []map[string]any
 	for _, f := range fields {
 		if f.Value == f.Original {
@@ -207,33 +210,43 @@ func ApplyDomains(ctx context.Context, in *coolify.Instance, res []dbx.PlannedRe
 	}
 	if len(items) > 0 {
 		var out struct {
-			OK     bool   `json:"ok"`
-			Error  string `json:"error"`
-			Rehost []struct {
+			OK        bool     `json:"ok"`
+			Error     string   `json:"error"`
+			Wildcards []string `json:"wildcards"`
+			Rehost    []struct {
 				UUID     string            `json:"uuid"`
 				Pairs    map[string]string `json:"pairs"`
 				EnvFiles []string          `json:"env_files"`
 			} `json:"rehost"`
 		}
 		if err := in.PHP(ctx, "set_domains", items, &out); err != nil {
-			return err
+			return nil, err
 		}
 		if !out.OK {
-			return fmt.Errorf("could not save the domains: %s", out.Error)
+			return nil, fmt.Errorf("could not save the domains: %s", out.Error)
+		}
+		for _, w := range out.Wildcards {
+			wild[w] = true
 		}
 		// A raw compose file loads env files from the application's folder;
 		// the old host names in them are replaced like in Coolify's data.
 		for _, r := range out.Rehost {
-			changed, err := rehostFiles(r.UUID, r.EnvFiles, r.Pairs)
+			changed, w, err := rehostFiles(r.UUID, r.EnvFiles, r.Pairs)
 			if err != nil {
-				return fmt.Errorf("could not change the domains in the env files: %w", err)
+				return nil, fmt.Errorf("could not change the domains in the env files: %w", err)
+			}
+			for _, h := range w {
+				wild[h] = true
 			}
 			for _, f := range changed {
 				run.Logf("domains changed in %s", f)
 			}
 		}
 	}
-	return refreshHolds(ctx, in, res)
+	for h := range wild {
+		run.Logf("every subdomain moved to %s: needs a DNS record and a certificate for it", h)
+	}
+	return sortedKeys(wild), refreshHolds(ctx, in, res)
 }
 
 func refreshHolds(ctx context.Context, in *coolify.Instance, res []dbx.PlannedResource) error {

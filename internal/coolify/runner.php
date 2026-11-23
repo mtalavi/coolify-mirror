@@ -64,19 +64,63 @@ function cm_host_pairs(string $old, string $new): array
 }
 
 // Replaces host names in a text: a whole host (not part of a longer name, not
-// an e-mail address) and a domain written with a leading dot (cookie domain,
-// *.wildcard). The same rules as engine.Rehost.
-function cm_rehost(string $text, array $pairs): string
+// an e-mail address), a domain written with a leading dot (cookie domain,
+// *.wildcard) and a host name written as a regular expression (Traefik
+// HostRegexp: vemela[.]app, vemela\.app, vemela\.app). The same rules as
+// engine.Rehost. $wild collects the new names that now stand for every
+// subdomain ("*.ir.example.com"), as engine.RehostWildcards.
+function cm_rehost(string $text, array $pairs, array &$wild = []): string
 {
     if ($pairs === []) {
         return $text;
     }
+    $pairs = array_change_key_case($pairs, CASE_LOWER);
     $olds = array_keys($pairs);
     usort($olds, fn ($a, $b) => strlen($b) <=> strlen($a));
     $alt = implode('|', array_map(fn ($h) => preg_quote($h, '/'), $olds));
     $text = preg_replace_callback('/(?<![A-Za-z0-9_.@-])('.$alt.')(?![A-Za-z0-9_-])/i', fn ($m) => $pairs[strtolower($m[1])], $text);
+    $text = preg_replace_callback('/(?<=[=*\s,"\'])\.('.$alt.')(?![A-Za-z0-9_-])/i', function ($m) use ($pairs, &$wild, $text) {
+        $new = $pairs[strtolower($m[1][0])];
+        if ($m[0][1] > 0 && $text[$m[0][1] - 1] === '*') {
+            $wild['*.'.strtolower($new)] = true;
+        }
 
-    return preg_replace_callback('/(?<=[=*\s,"\'])\.('.$alt.')(?![A-Za-z0-9_-])/i', fn ($m) => '.'.$pairs[strtolower($m[1])], $text);
+        return '.'.$new;
+    }, $text, -1, $count, PREG_OFFSET_CAPTURE);
+    foreach (['[.]', '\\.', '\.'] as $dot) {
+        if (! str_contains($text, $dot)) {
+            continue;
+        }
+        $forms = [];
+        foreach ($olds as $o) {
+            if (str_contains($o, '.')) {
+                $forms[str_replace('.', $dot, $o)] = $pairs[$o];
+            }
+        }
+        if ($forms === []) {
+            continue;
+        }
+        $alt = implode('|', array_map(fn ($h) => preg_quote($h, '/'), array_keys($forms)));
+        $subject = $text;
+        $text = preg_replace_callback('/(?<![A-Za-z0-9_-])('.$alt.')(?![A-Za-z0-9_-])/i', function ($m) use ($forms, $dot, $subject, &$wild) {
+            [$found, $at] = $m[1];
+            $before = substr($subject, 0, $at);
+            $afterDot = str_ends_with($before, $dot);
+            // The subdomain of another name (shop[.]example[.]com), or a name
+            // already moved (ir[.]example[.]com): kept.
+            if ($afterDot && strlen($before) > strlen($dot) && preg_match('/[A-Za-z0-9_-]$/', substr($before, 0, -strlen($dot)))) {
+                return $found;
+            }
+            $new = $forms[strtolower($found)];
+            if ($afterDot || str_ends_with($before, ')?') || str_ends_with($before, ')*')) {
+                $wild['*.'.strtolower($new)] = true;
+            }
+
+            return str_replace('.', $dot, $new);
+        }, $text, -1, $count, PREG_OFFSET_CAPTURE);
+    }
+
+    return $text;
 }
 
 // The env files a raw compose file loads from the application's folder.
@@ -477,7 +521,8 @@ try {
         case 'set_domains':
             // Same effect as editing the domain field in Coolify's UI.
             $rehosted = [];
-            Illuminate\Support\Facades\DB::transaction(function () use ($input, &$rehosted) {
+            $wild = [];
+            Illuminate\Support\Facades\DB::transaction(function () use ($input, &$rehosted, &$wild) {
                 foreach ($input as $item) {
                     $fqdn = ($item['fqdn'] ?? '') === '' ? null : $item['fqdn'];
                     if ($fqdn !== null && class_exists(App\Support\ValidationPatterns::class) && method_exists(App\Support\ValidationPatterns::class, 'normalizeApplicationDomains')) {
@@ -510,10 +555,10 @@ try {
                             ? cm_host_pairs((string) ($item['original'] ?? ''), (string) ($fqdn ?? ''))
                             : [];
                         if ($pairs !== []) {
-                            $application->docker_compose_raw = cm_rehost((string) $application->docker_compose_raw, $pairs);
+                            $application->docker_compose_raw = cm_rehost((string) $application->docker_compose_raw, $pairs, $wild);
                             foreach ($application->environment_variables()->get() as $ev) {
                                 $v = (string) $ev->value;
-                                $nv = cm_rehost($v, $pairs);
+                                $nv = cm_rehost($v, $pairs, $wild);
                                 if ($nv !== $v) {
                                     $ev->value = $nv;
                                     $ev->save();
@@ -536,6 +581,7 @@ try {
                 }
             });
             $result['rehost'] = $rehosted;
+            $result['wildcards'] = array_keys($wild);
             break;
 
         default:

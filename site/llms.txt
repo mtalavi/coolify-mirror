@@ -2,7 +2,7 @@
 
 > Coolify Mirror (coolify-mirror) is a free, open-source (MIT) command-line tool that migrates Coolify apps between servers. It backs up one app, one or more projects, or a whole Coolify server, and restores it on another Coolify with one pasted command. Apps, databases, volumes, environment variables, secrets, domains, images and proxy settings arrive running and verified. Works with Coolify v4.3, v4.4, v4.5, v4.6 and v4.7 (both servers on the same version), on Linux amd64 and arm64. Not affiliated with Coolify or coolLabs.
 
-Current version: 1.10.5. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0, 4.7.3, 4.7.5 and 4.7.6; every new Coolify release is tested automatically every day.
+Current version: 1.10.6. Tested with Coolify 4.3.23, 4.3.24, 4.4.2, 4.4.6, 4.4.7, 4.5.0, 4.5.1, 4.5.3, 4.6.0, 4.7.0, 4.7.3, 4.7.5 and 4.7.6; every new Coolify release is tested automatically every day.
 
 ## How to migrate Coolify to a new server
 
@@ -63,6 +63,10 @@ Selective and off-site full restore tests compare database contents, volumes and
 ## Coolify 4.7.6 validation
 
 Coolify 4.7.6 (2026-11-19) only updates the panel image: PHP, nginx and a PHP-FPM listener bound to loopback, with no database or application change. Mirror 1.10.4 passed the real selective and full off-site restore lab on fresh 4.7.6 installs unchanged; no new release was needed.
+
+## Mirror 1.10.6
+
+Mirror 1.10.6 (2026-11-23): --set-domain and the domain step also move routes for every subdomain: Traefik HostRegexp patterns (dots written as [.], \. or \\.) and *.wildcards in raw compose files, application variables and env files on the server. When such a route moves, the restore prints a red warning naming the new *.domain, which needs a DNS record pointing to the new server and a certificate covering it (Cloudflare's free certificate covers one level below the zone). Checked in the real lab with a subdomain routed by HostRegexp.
 
 ## Mirror 1.10.5
 

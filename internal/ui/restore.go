@@ -389,6 +389,8 @@ func startAndReport(ctx context.Context, in *coolify.Instance, f *engine.Fetched
 	b.WriteString("\n" + sBold.Render("Open Coolify: ") + dash)
 	b.WriteString("\n" + sMuted.Render("Point your domains' DNS to this server when you are ready to switch."))
 	fmt.Println(boxed(sBox, head+"\n"+b.String()))
+	// Again under the result, where it is read last.
+	showDNSNotice(ctx, in, rep)
 	if verdict != "" {
 		return errShown
 	}
@@ -576,10 +578,22 @@ func askDomains(ctx context.Context, in *coolify.Instance, rep *engine.RestoreRe
 		}
 		fmt.Println(sMuted.Render("  "+fields[i].Label+": ") + was + " → " + sOK.Render(now))
 	}
-	_, err = withSpinner(ctx, "Saving the domains", func(ctx context.Context) (struct{}, error) {
-		return struct{}{}, engine.ApplyDomains(ctx, in, rep.Resources, fields)
+	rep.Wildcards, err = withSpinner(ctx, "Saving the domains", func(ctx context.Context) ([]string, error) {
+		return engine.ApplyDomains(ctx, in, rep.Resources, fields)
 	})
+	showDNSNotice(ctx, in, rep)
 	return err
+}
+
+// showDNSNotice: a red box when the domain step moved a route for every
+// subdomain; the DNS record and the certificate are the user's to add.
+func showDNSNotice(ctx context.Context, in *coolify.Instance, rep *engine.RestoreReport) {
+	if len(rep.Wildcards) == 0 {
+		return
+	}
+	ip, _ := in.PublicIPs(ctx)
+	lines := engine.DNSNotice(rep.Wildcards, ip)
+	fmt.Println(boxed(sErrBox, sErr.Render("! "+engine.DNSNoticeTitle)+"\n"+sErr.Render(wrap(strings.Join(lines, "\n"), termWidth()-8))))
 }
 
 func hostList(v string) []string {

@@ -1,6 +1,9 @@
 package engine
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestRehost(t *testing.T) {
 	pairs := map[string]string{
@@ -68,5 +71,40 @@ func TestLastDeployError(t *testing.T) {
 	}
 	if got := lastDeployError("not json"); got != "" {
 		t.Fatalf("lastDeployError(not json) = %q", got)
+	}
+}
+
+func TestRehostRegex(t *testing.T) {
+	pairs := map[string]string{
+		"vemela.app":     "ir.vemela.app",
+		"api.vemela.app": "irapi.vemela.app",
+	}
+	cases := []struct {
+		in, want string
+		wild     []string
+	}{
+		{"rule=HostRegexp(`^[a-z0-9-]+[.]vemela[.]app$`)", "rule=HostRegexp(`^[a-z0-9-]+[.]ir[.]vemela[.]app$`)", []string{"*.ir.vemela.app"}},
+		{`rule=HostRegexp(` + "`" + `^[a-z0-9-]+\.vemela\.app$` + "`" + `)`, `rule=HostRegexp(` + "`" + `^[a-z0-9-]+\.ir\.vemela\.app$` + "`" + `)`, []string{"*.ir.vemela.app"}},
+		{`- "traefik.http.routers.t.rule=HostRegexp(` + "`" + `^[a-z0-9-]+\.vemela\.app$` + "`" + `)"`, `- "traefik.http.routers.t.rule=HostRegexp(` + "`" + `^[a-z0-9-]+\.ir\.vemela\.app$` + "`" + `)"`, []string{"*.ir.vemela.app"}},
+		{"HostRegexp(`^(?:[a-z]+[.])?vemela[.]app$`)", "HostRegexp(`^(?:[a-z]+[.])?ir[.]vemela[.]app$`)", []string{"*.ir.vemela.app"}},
+		// An exact name written as a pattern: no subdomains.
+		{"HostRegexp(`^vemela[.]app$`) HostRegexp(`^api[.]vemela[.]app$`)", "HostRegexp(`^ir[.]vemela[.]app$`) HostRegexp(`^irapi[.]vemela[.]app$`)", nil},
+		// The subdomain of another name, and names already moved, stay.
+		{"^shop[.]vemela[.]app$ ^irapi[.]vemela[.]app$ ^x[.]ir[.]vemela[.]app$", "^shop[.]vemela[.]app$ ^irapi[.]vemela[.]app$ ^x[.]ir[.]vemela[.]app$", nil},
+		{"^notvemela[.]app$ ^vemela[.]application$", "^notvemela[.]app$ ^vemela[.]application$", nil},
+		{"CORS=https://*.vemela.app", "CORS=https://*.ir.vemela.app", []string{"*.ir.vemela.app"}},
+		{"COOKIE_DOMAIN=.vemela.app", "COOKIE_DOMAIN=.ir.vemela.app", nil},
+	}
+	for _, c := range cases {
+		got, wild := RehostWildcards(c.in, pairs)
+		if got != c.want {
+			t.Errorf("Rehost(%q) = %q, want %q", c.in, got, c.want)
+		}
+		if strings.Join(wild, ",") != strings.Join(c.wild, ",") {
+			t.Errorf("wildcards of %q = %v, want %v", c.in, wild, c.wild)
+		}
+		if again, w2 := RehostWildcards(got, pairs); again != got || len(w2) != 0 {
+			t.Errorf("Rehost is not idempotent on %q: %q %v", got, again, w2)
+		}
 	}
 }

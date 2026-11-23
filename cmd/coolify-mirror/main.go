@@ -1025,6 +1025,11 @@ func cmdRestore(ctx context.Context, args []string) error {
 		// The resources are restored; a clashing one simply stays stopped.
 		fmt.Println("  ! domains were not changed:", err, "- change them in Coolify")
 	}
+	if len(report.Wildcards) > 0 {
+		printDNSNotice(ctx, in, report.Wildcards)
+		// Again at the very end, where it is read last.
+		defer printDNSNotice(ctx, in, report.Wildcards)
+	}
 	for _, p := range report.Problems {
 		fmt.Println("  ✗", p)
 	}
@@ -1265,7 +1270,22 @@ func cliDomains(ctx context.Context, in *coolify.Instance, rep *engine.RestoreRe
 			f.Value = v
 		}
 	}
-	return engine.ApplyDomains(ctx, in, rep.Resources, fields)
+	rep.Wildcards, err = engine.ApplyDomains(ctx, in, rep.Resources, fields)
+	return err
+}
+
+// printDNSNotice prints the DNS warning in red (when the output is a terminal).
+func printDNSNotice(ctx context.Context, in *coolify.Instance, wild []string) {
+	ip, _ := in.PublicIPs(ctx)
+	red, reset := "", ""
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		red, reset = "\033[1;31m", "\033[0m"
+	}
+	fmt.Println()
+	fmt.Println(red + "!!! " + engine.DNSNoticeTitle + reset)
+	for _, l := range engine.DNSNotice(wild, ip) {
+		fmt.Println(red + "    " + l + reset)
+	}
 }
 
 // cmdRepairPanel gives this server's Coolify its own panel address and IPs

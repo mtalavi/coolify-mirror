@@ -185,8 +185,11 @@ type RestoreReport struct {
 	// Problems: the restore is complete but something a resource needs to
 	// run or deploy again is missing here (never reported as a success).
 	Problems []string
-	AsideDir string
-	Duration time.Duration
+	// Wildcards: names that now stand for every subdomain after the domain
+	// step ("*.ir.example.com"); they need DNS and a certificate (DNSNotice).
+	Wildcards []string
+	AsideDir  string
+	Duration  time.Duration
 }
 
 // Apply writes files, volumes and images, then imports the configuration.
