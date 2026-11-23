@@ -141,6 +141,8 @@ for i in $(seq 1 180); do
 done
 got=$(on "$SRC" "curl -fsS --resolve raw-old.e2e.test:80:127.0.0.1 http://raw-old.e2e.test/" || true)
 echo "$got" | grep -q 'app_url=http://raw-old.e2e.test' || setup_fail "the raw compose app does not answer on the source: '$got'"
+got=$(on "$SRC" "curl -fsS --resolve shop.raw-old.e2e.test:80:127.0.0.1 http://shop.raw-old.e2e.test/" || true)
+echo "$got" | grep -q 'app=lab-raw' || setup_fail "the raw compose app does not answer on a subdomain on the source: '$got'"
 # From now on a build of the raw app fails, the way a build that needs the
 # source server (or a registry it cannot reach) fails on the target: the
 # restore must start it from the restored images, never through a build.
@@ -332,6 +334,16 @@ else echo "BAD raw compose app on $RAW_HOST: '$got'"; fail=1; fi
 if [ "$MODE" = selective ]; then
   left=$(on "$DST" "grep -rl raw-old /data/coolify/applications/$RAW/ 2>/dev/null; docker exec coolify-db psql -U coolify -d coolify -Atc \"select 'docker_compose_raw' from applications where uuid = '$RAW' and docker_compose_raw like '%raw-old%'\"" || true)
   [ -z "$left" ] && echo "ok  raw compose labels and env file moved to the new domain" || { echo "BAD old domain left in: $left"; fail=1; }
+  # The HostRegexp rule for every subdomain moved with the domain, and the
+  # restore said in its DNS warning that *.raw-new.e2e.test needs DNS.
+  got=$(on "$DST" "curl -fsS --resolve shop.$RAW_HOST:80:127.0.0.1 http://shop.$RAW_HOST/" || true)
+  echo "$got" | grep -q 'app=lab-raw' && echo "ok  raw compose app answers on a subdomain (shop.$RAW_HOST): its HostRegexp rule moved" ||
+    { echo "BAD raw compose app on shop.$RAW_HOST: '$got'"; fail=1; }
+  if grep -q 'subdomains moved' /tmp/cm-e2e-restore.log && grep -q "A  \*\.$RAW_HOST" /tmp/cm-e2e-restore.log; then
+    echo "ok  the restore warned that *.$RAW_HOST needs a DNS record"
+  else echo "BAD no DNS warning for *.$RAW_HOST in the restore output"; fail=1; fi
+elif grep -q 'subdomains moved' /tmp/cm-e2e-restore.log; then
+  echo "BAD DNS warning although no domain was changed"; fail=1
 fi
 if [ "$MODE" != selective ]; then
   got=$(on "$DST" "curl -fsS -m 10 http://127.0.0.1:8000/api/health" || true)

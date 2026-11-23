@@ -9,12 +9,28 @@ import (
 )
 
 // Rehost replaces host names in a text: a whole host name (not part of a
-// longer name, not the domain of an e-mail address) and a domain written with
-// a leading dot (a cookie domain, a *.wildcard). The same rules as
-// cm_rehost in runner.php, which applies them to Coolify's own data.
+// longer name, not the domain of an e-mail address), a domain written with a
+// leading dot (a cookie domain, a *.wildcard) and a host name written as a
+// regular expression (Traefik HostRegexp: vemela[.]app, vemela\.app or
+// vemela\\.app). The same rules as cm_rehost in runner.php, which applies
+// them to Coolify's own data.
 func Rehost(text string, pairs map[string]string) string {
+	out, _ := RehostWildcards(text, pairs)
+	return out
+}
+
+// regexDots are the spellings of a literal dot in a regular expression, the
+// longest first: [.], \\. (inside a double-quoted YAML string) and \.
+var regexDots = []string{"[.]", `\\.`, `\.`}
+
+// RehostWildcards is Rehost that also returns the new names that now stand
+// for every subdomain ("*.ir.example.com"): a replaced *.wildcard or a
+// replaced host name in a pattern that matches names in front of it, such as
+// ^[a-z0-9-]+[.]example[.]com$. Such names need a DNS record and a
+// certificate of their own for every subdomain.
+func RehostWildcards(text string, pairs map[string]string) (string, []string) {
 	if len(pairs) == 0 {
-		return text
+		return text, nil
 	}
 	lp := make(map[string]string, len(pairs))
 	olds := make([]string, 0, len(pairs))
@@ -24,6 +40,7 @@ func Rehost(text string, pairs map[string]string) string {
 	}
 	pairs = lp
 	sort.Slice(olds, func(i, j int) bool { return len(olds[i]) > len(olds[j]) })
+	wild := map[string]bool{}
 	lower := strings.ToLower(text)
 	var b strings.Builder
 	for i := 0; i < len(text); {
@@ -32,10 +49,69 @@ func Rehost(text string, pairs map[string]string) string {
 			for _, o := range olds {
 				if strings.HasPrefix(lower[i:], o) && (i+len(o) == len(text) || !isLabelByte(text[i+len(o)])) {
 					b.WriteString(pairs[o])
+					if i >= 2 && text[i-1] == '.' && text[i-2] == '*' {
+						wild[strings.ToLower(pairs[o])] = true
+					}
 					i += len(o)
 					matched = true
 					break
 				}
+			}
+		}
+		if !matched {
+			b.WriteByte(text[i])
+			i++
+		}
+	}
+	text = b.String()
+	for _, dot := range regexDots {
+		text = rehostRegex(text, pairs, olds, dot, wild)
+	}
+	out := make([]string, 0, len(wild))
+	for h := range wild {
+		out = append(out, "*."+h)
+	}
+	sort.Strings(out)
+	return text, out
+}
+
+// rehostRegex replaces the host names written with dot as the dot. A name
+// right after a label and a dot (shop[.]example[.]com) is the subdomain of
+// another name and stays; so does a name that is already the new one
+// (ir[.]example[.]com), which keeps the replacement idempotent.
+func rehostRegex(text string, pairs map[string]string, olds []string, dot string, wild map[string]bool) string {
+	if !strings.Contains(text, dot) {
+		return text
+	}
+	type form struct{ old, new, host string }
+	forms := make([]form, 0, len(olds))
+	for _, o := range olds {
+		if !strings.Contains(o, ".") {
+			continue
+		}
+		forms = append(forms, form{strings.ReplaceAll(o, ".", dot), strings.ReplaceAll(pairs[o], ".", dot), strings.ToLower(pairs[o])})
+	}
+	lower := strings.ToLower(text)
+	var b strings.Builder
+	for i := 0; i < len(text); {
+		matched := false
+		if i == 0 || !isLabelByte(text[i-1]) {
+			for _, f := range forms {
+				if !strings.HasPrefix(lower[i:], f.old) || i+len(f.old) < len(text) && isLabelByte(text[i+len(f.old)]) {
+					continue
+				}
+				before := text[:i]
+				afterDot := strings.HasSuffix(before, dot)
+				if afterDot && len(before) > len(dot) && isLabelByte(before[len(before)-len(dot)-1]) {
+					break // the subdomain of another name
+				}
+				b.WriteString(f.new)
+				if afterDot || strings.HasSuffix(before, ")?") || strings.HasSuffix(before, ")*") {
+					wild[f.host] = true
+				}
+				i += len(f.old)
+				matched = true
+				break
 			}
 		}
 		if !matched {
@@ -63,31 +139,32 @@ func isHostByte(c byte) bool { return isLabelByte(c) || c == '.' }
 
 // rehostFiles applies Rehost to env files of an application (paths given by
 // Coolify), keeping their mode and owner. Only files inside the application's
-// own folder are touched.
-func rehostFiles(uuid string, files []string, pairs map[string]string) (changed []string, err error) {
+// own folder are touched. wild: the names that now stand for every subdomain.
+func rehostFiles(uuid string, files []string, pairs map[string]string) (changed, wild []string, err error) {
 	root := "/data/coolify/applications/" + uuid + "/"
 	for _, f := range files {
 		clean := filepath.Clean(f)
 		if !strings.HasPrefix(clean, root) || clean != f {
-			return changed, fmt.Errorf("refusing to change %s: outside %s", f, root)
+			return changed, wild, fmt.Errorf("refusing to change %s: outside %s", f, root)
 		}
 		data, err := os.ReadFile(clean)
 		if os.IsNotExist(err) {
 			continue
 		}
 		if err != nil {
-			return changed, err
+			return changed, wild, err
 		}
-		out := Rehost(string(data), pairs)
+		out, w := RehostWildcards(string(data), pairs)
 		if out == string(data) {
 			continue
 		}
 		if err := writeKeepingMode(clean, []byte(out)); err != nil {
-			return changed, err
+			return changed, wild, err
 		}
 		changed = append(changed, clean)
+		wild = append(wild, w...)
 	}
-	return changed, nil
+	return changed, wild, nil
 }
 
 // interpolate resolves ${VAR}, ${VAR:-default}, ${VAR-default}, ${VAR:?err},
