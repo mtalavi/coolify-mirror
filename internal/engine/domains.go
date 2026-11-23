@@ -210,7 +210,7 @@ func ApplyDomains(ctx context.Context, in *coolify.Instance, res []dbx.PlannedRe
 	}
 	if len(items) > 0 {
 		var out struct {
-			OK     bool   `json:"ok"`
+			OK        bool     `json:"ok"`
 			Error     string   `json:"error"`
 			Wildcards []string `json:"wildcards"`
 			Rehost    []struct {

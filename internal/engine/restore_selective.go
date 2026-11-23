@@ -189,7 +189,7 @@ type RestoreReport struct {
 	// step ("*.ir.example.com"); they need DNS and a certificate (DNSNotice).
 	Wildcards []string
 	AsideDir  string
-	Duration time.Duration
+	Duration  time.Duration
 }
 
 // Apply writes files, volumes and images, then imports the configuration.
